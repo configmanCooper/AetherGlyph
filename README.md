@@ -4,12 +4,17 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Phase 2 (full combat content) is implemented on top of the Phase 1 slice.**
-All 40 catalog spells now have executable effects, the environmental reaction
-matrix is live, loadouts are player-buildable, and duels run as a best-of-three
-series. Planning artifacts remain authoritative for later phases.
+**Phase 3 (authoritative online multiplayer) is implemented on top of the Phase
+1/2 offline slices.** Two devices can play a real best-of-three duel through an
+authoritative Express + Socket.IO server that owns every match simulation.
+Casting online is by drawing — the server reclassifies the gesture and is the
+sole authority over health, resources, spell ids, and results. All 40 spell
+gestures are now drawable. Planning artifacts remain authoritative for later
+phases.
 
 - `MASTERPLAN.md` - authoritative product, game, technical, test, deployment, and release plan
+- `docs/DEPLOYMENT.md` - environment variables, Render blueprint, scaling limits
+- `render.yaml` - one-click Render deploy (single instance)
 - `design/spells.csv` - implementation-ready launch spell roster
 - `design/environment-matrix.md` - shared battlefield reactions and counter rules
 - `design/tutorial.md` - complete solo tutorial campaign
@@ -24,16 +29,17 @@ draw spells, see them cast, deal and take damage, and finish a round against a b
 ### Run it
 
 ```bash
-npm install          # installs express + three, vendors three.js locally, generates spell data
-npm start            # serves the client on http://localhost:8130
+npm install          # express + socket.io + three; vendors three.js & socket.io client; generates spell data
+npm start            # serves the client AND the authoritative server on http://localhost:8130
 # open http://localhost:8130  (use a phone or device emulation, landscape)
 ```
 
-`npm install` runs `postinstall` which copies `three.module.js` into
-`client/vendor/` so the game works with **no CDN access**. If you pull new
-changes without reinstalling, run `npm run vendor:three` and `npm run gen:spells`.
+`npm install` runs `postinstall` which copies `three.module.js` and the Socket.IO
+browser client into `client/vendor/` so the game works with **no CDN access**. If
+you pull new changes without reinstalling, run `npm run vendor:three`,
+`npm run vendor:socketio`, and `npm run gen:spells`.
 
-Health endpoint: `GET /healthz`.
+Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT.md`.
 
 ### Play
 
@@ -44,15 +50,17 @@ Health endpoint: `GET /healthz`.
   Stone Shard (V), Spark Dart (zigzag), Concussive Blast (arc), Ward (bracket),
   Barrier Dome (circle), Reflect (check mark).
 - Modes: **Tutorial** (guided glyph lessons), **Practice** (free draw + recognizer
-  diagnostics), **Bot Duel** (best-of-three vs Apprentice→Archmage).
+  diagnostics), **Bot Duel** (best-of-three vs Apprentice→Archmage), **Online Duel**
+  (best-of-three vs another device: Quick Match, Create Private Duel, or Join Code).
 - **Loadout builder**: pick from all 40 spells or an archetype preset (Ember Rush,
   Tide Control, Storm Tempo, Stone Warden, Gale Trickster, Arcane Combo, Umbra
   Attrition, Prismatic Hybrid); live 14-point / school / heavy validation.
-- In a duel, cast by drawing (starter gestures) or by tapping the on-screen cast
-  bar; the arena shows environmental zones and both wizards' statuses.
-- Dev accessibility fallback: keyboard `1`–`8` quick-cast, `A`/`D` move, `F` focus,
-  space to dodge, and optional on-screen quick-cast buttons (Settings). Normal play
-  uses drawing.
+- In an offline duel, cast by drawing or by tapping the on-screen cast bar; the
+  arena shows environmental zones and both wizards' statuses. **Online duels are
+  draw-only** — the server reclassifies every gesture and is authoritative.
+- Dev accessibility fallback (offline only): keyboard `1`–`8` quick-cast, `A`/`D`
+  move, `F` focus, space to dodge, and optional on-screen quick-cast buttons
+  (Settings). The cast bar, keyboard cast, and dev buttons are hidden online.
 
 ### Test
 
@@ -60,14 +68,23 @@ Health endpoint: `GET /healthz`.
 npm test             # headless Node suite (spell gen, determinism incl. zones,
                      # resources, casting/counters, status/Tenacity, all-40 effects,
                      # environment reactions, loadout validation, best-of-three
-                     # series, secret spells, bot termination w/ archetypes, gesture)
+                     # series, secret spells, bot termination, gesture, all-40
+                     # template separation, shared net protocol/remap)
+npm run test:server  # authoritative server integration over socket.io-client
 npm run test:browser # OPTIONAL headless browser smoke via local Edge/Chrome (WebGL)
+npm run gesture:audit # dev tool: gesture separation report (not part of npm test)
 ```
 
-`npm test` requires no browser. `npm run test:browser` uses `puppeteer-core` with a
-locally installed Edge/Chrome (no Chromium download); it boots the client, applies an
-archetype preset in the loadout builder, starts a best-of-three series, draws real
-glyphs, exercises the on-screen cast bar, and asserts a clean running state.
+`npm test` and `npm run test:server` require no browser. `npm run test:server`
+spins the authoritative service on an ephemeral port and drives the wire protocol
+end-to-end (compatibility rejection, private room create/join, quick match,
+invalid loadout, forged spell id ignored, valid trace classified, oversized/
+malformed/too-fast rejection, duplicate/stale sequences, authoritative damage/
+resource state, reconnect token rotation + resume, disconnect forfeit, match
+termination). `npm run test:browser` uses `puppeteer-core` with a locally
+installed Edge/Chrome; it boots the client, opens the Online menu and creates a
+private room end-to-end, applies an archetype preset, starts a best-of-three bot
+series, draws real glyphs, and asserts a clean running state.
 
 ### Architecture (Phase 1)
 
@@ -136,17 +153,71 @@ Phase 1 basic modes (Tutorial, Practice, starter smoke path) intact.
 
 ### Known Phase 2 limitations
 
-- Only the eight starter gestures have hand-authored recognizer templates, so in
-  a duel those spells are castable by drawing; every equipped spell is always
-  castable from the on-screen cast bar (and keyboard `1`–`8`). Full per-spell
-  gesture templates arrive with the gesture-corpus milestone.
-- No online/networking yet (Milestone 4) and no Capacitor Android packaging yet
-  (Milestone 6).
 - The comprehensive tutorial campaign, codex, secret-unlock progression, and the
   full AI-practice expansion are intentionally deferred to the final solo phase;
-  secrets are freely selectable for Phase 2 development.
+  secrets are freely selectable for development.
 - Arena visuals remain functional, readability-first placeholders.
 - Sim uses floating-point with quantized hashing; fixed-point is a later item.
+
+## Phase 3 — authoritative online multiplayer (Milestone 4)
+
+Phase 3 turns the offline slice into a genuinely playable two-device online
+duel while preserving the deterministic shared simulation and all offline modes.
+
+- **Authoritative server.** `server.js` is now Express + Socket.IO. It still
+  serves the static client/shared/design modules and `/healthz`, and adds a
+  hardened connection gate: a strict configurable **Origin allowlist** (env
+  `ALLOWED_ORIGINS`) with localhost/dev + private-LAN support, a
+  **protocol/balance/roster compatibility gate**, bounded payloads
+  (`maxHttpBufferSize`), security headers, per-event **acknowledgements**, and a
+  graceful **SIGTERM drain** for Render deploys.
+- **Server owns each match.** `server/matchRoom.js` runs the exact same
+  deterministic shared `Sim` at its fixed tick, validates sequenced intents,
+  advances the best-of-three series, and broadcasts personalized snapshots +
+  domain events at a bounded 15 Hz. Clients never set health, resources, spell
+  ids, or results. `server/roomManager.js` owns private rooms (create/join by
+  short code), a **quick-match queue with a widening rating band**, anonymous
+  stable identity, per-socket rate limiting, disconnect routing, and drain.
+- **Draw-to-cast is authoritative.** A cast intent sends a **bounded, quantized
+  gesture trace + timing**, never a trusted spell id. The server re-runs the
+  shared `Recognizer` restricted to the player's equipped loadout and rejects
+  malformed / ambiguous / too-fast / oversized / rate-limited casts, passing only
+  the classified id + quality into the sim. Development quick-cast (cast bar,
+  keyboard, dev buttons) is unavailable online — online casting uses the gesture
+  pad. **All 40 spell gestures have distinct single-stroke templates**, so any
+  legal online loadout is fully drawable; `test/templates.test.js` proves each
+  classifies its own trace under legal loadouts with an acceptable margin.
+- **Sequencing & anti-abuse.** Per-player sequence numbers with duplicate/stale
+  rejection, an input state machine (movement/focus/brace + one-shot
+  sidestep/casts), and per-player cast-attempt rate limits (3/s).
+- **Reconnect / resume.** A single-use **rotating HMAC resume token**, a resume
+  **epoch**, last-acknowledged sequence, a full authoritative snapshot on
+  resume, and a **25-second grace** (shortened on repeat disconnects). A
+  disconnected player stops issuing actions (the match pauses); after grace the
+  round/series is forfeited. Render sticky sessions are not assumed.
+- **Rating persistence adapter.** `server/ratings.js` uses **Postgres** when
+  `DATABASE_URL` is set (idempotent schema init, parameterized queries) and an
+  **explicit in-memory development adapter** otherwise. Quick match is ranked
+  (widening band); private matches do not affect rating. No secrets in source.
+- **Client.** `client/src/net/onlineMatch.js` + `net.js` add the Online menu
+  (Create Private Duel, Join Code, Quick Match), waiting/cancel states, room-code
+  display/copy, connection-quality + reconnect status, and the authoritative
+  result flow. Server snapshots are rendered by the **same** renderer/HUD as the
+  offline sim; slot mapping means each device always sees itself as local player
+  0. Backgrounding stops inputs and reconnects rather than simulating locally.
+
+Run it and deploy: see `docs/DEPLOYMENT.md` and `render.yaml`.
+
+### Scaling & limitations (Phase 3)
+
+- **Single instance only.** One process owns each live match in memory. This
+  build does **not** support horizontal multi-instance operation; that would
+  require external match-ownership leases + fencing tokens and a shared
+  queue/room store (not implemented). Do not raise `numInstances`.
+- Snapshots are full (not delta-compressed) and rendered without client-side
+  interpolation smoothing yet; both are natural follow-ups.
+- No Capacitor Android packaging yet (Milestone 6). The comprehensive solo
+  tutorial/practice expansion remains deferred.
 
 ## Product decision
 

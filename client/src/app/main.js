@@ -8,6 +8,8 @@ import { Audio } from '../audio/audio.js';
 import { GestureInput } from '../input/gestureInput.js';
 import { MovementControl } from '../input/movement.js';
 import { LocalMatch } from '../game/localMatch.js';
+import { OnlineMatch } from '../net/onlineMatch.js';
+import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import { LESSONS, guideFor } from '../tutorial/tutorial.js';
 
 import { Recognizer } from '@shared/gesture/recognizer.js';
@@ -44,6 +46,10 @@ let lastGuideKey = null;
 // Best-of-three series.
 let series = null; // { score:[0,0], round:0, difficulty, botKey, baseSeed }
 
+// Online duel session (OnlineMatch adapter). `match` points at it while online.
+let online = null;
+let onlineRoundIndex = 0;
+
 function haptic(kind) {
   if (!settings.haptics || !navigator.vibrate) return;
   const map = { accept: 12, reject: [8, 30, 8], counter: [20, 20, 20], damage: 40, round: [60, 40, 120] };
@@ -54,6 +60,7 @@ function haptic(kind) {
 const dummyInput = { move: 0, sidestep: 0, focus: false, brace: false, pendingCast: null, pendingQuality: 1 };
 
 function castSpell(id, quality = 1) {
+  if (mode === 'online') return; // online casting is authoritative — gesture pad only
   audio.unlock();
   if (match) { match.input.pendingCast = id; match.input.pendingQuality = quality; }
 }
@@ -62,10 +69,14 @@ const gesture = new GestureInput($('#draw-canvas'), {
   recognizer: null,
   reduced: settings.reduced,
   haptics: haptic,
-  onCast: (spellId, quality, diag) => {
+  onCast: (spellId, quality, diag, trace) => {
     audio.unlock(); audio.accept();
-    castSpell(spellId, quality);
     hud.setDiag(diag);
+    if (mode === 'online') {
+      if (online && trace) online.sendCastTrace(trace); // server reclassifies + is authoritative
+      return;
+    }
+    castSpell(spellId, quality);
     if (mode === 'tutorial') checkLesson(spellId);
   },
   onReject: (diag) => { audio.unlock(); audio.reject(); hud.setDiag(diag); },
@@ -394,6 +405,201 @@ function saveLoadout() {
   showPanel('panel-duel');
 }
 
+// ------------------------------------------------------------------ online duel
+function updateOnlineSummary() {
+  const el = $('#online-loadout-summary');
+  if (!el) return;
+  const names = playerLoadout.map((s) => s.name).join(', ');
+  const pts = playerLoadout.reduce((a, s) => a + s.loadout_points, 0);
+  el.textContent = `Your loadout (${pts} pts): ${names}`;
+}
+
+function openOnline() {
+  updateOnlineSummary();
+  const id = clientIdentity();
+  $('#online-name').value = id.name || '';
+  $('#online-error').textContent = '';
+  $('#online-code').value = '';
+  showPanel('panel-online');
+  updateConnBadges({ state: online && online.connected ? 'connected' : 'idle', rttMs: online ? online.rtt : null });
+}
+
+function onlineErrorText(ack) {
+  const code = ack && ack.code;
+  const map = {
+    'invalid-loadout': 'Your loadout is not legal. Edit it first.',
+    'no-room': 'No duel found with that code.',
+    'bad-code': 'Enter a valid 5-character code.',
+    'room-full': 'That room is already full.',
+    incompatible: 'Update required — client and server versions differ.',
+    'in-match': 'Already in a duel or queue.',
+    draining: 'Server is restarting. Try again shortly.',
+    offline: 'Cannot reach the server.',
+    timeout: 'The server did not respond.',
+  };
+  return map[code] || (ack && ack.errors && ack.errors[0]) || 'Something went wrong. Try again.';
+}
+
+function showOnlineError(msg) {
+  const el = $('#online-error');
+  if (el) el.textContent = msg;
+  showPanel('panel-online');
+}
+
+async function ensureOnline() {
+  if (online && online.connected) return online;
+  if (!online) { online = new OnlineMatch({ url: '', loadoutIds: playerIds }); wireOnlineCallbacks(online); }
+  await online.connect();
+  return online;
+}
+
+function wireOnlineCallbacks(o) {
+  o.onMatchStart = () => onOnlineMatchStart();
+  o.onRoundEnd = (p) => onOnlineRoundEnd(p);
+  o.onMatchEnd = (p) => onOnlineMatchEnd(p);
+  o.onStatus = (p) => onOnlineStatus(p);
+  o.onRoom = () => {};
+  o.onConnection = (p) => updateConnBadges(p);
+  o.onError = (err) => onOnlineError(err);
+  o.onCastAck = (ack) => { if (ack && !ack.ok && ack.code === 'rate') toast('Slow down — too many casts.'); };
+}
+
+async function startOnlineAction(kind, code) {
+  const nm = $('#online-name').value.trim();
+  if (nm) setDisplayName(nm);
+  rebuildForLoadout(); // ensure the recognizer matches the equipped loadout
+  try { await ensureOnline(); } catch (err) { onOnlineError(err); return; }
+  online.setLoadout(playerIds);
+  if (nm) online.identity.name = nm;
+  let ack;
+  if (kind === 'quick') ack = await online.quickMatch();
+  else if (kind === 'create') ack = await online.createRoom();
+  else if (kind === 'join') ack = await online.joinRoom(String(code || '').toUpperCase());
+  if (!ack || !ack.ok) { showOnlineError(onlineErrorText(ack)); return; }
+  showWaiting(kind, ack);
+}
+
+function showWaiting(kind, ack) {
+  mode = 'online-wait';
+  const codeBox = $('#wait-code');
+  if (kind === 'create') {
+    $('#wait-title').textContent = 'Waiting for opponent';
+    $('#wait-text').textContent = 'Share your code. The duel starts when they join.';
+    $('#wait-code-value').textContent = ack.code;
+    codeBox.classList.remove('hidden');
+  } else if (kind === 'join') {
+    $('#wait-title').textContent = 'Joining duel…';
+    $('#wait-text').textContent = 'Connecting to the room.';
+    codeBox.classList.add('hidden');
+  } else {
+    $('#wait-title').textContent = 'Finding a duel…';
+    $('#wait-text').textContent = 'Matching you with an opponent of similar rating.';
+    codeBox.classList.add('hidden');
+  }
+  showPanel('panel-online-wait');
+}
+
+function copyRoomCode() {
+  const code = $('#wait-code-value').textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => toast('Code copied')).catch(() => toast(code));
+  else toast(code);
+}
+
+function cancelOnline() {
+  if (online) online.leave();
+  mode = null;
+  showPanel('panel-online');
+}
+
+function onOnlineMatchStart() {
+  mode = 'online';
+  match = online;
+  series = null;
+  onlineRoundIndex = 0;
+  running = true;
+  hud.showDiag = false;
+  hud.setDiag(null);
+  hud.setSeries([0, 0], 0);
+  arena.reset();
+  showOverlay(false);
+  $('#hud').classList.remove('hidden');
+  $('#spellbar').classList.add('hidden');  // online: draw to cast
+  $('#devcast').classList.add('hidden');
+  gesture.setGuide(null);
+  setNetStatus('connected');
+  toast('Duel found! Draw glyphs to cast.');
+}
+
+function onOnlineRoundEnd(p) {
+  onlineRoundIndex += 1;
+  if (Array.isArray(p.score)) hud.setSeries(p.score, onlineRoundIndex);
+  const label = p.winner === 'win' ? 'Round won' : p.winner === 'loss' ? 'Round lost' : 'Round drawn';
+  audio.roundEnd(p.winner === 'win'); haptic('round');
+  toast(`${label} — series ${p.score ? p.score[0] : 0}–${p.score ? p.score[1] : 0}`);
+}
+
+function onOnlineMatchEnd(p) {
+  running = false;
+  const win = p.winner === 'win';
+  audio.roundEnd(win); haptic('round');
+  $('#result-title').textContent = win ? 'Series won!' : p.winner === 'draw' ? 'Series drawn' : 'Series lost';
+  const reason = p.reason === 'disconnect' ? ' (opponent left)' : p.reason === 'forfeit' ? ' (opponent forfeited)'
+    : p.reason === 'connection-lost' ? ' (you lost connection)' : '';
+  const score = Array.isArray(p.score) ? `${p.score[0]}–${p.score[1]}` : '';
+  $('#result-text').textContent = `Online duel${score ? ` ${score}` : ''}${reason}.`;
+  $('#btn-next-round').classList.add('hidden');
+  setNetStatus(null);
+  showPanel('panel-result'); showOverlay(true);
+}
+
+function onOnlineStatus(p) {
+  const s = p && p.state;
+  if (s === 'reconnecting') { setNetStatus('reconnecting'); toast('Connection lost — reconnecting…'); }
+  else if (s === 'resuming') setNetStatus('resuming');
+  else if (s === 'resumed') { setNetStatus('connected'); toast('Reconnected.'); }
+  else if (s === 'resume-failed') { setNetStatus('lost'); toast('Could not rejoin the duel.'); }
+  else if (s === 'disconnected') { setNetStatus('opponent'); toast('Opponent disconnected — waiting…'); }
+  else if (s === 'returned') { setNetStatus('connected'); toast('Opponent reconnected.'); }
+  else if (s === 'aborted') { setNetStatus('lost'); toast('Server restarting — duel ended.'); }
+}
+
+function onOnlineError(err) {
+  const code = err && (err.code || (err.data && err.data.code));
+  if (code === 'incompatible') toast('Update required — version mismatch.');
+  else toast(err && err.message ? `Network: ${err.message}` : 'Network error.');
+  if (mode === 'online-wait' || !online || !online.inMatch) showOnlineError(onlineErrorText({ code }));
+}
+
+function setNetStatus(kind) {
+  const el = $('#net-status');
+  if (!el) return;
+  if (!kind) { el.classList.add('hidden'); return; }
+  const map = {
+    connected: '● online', reconnecting: '◌ reconnecting…', resuming: '◌ rejoining…',
+    opponent: '◌ opponent away…', lost: '✕ disconnected',
+  };
+  el.classList.remove('hidden');
+  el.textContent = map[kind] || kind;
+  el.className = `net-status ns-${kind}`;
+}
+
+function updateConnBadges(p) {
+  const q = p && p.quality;
+  const rtt = p && p.rttMs != null ? ` · ${Math.round(p.rttMs)}ms` : '';
+  let text = 'connecting…';
+  if (p && p.state === 'connected') text = `${q && q !== 'unknown' ? q : 'connected'}${rtt}`;
+  else if (p && p.state === 'disconnected') text = 'disconnected';
+  else if (p && p.state === 'error') text = 'server unreachable';
+  else if (p && p.state === 'idle') text = 'not connected';
+  for (const id of ['#conn-quality', '#conn-quality-wait']) {
+    const el = $(id);
+    if (el) { el.textContent = text; el.className = `conn-badge cq-${(p && p.state) || 'idle'}${q ? ' q-' + q : ''}`; }
+  }
+  if (mode === 'online' && online && online.inMatch && p && p.state === 'connected') setNetStatus('connected');
+}
+
+function disposeOnline() { if (online) { online.dispose(); online = null; } }
+
 // ------------------------------------------------------------------ menu / overlay
 function showOverlay(v) { $('#overlay').classList.toggle('hidden', !v); }
 function showPanel(id) {
@@ -408,6 +614,12 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     if (a === 'tutorial') { showPanel('panel-tutorial'); $('#tut-title').textContent = 'Tutorial'; $('#tut-text').textContent = 'A short introduction to drawing, casting, and defending. Follow the dotted guides.'; }
     else if (a === 'practice') { series = null; startMatch('practice'); }
     else if (a === 'duel') { updateDuelSummary(); showPanel('panel-duel'); }
+    else if (a === 'online') openOnline();
+    else if (a === 'online-quick') startOnlineAction('quick');
+    else if (a === 'online-create') startOnlineAction('create');
+    else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
+    else if (a === 'online-cancel') cancelOnline();
+    else if (a === 'online-copy') copyRoomCode();
     else if (a === 'loadout') openLoadoutBuilder();
     else if (a === 'settings') showPanel('panel-settings');
     else if (a === 'start-duel') startSeries($('#duel-diff').value);
@@ -415,15 +627,24 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
     else if (a === 'next-round') startSeriesRound();
-    else if (a === 'back' || a === 'menu') { running = false; match = null; series = null; hud.setSeries(null); $('#hud').classList.add('hidden'); showPanel('panel-main'); showOverlay(true); }
+    else if (a === 'back' || a === 'menu') {
+      running = false; match = null; series = null;
+      if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
+      mode = null; setNetStatus(null); hud.setSeries(null);
+      $('#hud').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
+    }
     else if (a === 'rematch') {
-      if (mode === 'duel') startSeries($('#duel-diff').value);
+      if (mode === 'online') {
+        running = false; match = null; mode = null; setNetStatus(null);
+        hud.setSeries(null); $('#hud').classList.add('hidden');
+        openOnline(); showOverlay(true);
+      } else if (mode === 'duel') startSeries($('#duel-diff').value);
       else startMatch(mode === 'tutorial' ? 'duel' : mode);
     }
   });
 });
 
-$('#btn-menu').addEventListener('click', () => { running = false; showPanel('panel-main'); showOverlay(true); });
+$('#btn-menu').addEventListener('click', () => { running = false; if (mode === 'online' && online) online.setActive(false); showPanel('panel-main'); showOverlay(true); });
 
 // ------------------------------------------------------------------ settings
 function applySettings() {
@@ -433,7 +654,7 @@ function applySettings() {
   gesture.setReduced(settings.reduced);
   arena.setReduced(settings.reduced);
   audio.setEnabled(settings.audio);
-  $('#devcast').classList.toggle('hidden', !settings.devcast || !match);
+  $('#devcast').classList.toggle('hidden', !settings.devcast || !match || mode === 'online');
 }
 $('#set-lefthand').addEventListener('change', (e) => { settings.lefthand = e.target.checked; applySettings(); });
 $('#set-reduced').addEventListener('change', (e) => { settings.reduced = e.target.checked; applySettings(); });
@@ -456,6 +677,10 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     pausedForVisibility = running;
     running = false;
+    if (mode === 'online' && online) online.setActive(false); // stop issuing inputs while backgrounded
+  } else if (mode === 'online' && online) {
+    online.setActive(true);
+    if (online.inMatch) { running = true; setNetStatus(online.connected ? 'connected' : 'reconnecting'); }
   } else if (pausedForVisibility && match && !match.sim.ended) {
     pausedForVisibility = false;
     running = true;
@@ -468,3 +693,13 @@ rebuildForLoadout();
 console.log('Aetherglyph client', versionTag());
 showOverlay(true);
 showPanel('panel-main');
+
+const storedResume = loadResume();
+if (storedResume && storedResume.token) {
+  mode = 'online-wait';
+  $('#wait-title').textContent = 'Rejoining duel...';
+  $('#wait-text').textContent = 'Restoring the authoritative match state.';
+  $('#wait-code').classList.add('hidden');
+  showPanel('panel-online-wait');
+  ensureOnline().catch((err) => onOnlineError(err));
+}

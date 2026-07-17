@@ -4,6 +4,13 @@
 // and on release classifies against the equipped loadout via the shared
 // Recognizer. Touch + mouse via Pointer Events. A two-finger tap breaks the
 // trace with no cost (MASTERPLAN §4).
+//
+// For online play the pad also hands the onCast callback a BOUNDED, quantized
+// copy of the trace plus its duration (never the live mutable `points` array),
+// so the network adapter can submit the authoritative cast packet. The same
+// bounded trace is classified locally so client prediction matches the server.
+
+import { boundTrace } from '@shared/protocol/net.js';
 
 export class GestureInput {
   constructor(canvas, opts = {}) {
@@ -21,6 +28,7 @@ export class GestureInput {
     this.activePointer = null;
     this.pointerCount = 0;
     this.rect = null;
+    this.startTime = 0;
     this.guide = null; // optional template guide (array of {x,y} in 0..100 space)
 
     this._bind();
@@ -67,6 +75,7 @@ export class GestureInput {
     this.canvas.setPointerCapture(e.pointerId);
     this.activePointer = e.pointerId;
     this.drawing = true;
+    this.startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     this.points = [this._pos(e)];
     this._redraw();
   }
@@ -107,14 +116,21 @@ export class GestureInput {
 
   _classify() {
     if (!this.recognizer) return;
-    const diag = this.recognizer.recognize(this.points);
+    // A bounded, quantized copy of the trace (new objects — never the live
+    // mutable `points` array). Classify the SAME bounded trace the network
+    // adapter will submit, so local prediction agrees with server authority.
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const durationMs = Math.max(0, Math.round(now - this.startTime));
+    const points = boundTrace(this.points);
+    const trace = { points, durationMs, pointCount: points.length };
+    const diag = this.recognizer.recognize(points);
     if (diag.accepted) {
       const q = 0.9 + Math.min(1, Math.max(0, (diag.best.score - 0.6) / 0.4)) * 0.15; // 0.90..1.05
       this.haptics('accept');
-      this.onCast(diag.spellId, Math.min(1.05, q), diag);
+      this.onCast(diag.spellId, Math.min(1.05, q), diag, trace);
     } else {
       this.haptics('reject');
-      this.onReject(diag);
+      this.onReject(diag, trace);
     }
   }
 

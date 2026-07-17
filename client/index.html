@@ -13,6 +13,7 @@
   {
     "imports": {
       "three": "/client/vendor/three.module.js",
+      "socket.io-client": "/client/vendor/socket.io.esm.min.js",
       "@shared/": "/shared/src/"
     }
   }
@@ -50,6 +51,7 @@
       <span id="round-timer">1:45</span>
       <span id="pressure" class="pressure hidden">Arcane Pressure</span>
       <span id="series-score" class="series hidden"></span>
+      <span id="net-status" class="net-status hidden"></span>
     </div>
 
     <!-- Active environmental zones -->
@@ -95,10 +97,11 @@
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
         <button class="menu-btn" data-action="practice">Practice (templates + diagnostics)</button>
         <button class="menu-btn" data-action="duel">Bot Duel</button>
+        <button class="menu-btn" data-action="online">Online Duel</button>
         <button class="menu-btn" data-action="loadout">Loadout builder</button>
         <button class="menu-btn" data-action="settings">Settings</button>
       </div>
-      <p class="offline-note">Fully offline. No account required.</p>
+      <p class="offline-note">Tutorial &amp; practice are fully offline. Online duels connect to the authoritative server.</p>
       <p class="links">
         <a href="/MASTERPLAN.md">Master plan</a> ·
         <a href="/design/spells.csv">Spell roster</a>
@@ -125,6 +128,42 @@
         <button class="menu-btn ghost" data-action="loadout">Edit my loadout</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
+    </div>
+
+    <div class="panel hidden" id="panel-online">
+      <h2>Online Duel</h2>
+      <p>Play a best-of-three against another device. Casting is by drawing on the glyph pad — the server validates every spell.</p>
+      <label class="field">Display name (optional)
+        <input type="text" id="online-name" maxlength="24" placeholder="Anonymous wizard" />
+      </label>
+      <p id="online-loadout-summary" class="loadout-summary"></p>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="online-quick">Quick Match (ranked)</button>
+        <button class="menu-btn" data-action="online-create">Create Private Duel</button>
+        <div class="join-row">
+          <input type="text" id="online-code" maxlength="5" placeholder="CODE" autocomplete="off" />
+          <button class="menu-btn" data-action="online-join">Join Code</button>
+        </div>
+        <button class="menu-btn ghost" data-action="loadout">Edit my loadout</button>
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+      <p id="online-error" class="ls-err-line"></p>
+      <p class="offline-note"><span id="conn-quality" class="conn-badge">connecting…</span></p>
+    </div>
+
+    <div class="panel hidden" id="panel-online-wait">
+      <h2 id="wait-title">Finding a duel…</h2>
+      <p id="wait-text">Searching for an opponent.</p>
+      <div id="wait-code" class="room-code hidden">
+        <span class="rc-label">Share this code</span>
+        <span id="wait-code-value" class="rc-value">-----</span>
+        <button class="menu-btn ghost" id="wait-copy" data-action="online-copy">Copy</button>
+      </div>
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="menu-list">
+        <button class="menu-btn ghost" data-action="online-cancel">Cancel</button>
+      </div>
+      <p class="offline-note"><span id="conn-quality-wait" class="conn-badge">connecting…</span></p>
     </div>
 
     <div class="panel hidden wide" id="panel-loadout">

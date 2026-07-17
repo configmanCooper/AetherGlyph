@@ -36,6 +36,7 @@ export function run() {
   let correct = 0, total = 0;
   for (const [key, variants] of Object.entries(GESTURE_TEMPLATES)) {
     const expectId = keyToId[key];
+    if (expectId == null) continue; // only the starter loadout is scoped into `rec`
     for (let v = 0; v < variants.length; v++) {
       for (let seed = 1; seed <= 3; seed++) {
         total++;

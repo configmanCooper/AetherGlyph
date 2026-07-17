@@ -59,6 +59,20 @@ try {
     fail('#panel-main missing. errors=' + JSON.stringify(errors.slice(0, 6)) + ' body=' + body);
   }
 
+  // Online menu smoke: open it, create a private room end-to-end (real socket
+  // to the authoritative server), confirm a share code appears, then cancel.
+  await page.click('[data-action="online"]');
+  await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="online-create"]');
+  await page.waitForSelector('#panel-online-wait:not(.hidden)', { timeout: 15000 });
+  await page.waitForFunction(() => /^[A-Z0-9]{5}$/.test(document.querySelector('#wait-code-value')?.textContent || ''), { timeout: 15000 });
+  const roomCode = await page.evaluate(() => document.querySelector('#wait-code-value')?.textContent);
+  if (!/^[A-Z0-9]{5}$/.test(roomCode || '')) fail('online create did not yield a room code: ' + roomCode);
+  await page.click('[data-action="online-cancel"]');
+  await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
+  await page.click('#panel-online [data-action="back"]');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
   // Non-starter loadout path: open the builder, apply an archetype preset,
   // save it, then start a best-of-three series against a chosen opponent.
   await page.click('[data-action="loadout"]');

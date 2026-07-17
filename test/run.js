@@ -13,6 +13,9 @@ import { run as reactions } from './reactions.test.js';
 import { run as loadout } from './loadout.test.js';
 import { run as series } from './series.test.js';
 import { run as secret } from './secret.test.js';
+import { run as templates } from './templates.test.js';
+import { run as net } from './net.test.js';
+import { run as onlineMatch } from './onlineMatch.test.js';
 
 console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
@@ -28,13 +31,16 @@ const modules = [
   ['loadout', loadout],
   ['series', series],
   ['secret', secret],
+  ['templates', templates],
+  ['net', net],
+  ['onlineMatch', onlineMatch],
   ['bot', bot],
   ['gesture', gesture],
 ];
 
 let pass = 0, fail = 0;
 for (const [, fn] of modules) {
-  const r = fn();
+  const r = await fn();
   pass += r.pass; fail += r.fail;
 }
 

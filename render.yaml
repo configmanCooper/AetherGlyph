@@ -1,0 +1,44 @@
+# render.yaml — one-click Render blueprint for the Aetherglyph authoritative
+# service. A SINGLE Web Service serves the static client AND runs the
+# authoritative Socket.IO duel simulation. Render sets $PORT automatically;
+# server.js honours process.env.PORT.
+#
+# Deploy: push to GitHub, then Render Dashboard -> New -> Blueprint -> pick this
+# repo. WebSockets work out of the box on Render Web Services.
+#
+# IMPORTANT — SINGLE INSTANCE ONLY. One process owns each live match (in-memory
+# match ownership). Do NOT raise numInstances: horizontal scaling requires
+# external match-ownership leases + fencing tokens and a shared queue/room store,
+# which are NOT implemented. See README "Scaling & limitations".
+
+services:
+  - type: web
+    name: aetherglyph
+    runtime: node
+    plan: free            # free instances sleep after ~15 min idle (not for ranked prod)
+    numInstances: 1       # do not increase — match ownership is in-memory
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # HMAC secret for single-use resume tokens (never commit a secret).
+      - key: SESSION_SECRET
+        generateValue: true
+      # Public origin of THIS service (used for the Origin allowlist).
+      - key: ALLOWED_ORIGINS
+        value: "https://aetherglyph.onrender.com"
+      # Optional: anonymous-account rating persistence. Uncomment the database
+      # block below and this fromDatabase mapping to enable Postgres; otherwise
+      # the server uses the explicit in-memory development rating adapter.
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: aetherglyph-db
+      #     property: connectionString
+
+# databases:
+#   - name: aetherglyph-db
+#     plan: free
+#     postgresMajorVersion: "16"

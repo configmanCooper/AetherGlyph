@@ -1012,7 +1012,8 @@ export class Sim {
       endReason: this.endReason,
       pressureLevel: this.pressureLevel,
       projectiles: this.projectiles.map((p) => ({
-        id: p.id, owner: p.owner, spellId: p.spellId, ticks: p.ticks, targetPos: p.targetPos,
+        id: p.id, owner: p.owner, spellId: p.spellId, ticks: p.ticks,
+        totalTicks: p.totalTicks, originPos: p.originPos, targetPos: p.targetPos,
       })),
       zones: this.zones.map((z) => ({
         id: z.id, owner: z.owner, kind: z.kind, center: z.center, radius: z.radius,
@@ -1020,8 +1021,8 @@ export class Sim {
       })),
       wizards: this.wizards.map((w) => ({
         id: w.id, health: w.health, aether: w.aether, charges: w.charges,
-        arcPos: w.arcPos, casting: w.casting ? { spellId: w.casting.spellId, ticks: w.casting.ticks } : null,
-        channel: w.channel ? { spellId: w.channel.spellId, ticks: w.channel.ticks } : null,
+        arcPos: w.arcPos, casting: w.casting ? { spellId: w.casting.spellId, ticks: w.casting.ticks, totalTicks: w.casting.totalTicks } : null,
+        channel: w.channel ? { spellId: w.channel.spellId, ticks: w.channel.ticks, totalTicks: w.channel.totalTicks } : null,
         focusing: w.focusing, focusTicks: w.focusTicks, braceTicks: w.braceTicks,
         shield: w.shield ? { absorb: w.shield.absorb, ticks: w.shield.ticks } : null,
         barrier: w.barrier ? { absorb: w.barrier.absorb, ticks: w.barrier.ticks } : null,

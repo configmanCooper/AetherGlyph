@@ -1,8 +1,9 @@
 # Dependencies
 node_modules/
 
-# Vendored copies produced by scripts/copy-three.js (regenerated on install)
+# Vendored copies produced by scripts/copy-*.js (regenerated on install)
 client/vendor/three.module.js
+client/vendor/socket.io.esm.min.js
 
 # Logs / OS / editor cruft
 *.log

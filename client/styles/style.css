@@ -229,3 +229,40 @@ body.reduced * { animation: none !important; transition: none !important; }
 .menu-btn[disabled] { opacity: 0.4; pointer-events: none; }
 
 body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
+
+/* ------------------------------------------------------------ online duel UI */
+.join-row { display: flex; gap: 8px; align-items: stretch; }
+.join-row input {
+  flex: 1; min-width: 0; padding: 10px; border-radius: 10px; background: #1a1230;
+  color: var(--ink); border: 1px solid rgba(255,255,255,0.2);
+  text-transform: uppercase; letter-spacing: 3px; font-weight: 700; text-align: center;
+}
+.join-row .menu-btn { flex: 0 0 auto; margin: 0; }
+#online-name { display: block; width: 100%; margin-top: 6px; padding: 8px; border-radius: 8px;
+  background: #1a1230; color: var(--ink); border: 1px solid rgba(255,255,255,0.2); }
+
+.room-code { margin: 12px 0; padding: 12px; border-radius: 12px; text-align: center;
+  background: rgba(139,107,255,0.12); border: 1px solid rgba(139,107,255,0.4); }
+.room-code.hidden { display: none; }
+.rc-label { display: block; font-size: 12px; color: var(--muted); }
+.rc-value { display: block; font-size: 34px; font-weight: 800; letter-spacing: 8px;
+  color: var(--ink); margin: 6px 0; font-variant-numeric: tabular-nums; }
+
+.conn-badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2); color: var(--muted); }
+.conn-badge.q-good { color: #6ee7a8; border-color: rgba(110,231,168,0.5); }
+.conn-badge.q-fair { color: #ffd479; border-color: rgba(255,212,121,0.5); }
+.conn-badge.q-poor, .conn-badge.cq-disconnected, .conn-badge.cq-error { color: var(--danger); border-color: rgba(255,93,115,0.5); }
+
+.net-status { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.net-status.hidden { display: none; }
+.net-status.ns-connected { color: #6ee7a8; }
+.net-status.ns-reconnecting, .net-status.ns-resuming, .net-status.ns-opponent { color: #ffd479; animation: pulse 1s infinite; }
+.net-status.ns-lost { color: var(--danger); }
+
+.ls-err-line { color: var(--danger); font-size: 13px; min-height: 16px; margin: 6px 0 0; }
+
+.spinner { width: 34px; height: 34px; margin: 14px auto; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.15); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+body.reduced .spinner { animation: none; }
