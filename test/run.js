@@ -8,8 +8,13 @@ import { run as casting } from './casting.test.js';
 import { run as status } from './status.test.js';
 import { run as bot } from './bot.test.js';
 import { run as gesture } from './gesture.test.js';
+import { run as effects } from './effects.test.js';
+import { run as reactions } from './reactions.test.js';
+import { run as loadout } from './loadout.test.js';
+import { run as series } from './series.test.js';
+import { run as secret } from './secret.test.js';
 
-console.log('Aetherglyph Phase 1 test suite');
+console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
 
 const modules = [
@@ -18,6 +23,11 @@ const modules = [
   ['resources', resources],
   ['casting', casting],
   ['status', status],
+  ['effects', effects],
+  ['reactions', reactions],
+  ['loadout', loadout],
+  ['series', series],
+  ['secret', secret],
   ['bot', bot],
   ['gesture', gesture],
 ];

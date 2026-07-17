@@ -3,6 +3,7 @@
 import { createHarness } from './tiny.js';
 import { createMatch, runMatch } from '../shared/src/sim/match.js';
 import { makeBots, DIFFICULTY } from '../shared/src/bot/bot.js';
+import { presetLoadout, PRESETS } from '../shared/src/balance/loadouts.js';
 import { AETHER, SIGIL, MATCH } from '../shared/src/sim/constants.js';
 
 export function run() {
@@ -49,6 +50,30 @@ export function run() {
   const bots2 = makeBots(77, 'apprentice', 'archmage');
   const res2 = runMatch(sim2, [(x) => bots2[0].act(x), (x) => bots2[1].act(x)]);
   ok(res2.ended && !res2.hitCap, 'archmage vs apprentice terminates cleanly');
+
+  // Varied archetypes: the bot legally pilots every curated preset against
+  // every other preset and every such match terminates within the timer.
+  let archEnded = true, archNoCap = true, archLegal = true, archDamage = 0;
+  for (let i = 0; i < PRESETS.length; i++) {
+    for (let j = 0; j < PRESETS.length; j++) {
+      const seed = 5000 + i * 20 + j;
+      const s = createMatch({ seed, loadouts: [presetLoadout(PRESETS[i].key), presetLoadout(PRESETS[j].key)] });
+      const bs = makeBots(seed, 'magus', 'archmage');
+      const r = runMatch(s, [(x) => bs[0].act(x), (x) => bs[1].act(x)]);
+      if (!r.ended) archEnded = false;
+      if (r.hitCap) archNoCap = false;
+      if (r.health[0] < 100 || r.health[1] < 100) archDamage++;
+      for (const w of s.wizards) {
+        if (w.aether < -0.001 || w.aether > AETHER.max + 0.001) archLegal = false;
+        if (w.charges < 0 || w.charges > SIGIL.max) archLegal = false;
+        if (w.health < 0 || w.health > MATCH.startHealth) archLegal = false;
+      }
+    }
+  }
+  ok(archEnded, 'bot terminates with every preset matchup');
+  ok(archNoCap, 'no preset matchup hits the hard tick cap');
+  ok(archLegal, 'resources stay legal across all preset matchups');
+  ok(archDamage >= PRESETS.length * PRESETS.length - 2, 'bots deal damage in (almost) every preset matchup');
 
   return report('bot');
 }

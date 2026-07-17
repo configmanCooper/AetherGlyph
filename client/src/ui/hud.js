@@ -1,14 +1,24 @@
 // hud.js — HTML overlay HUD. Reads sim state (never mutates it) and renders
-// health / Aether / Sigil charges / statuses / round timer / cast tells.
-// Statuses use text + icon, never color alone (accessibility, MASTERPLAN §4).
+// health / Aether / Sigil charges / statuses / zones / round timer / cast tells
+// / best-of-three series score. Statuses use text + icon, never color alone
+// (accessibility, MASTERPLAN §4).
 
 import { MATCH, AETHER, SIGIL } from '@shared/sim/constants.js';
 import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
 
 const STATUS_ICON = {
-  Burning: '🔥', Chilled: '❄', Soaked: '💧', Static: '⚡', Sundered: '🪓',
-  Weakened: '▽', Marked: '◎', Rooted: '🌿', Frozen: '🧊', Stunned: '★',
+  Burning: 'Bu', Chilled: 'Ch', Soaked: 'So', Static: 'St', Sundered: 'Sd',
+  Weakened: 'Wk', Marked: 'Mk', Rooted: 'Rt', Frozen: 'Fz', Stunned: 'Sn',
+  Sloth: 'Sl', Blinded: 'Bl', Veiled: 'Vl',
+  Haste: 'Ha', Grounded: 'Gr', AetherSurge: 'AS', Attunement: 'At', Phoenix: 'Px',
 };
+
+const ZONE_ICON = {
+  Oil: 'Oil', Wet: 'Wet', Fog: 'Fog', Frozen: 'Ice', Snare: 'Snare',
+  Cover: 'Cover', Hourglass: 'Time', Fire: 'Fire', Gust: 'Gust', Grounded: 'Grd',
+};
+
+const BUFFS = new Set(['Haste', 'Grounded', 'AetherSurge', 'Attunement', 'Phoenix']);
 
 export class HUD {
   constructor(root) {
@@ -26,8 +36,12 @@ export class HUD {
       timer: root.querySelector('#round-timer'),
       pressure: root.querySelector('#pressure'),
       diag: root.querySelector('#diag'),
+      environment: root.querySelector('#environment'),
+      series: root.querySelector('#series-score'),
+      spellbar: root.querySelector('#spellbar'),
     };
     this.showDiag = false;
+    this.spellButtons = new Map(); // spellId -> button element
   }
 
   _pips(container, charges) {
@@ -46,10 +60,67 @@ export class HUD {
   _statuses(container, w) {
     const chips = Object.entries(w.statuses)
       .filter(([, v]) => v.ticks > 0)
-      .map(([name, v]) => `<span class="status-chip">${STATUS_ICON[name] || ''} ${name}${v.stacks > 1 ? ' ' + v.stacks : ''}</span>`);
-    if (w.braceTicks > 0) chips.push('<span class="status-chip">🛡 Brace</span>');
-    if (w.tenacityTicks > 0) chips.push('<span class="status-chip">✊ Tenacity</span>');
+      .map(([name, v]) => {
+        const cls = BUFFS.has(name) ? 'status-chip buff' : 'status-chip';
+        return `<span class="${cls}" title="${name}">${STATUS_ICON[name] || name.slice(0, 2)} ${name}${v.stacks > 1 ? ' ' + v.stacks : ''}</span>`;
+      });
+    if (w.braceTicks > 0) chips.push('<span class="status-chip">Brace</span>');
+    if (w.tenacityTicks > 0) chips.push('<span class="status-chip">Tenacity</span>');
+    if (w.reflectTicks > 0) chips.push('<span class="status-chip buff">Reflect</span>');
+    if (w.mirrorTicks > 0) chips.push('<span class="status-chip buff">Decoy</span>');
+    if (w.channel) chips.push('<span class="status-chip">Channel</span>');
     container.innerHTML = chips.join('');
+  }
+
+  // Build the on-screen cast bar for the equipped loadout (primary Phase 2
+  // input alongside drawing). onCast(spellId) fires when a button is pressed.
+  buildSpellbar(loadout, onCast) {
+    if (!this.el.spellbar) return;
+    this.el.spellbar.innerHTML = '';
+    this.spellButtons.clear();
+    loadout.forEach((s, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'spell-btn';
+      btn.dataset.spell = s.id;
+      btn.innerHTML = `<span class="sb-key">${i + 1}</span><span class="sb-name">${s.name}</span>` +
+        `<span class="sb-cost">${s.aether}${s.charges ? ' ' + '#'.repeat(s.charges) : ''}</span>`;
+      btn.title = `${s.school} - ${s.category}\n${s.effect}`;
+      btn.addEventListener('pointerdown', (e) => { e.preventDefault(); onCast(s.id); });
+      this.el.spellbar.appendChild(btn);
+      this.spellButtons.set(s.id, btn);
+    });
+  }
+
+  _updateSpellbar(w) {
+    for (const [id, btn] of this.spellButtons) {
+      const sp = SPELLS_BY_ID[id];
+      const cd = (w.cooldowns[id] || 0) > 0;
+      const poor = w.aether < sp.aether;
+      const noCharge = (sp.charges || 0) > w.charges;
+      btn.classList.toggle('cooldown', cd);
+      btn.classList.toggle('disabled', cd || poor || noCharge);
+      const cdEl = btn.querySelector('.sb-cost');
+      if (cd && cdEl) cdEl.textContent = (w.cooldowns[id] / 60).toFixed(1) + 's';
+      else if (cdEl) cdEl.textContent = `${sp.aether}${sp.charges ? ' ' + '#'.repeat(sp.charges) : ''}`;
+    }
+  }
+
+  _environment(sim) {
+    if (!this.el.environment) return;
+    const chips = sim.zones.map((z) => {
+      const owner = z.owner === 0 ? 'you' : 'foe';
+      const secs = Math.ceil(z.ticks / 60);
+      return `<span class="zone-chip zone-${z.kind.toLowerCase()}">${ZONE_ICON[z.kind] || z.kind} ${secs}s <em>${owner}</em></span>`;
+    });
+    this.el.environment.innerHTML = chips.join('');
+  }
+
+  setSeries(score, roundIndex) {
+    if (!this.el.series) return;
+    if (!score) { this.el.series.classList.add('hidden'); return; }
+    this.el.series.classList.remove('hidden');
+    this.el.series.innerHTML = `<span class="you">You ${score[0]}</span> - <span class="foe">${score[1]} Foe</span>` +
+      `<span class="rd">Round ${Math.min(roundIndex + 1, 3)}/3</span>`;
   }
 
   update(sim) {
@@ -62,11 +133,16 @@ export class HUD {
     this._pips(this.el.enemyCharges, e.charges);
     this._statuses(this.el.playerStatus, p);
     this._statuses(this.el.enemyStatus, e);
+    this._environment(sim);
+    this._updateSpellbar(p);
 
     // Enemy cast tell (school + name).
     if (e.casting) {
       const sp = SPELLS_BY_ID[e.casting.spellId];
-      this.el.enemyCast.textContent = sp ? `${sp.school}: ${sp.name}…` : 'casting…';
+      this.el.enemyCast.textContent = sp ? `${sp.school}: ${sp.name}...` : 'casting...';
+    } else if (e.channel) {
+      const sp = SPELLS_BY_ID[e.channel.spellId];
+      this.el.enemyCast.textContent = sp ? `${sp.school}: ${sp.name} (channel)` : 'channel...';
     } else {
       this.el.enemyCast.textContent = '';
     }
@@ -83,15 +159,15 @@ export class HUD {
   setDiag(diag) {
     if (!this.showDiag) { this.el.diag.classList.add('hidden'); return; }
     this.el.diag.classList.remove('hidden');
-    if (!diag) { this.el.diag.innerHTML = 'draw a glyph…'; return; }
+    if (!diag) { this.el.diag.innerHTML = 'draw a glyph...'; return; }
     if (diag.accepted) {
       this.el.diag.innerHTML =
-        `<div class="accepted">✓ ${diag.name} (${diag.best.score.toFixed(2)})</div>` +
+        `<div class="accepted">OK ${diag.name} (${diag.best.score.toFixed(2)})</div>` +
         `margin ${diag.margin.toFixed(2)}`;
     } else {
-      const best = diag.best ? `${diag.best.gestureKey || diag.best.name} ${diag.best.score.toFixed(2)}` : '—';
+      const best = diag.best ? `${diag.best.gestureKey || diag.best.name} ${diag.best.score.toFixed(2)}` : '-';
       this.el.diag.innerHTML =
-        `<div class="rejected">✗ ${diag.reason}</div>best: ${best}<br>margin ${(diag.margin || 0).toFixed(2)}`;
+        `<div class="rejected">x ${diag.reason}</div>best: ${best}<br>margin ${(diag.margin || 0).toFixed(2)}`;
     }
   }
 }

@@ -4,8 +4,10 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Phase 1 (offline vertical slice) is implemented and playable.** Planning
-artifacts remain authoritative for later phases.
+**Phase 2 (full combat content) is implemented on top of the Phase 1 slice.**
+All 40 catalog spells now have executable effects, the environmental reaction
+matrix is live, loadouts are player-buildable, and duels run as a best-of-three
+series. Planning artifacts remain authoritative for later phases.
 
 - `MASTERPLAN.md` - authoritative product, game, technical, test, deployment, and release plan
 - `design/spells.csv` - implementation-ready launch spell roster
@@ -42,7 +44,12 @@ Health endpoint: `GET /healthz`.
   Stone Shard (V), Spark Dart (zigzag), Concussive Blast (arc), Ward (bracket),
   Barrier Dome (circle), Reflect (check mark).
 - Modes: **Tutorial** (guided glyph lessons), **Practice** (free draw + recognizer
-  diagnostics), **Bot Duel** (Apprentice→Archmage).
+  diagnostics), **Bot Duel** (best-of-three vs Apprentice→Archmage).
+- **Loadout builder**: pick from all 40 spells or an archetype preset (Ember Rush,
+  Tide Control, Storm Tempo, Stone Warden, Gale Trickster, Arcane Combo, Umbra
+  Attrition, Prismatic Hybrid); live 14-point / school / heavy validation.
+- In a duel, cast by drawing (starter gestures) or by tapping the on-screen cast
+  bar; the arena shows environmental zones and both wizards' statuses.
 - Dev accessibility fallback: keyboard `1`–`8` quick-cast, `A`/`D` move, `F` focus,
   space to dodge, and optional on-screen quick-cast buttons (Settings). Normal play
   uses drawing.
@@ -50,14 +57,17 @@ Health endpoint: `GET /healthz`.
 ### Test
 
 ```bash
-npm test             # headless Node suite (spell gen, determinism, resources,
-                     # casting/counters, status/Tenacity, bot termination, gesture)
+npm test             # headless Node suite (spell gen, determinism incl. zones,
+                     # resources, casting/counters, status/Tenacity, all-40 effects,
+                     # environment reactions, loadout validation, best-of-three
+                     # series, secret spells, bot termination w/ archetypes, gesture)
 npm run test:browser # OPTIONAL headless browser smoke via local Edge/Chrome (WebGL)
 ```
 
 `npm test` requires no browser. `npm run test:browser` uses `puppeteer-core` with a
-locally installed Edge/Chrome (no Chromium download); it boots the client, starts a
-duel, draws real glyphs through the pointer pipeline, and asserts a clean running state.
+locally installed Edge/Chrome (no Chromium download); it boots the client, applies an
+archetype preset in the loadout builder, starts a best-of-three series, draws real
+glyphs, exercises the on-screen cast bar, and asserts a clean running state.
 
 ### Architecture (Phase 1)
 
@@ -83,17 +93,60 @@ server.js            Express static + /healthz (offline; no online authority yet
 
 The simulation is headless and emits events that rendering/audio/UI consume
 (Fish-Friends pattern). It uses a seeded RNG, a fixed tick, and produces state
-hashes for replay/divergence checks — ready for Phase 2 authoritative online
+hashes for replay/divergence checks — ready for Phase 3 authoritative online
 multiplayer.
 
-### Known Phase 1 limitations
+## Phase 2 — full spell simulation (Milestone 3)
 
-- Curated **8-spell** starter loadout is wired for combat; the full 40-spell
-  catalog is present as data but only the starter set has authored combat effects.
-- No online/networking yet (Milestone 4), no Capacitor Android packaging yet
-  (Milestone 6), no environmental reaction matrix yet (Milestone 3).
-- Arena visuals are a functional, low-poly placeholder; readability first.
-- Sim uses floating-point with quantized hashing; fixed-point is a Phase 2 item.
+Phase 2 turns the vertical slice into the full combat game while keeping the
+Phase 1 basic modes (Tutorial, Practice, starter smoke path) intact.
+
+- **All 40 spells are executable.** Every catalog spell has a machine-usable
+  effect in `shared/src/sim/spellEffects.js` — offense, defenses, buffs,
+  debuffs, control, environmental zones, and all four secrets. Costs, cooldowns,
+  charges, and cast times are still sourced from `design/spells.csv` via the
+  generated data (no numbers are re-typed). There are no silent no-op spells.
+- **Environmental reaction matrix.** `shared/src/sim/reactions.js` +
+  `Sim.triggerReactions` implement the deterministic priority order
+  (`douse < ground < freeze < conduct < ignite < spread < cover`) for Oil+Ember,
+  Oil+Rain, Wet+Storm, Wet+Frost, Frozen+Ember steam/fog, Burning+Rain,
+  Burning+Gust, Fog+Gust/Flame, Grounding Mantle, Stone Wall cover, Chilled+Frost
+  Bind, Soaked/Static+Thunderclap, and the mixed-resonance Prismatic utility.
+  Two zones per player, once-per-second reaction cooldowns, visible durations,
+  Tenacity on hard-control reactions, and no recursive chains are enforced.
+- **Statuses & buffs for real play.** Soaked, Static, Sundered, Weakened, Marked,
+  Rooted, Frozen, Stunned, Sloth, Haste, Aether Surge, Attunement, Grounding,
+  Veil, Blinded, Phoenix protection, Hourglass shared slow, and the Mirror decoy
+  are all simulated.
+- **Loadout builder.** `validateLoadout` enforces 8 spells / 14-point budget /
+  max two 3-point spells / max three per school, with a soft "no defensive
+  answer" warning. Eight curated archetype presets are provided, and the
+  responsive builder UI exposes all 40 spells (secrets selectable in Phase 2).
+- **Best-of-three series.** Rounds reset the arena/statuses/resources while
+  preserving both loadouts; a running series score, per-round transitions, and
+  correct rematch/menu behaviour are wired (`Series` / `runSeries` in
+  `shared/src/sim/match.js`).
+- **Bot pilots any loadout.** The `DuelBot` categorises whatever it is dealt and
+  reasons about setup (chill→Frost Bind, static/soak→Thunderclap), resources
+  (charges/Focus), zones (place then ignite), defense (Ward/Reflect/Blink/Dispel),
+  and counters (Grounding vs lightning). Four internal levels are kept.
+- **Visuals/HUD.** The Three.js arena draws generic zone disks and effects per
+  category; the HUD shows statuses (buffs vs debuffs), active zones + durations,
+  the series score, and an on-screen cast bar for the equipped loadout.
+
+### Known Phase 2 limitations
+
+- Only the eight starter gestures have hand-authored recognizer templates, so in
+  a duel those spells are castable by drawing; every equipped spell is always
+  castable from the on-screen cast bar (and keyboard `1`–`8`). Full per-spell
+  gesture templates arrive with the gesture-corpus milestone.
+- No online/networking yet (Milestone 4) and no Capacitor Android packaging yet
+  (Milestone 6).
+- The comprehensive tutorial campaign, codex, secret-unlock progression, and the
+  full AI-practice expansion are intentionally deferred to the final solo phase;
+  secrets are freely selectable for Phase 2 development.
+- Arena visuals remain functional, readability-first placeholders.
+- Sim uses floating-point with quantized hashing; fixed-point is a later item.
 
 ## Product decision
 

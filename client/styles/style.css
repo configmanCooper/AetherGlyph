@@ -152,3 +152,80 @@ body.reduced * { animation: none !important; transition: none !important; }
 @media (orientation: portrait) {
   .hud .control-zone { bottom: calc(10px + var(--safe-bottom)); }
 }
+
+/* ===================== Phase 2 additions ===================== */
+
+/* Series score + environment + spellbar */
+.round-info { position: absolute; top: calc(8px + var(--safe-top)); right: calc(12px + var(--safe-right)); text-align: right; font-variant-numeric: tabular-nums; }
+#round-timer { font-size: 20px; font-weight: 700; }
+.series { display: block; margin-top: 4px; font-size: 12px; color: var(--accent2); }
+.series .you { color: var(--accent2); } .series .foe { color: var(--danger); }
+.series .rd { display: block; color: var(--muted); }
+
+.environment {
+  position: absolute; top: calc(96px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 70%;
+}
+.zone-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px; color: var(--ink);
+  background: rgba(30,22,52,0.8); border: 1px solid rgba(139,107,255,0.4);
+}
+.zone-chip em { color: var(--muted); font-style: normal; margin-left: 3px; font-size: 10px; }
+.zone-chip.zone-fire, .zone-chip.zone-oil { border-color: rgba(255,106,61,0.7); }
+.zone-chip.zone-wet, .zone-chip.zone-frozen { border-color: rgba(84,200,255,0.7); }
+.zone-chip.zone-fog, .zone-chip.zone-gust { border-color: rgba(155,232,216,0.7); }
+.zone-chip.zone-hourglass { border-color: rgba(216,178,74,0.8); }
+
+.status-chip.buff { border-color: rgba(79,214,201,0.6); color: var(--accent2); }
+
+/* On-screen cast bar */
+.spellbar {
+  position: absolute; bottom: calc(8px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
+  display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; max-width: 62%;
+  pointer-events: auto;
+}
+.spell-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 62px; padding: 5px 6px; border-radius: 9px; cursor: pointer;
+  background: linear-gradient(180deg, rgba(139,107,255,0.28), rgba(30,22,52,0.9));
+  border: 1px solid rgba(139,107,255,0.55); color: var(--ink);
+}
+.spell-btn .sb-key { font-size: 10px; color: var(--accent2); }
+.spell-btn .sb-name { font-size: 11px; font-weight: 600; line-height: 1.1; text-align: center; }
+.spell-btn .sb-cost { font-size: 10px; color: var(--muted); }
+.spell-btn.disabled { opacity: 0.4; }
+.spell-btn.cooldown { border-color: rgba(255,93,115,0.6); }
+.spell-btn:active { transform: translateY(1px); }
+
+/* Loadout builder */
+.panel.wide { max-width: min(96vw, 760px); max-height: 88vh; overflow-y: auto; }
+.loadout-rules { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.loadout-summary { color: var(--accent2); font-size: 12px; }
+.loadout-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.preset-btn {
+  flex: 1 1 44%; text-align: left; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  background: rgba(30,22,52,0.85); border: 1px solid rgba(139,107,255,0.4); color: var(--ink);
+}
+.preset-btn strong { display: block; font-size: 13px; }
+.preset-btn small { color: var(--muted); font-size: 11px; }
+.loadout-status { font-size: 13px; margin: 8px 0; }
+.ls-line { color: var(--ink); } .ls-ok { color: var(--accent2); }
+.ls-err { color: var(--danger); } .ls-warn { color: #ffcf6a; }
+.loadout-picked { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; min-height: 26px; }
+.picked-chip { font-size: 12px; padding: 3px 8px; border-radius: 9px; background: rgba(79,214,201,0.18); border: 1px solid rgba(79,214,201,0.5); }
+.picked-chip em { color: var(--muted); font-style: normal; }
+.muted { color: var(--muted); }
+.cat-group { margin: 10px 0; }
+.cat-group h4 { margin: 4px 0; font-size: 13px; color: var(--accent2); }
+.cat-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.spell-chip {
+  text-align: left; padding: 5px 8px; border-radius: 9px; cursor: pointer;
+  background: rgba(24,16,42,0.9); border: 1px solid rgba(255,255,255,0.16); color: var(--ink);
+}
+.spell-chip .chip-name { display: block; font-size: 12px; font-weight: 600; }
+.spell-chip .chip-meta { display: block; font-size: 10px; color: var(--muted); }
+.spell-chip.picked { border-color: var(--accent2); background: rgba(79,214,201,0.18); }
+.spell-chip.secret { border-style: dashed; }
+.menu-btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }

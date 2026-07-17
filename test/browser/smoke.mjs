@@ -59,11 +59,19 @@ try {
     fail('#panel-main missing. errors=' + JSON.stringify(errors.slice(0, 6)) + ' body=' + body);
   }
 
-  // Navigate: Bot Duel -> Begin duel.
-  await page.click('[data-action="duel"]');
+  // Non-starter loadout path: open the builder, apply an archetype preset,
+  // save it, then start a best-of-three series against a chosen opponent.
+  await page.click('[data-action="loadout"]');
+  await page.waitForSelector('#panel-loadout:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('.preset-btn', { timeout: 5000 });
+  await page.click('.preset-btn'); // apply the first curated preset (Ember Rush)
+  await page.waitForSelector('.ls-ok', { timeout: 5000 }); // legal loadout confirmed
+  await page.click('[data-action="save-loadout"]');
   await page.waitForSelector('#panel-duel:not(.hidden)', { timeout: 5000 });
   await page.click('[data-action="start-duel"]');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('#series-score:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
 
   // Draw a horizontal flick (Ember Bolt) on the draw pad via pointer.
   const pad = await page.$('#draw-canvas');
@@ -79,6 +87,13 @@ try {
   await drawLine(box.width * 0.2, box.width * 0.8);
   await drawLine(box.width * 0.2, box.width * 0.8);
 
+  // Exercise the on-screen cast bar (a spell that has no drawn gesture yet).
+  const spellBtns = await page.$$('#spellbar .spell-btn');
+  for (let k = 0; k < Math.min(3, spellBtns.length); k++) {
+    await spellBtns[k].click();
+    await new Promise((r) => setTimeout(r, 120));
+  }
+
   // Let the match run a bit.
   await new Promise((r) => setTimeout(r, 2500));
 
@@ -87,11 +102,15 @@ try {
     enemyHp: document.querySelector('#enemy-health')?.style.width,
     playerHp: document.querySelector('#player-health')?.style.width,
     hudVisible: !document.querySelector('#hud')?.classList.contains('hidden'),
+    seriesVisible: !document.querySelector('#series-score')?.classList.contains('hidden'),
+    spellButtons: document.querySelectorAll('#spellbar .spell-btn').length,
   }));
 
   if (errors.length) fail('console/page errors: ' + errors.slice(0, 4).join(' | '));
   if (http404.length) fail('unexpected 404s: ' + http404.slice(0, 4).join(' | '));
   if (!state.hudVisible) fail('HUD not visible after starting duel');
+  if (!state.seriesVisible) fail('series score not shown in best-of-three');
+  if (state.spellButtons !== 8) fail('cast bar should have 8 equipped spells, has ' + state.spellButtons);
   if (!state.timer || state.timer === '1:45') fail('round timer did not advance: ' + state.timer);
 
   console.log('SMOKE PASS', JSON.stringify(state));

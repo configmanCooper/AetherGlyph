@@ -1,9 +1,13 @@
-// localMatch.js — offline match driver.
+// localMatch.js — offline match driver for a single round.
 //
 // Wraps the pure shared Sim with a fixed-tick accumulator (decoupled from
 // requestAnimationFrame, per the Fish-Friends pattern) plus a DuelBot for the
 // opponent. The UI mutates `input`; each fixed tick we translate it into a sim
 // intent. One-shot inputs (sidestep, a recognized cast) fire once then clear.
+//
+// Best-of-three series state lives in the app layer (main.js): it constructs a
+// fresh LocalMatch per round with the SAME player/opponent loadouts and a
+// per-round derived seed, so loadouts are preserved while arena/statuses reset.
 
 import { Sim } from '@shared/sim/sim.js';
 import { DT, TICK_HZ } from '@shared/sim/constants.js';
@@ -19,8 +23,10 @@ export class LocalMatch {
     const seed = (opts.seed ?? ((Date.now() & 0x7fffffff))) >>> 0;
     this.seed = seed;
     this.mode = opts.mode || 'duel';
-    this.loadout = starterLoadout();
-    this.sim = new Sim({ seed, loadouts: [starterLoadout(), starterLoadout()] });
+    this.playerLoadout = opts.playerLoadout || starterLoadout();
+    this.botLoadout = opts.botLoadout || starterLoadout();
+    this.loadout = this.playerLoadout;
+    this.sim = new Sim({ seed, loadouts: [this.playerLoadout, this.botLoadout] });
     // Player is wizard 0; the bot controls wizard 1.
     this.bot = new DuelBot(1, { difficulty: opts.difficulty || 'apprentice', rng: makeRng((seed ^ 0x5a5a) >>> 0) });
     this.botActive = opts.botActive !== false;

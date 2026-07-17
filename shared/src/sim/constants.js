@@ -69,18 +69,68 @@ export const CAST = {
 
 // --- Status effect definitions (MASTERPLAN §7) ---------------------------
 // duration in seconds; other fields are read by sim/status logic.
+// `harmful: true` marks statuses Dispel can strip and the HUD flags as debuffs.
+// `buff: true` (kind:'buff') marks self buffs — never dispelled off the caster
+// by an opponent and shown as beneficial in the HUD.
 export const STATUSES = {
-  Burning:  { durationS: 3, maxStacks: 2, dps: 2, kind: 'dot' },
-  Chilled:  { durationS: 3, maxStacks: 1, slow: 0.18, kind: 'slow' },
-  Soaked:   { durationS: 4, maxStacks: 1, lightningBonus: 0.25, kind: 'flag' },
-  Static:   { durationS: 3, maxStacks: 3, kind: 'flag' },
-  Sundered: { durationS: 4, maxStacks: 1, damageTaken: 0.20, kind: 'amp' },
-  Weakened: { durationS: 4, maxStacks: 1, damageDealt: 0.22, kind: 'amp' },
-  Marked:   { durationS: 5, maxStacks: 1, markBonus: 0.35, kind: 'flag' },
-  Rooted:   { durationS: 1.5, maxStacks: 1, canCast: true, kind: 'control' },
-  Frozen:   { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control' },
-  Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control' },
+  // Debuffs / crowd control ------------------------------------------------
+  Burning:  { durationS: 3, maxStacks: 2, dps: 2, kind: 'dot', harmful: true },
+  Chilled:  { durationS: 3, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Sloth:    { durationS: 4, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Soaked:   { durationS: 4, maxStacks: 1, lightningBonus: 0.25, kind: 'flag', harmful: true },
+  Static:   { durationS: 3, maxStacks: 3, kind: 'flag', harmful: true },
+  Sundered: { durationS: 4, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
+  Weakened: { durationS: 4, maxStacks: 1, damageDealt: 0.22, kind: 'amp', harmful: true },
+  Marked:   { durationS: 5, maxStacks: 1, markBonus: 0.35, kind: 'flag', harmful: true },
+  Blinded:  { durationS: 2, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
+  Veiled:   { durationS: 2, maxStacks: 1, kind: 'flag', harmful: true },   // Veil Hex (visual)
+  Rooted:   { durationS: 1.5, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
+  Frozen:   { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
+  Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
+  // Self buffs -------------------------------------------------------------
+  Haste:       { durationS: 6, maxStacks: 1, haste: 0.15, kind: 'buff' },
+  Grounded:    { durationS: 5, maxStacks: 1, dmgReduction: 0.15, moveSlow: 0.15, kind: 'buff' },
+  AetherSurge: { durationS: 6, maxStacks: 1, aetherPerS: 5, kind: 'buff' },
+  Attunement:  { durationS: 6, maxStacks: 1, school: 'Ember', costMul: 0.85, kind: 'buff' },
+  Phoenix:     { durationS: 5, maxStacks: 1, kind: 'buff' },
 };
 
 // Hard control that Tenacity guards against.
 export const HARD_CONTROL = new Set(['Frozen', 'Stunned']);
+
+// Harmful statuses Dispel can strip (order = Dispel removal priority).
+export const DISPELLABLE = [
+  'Frozen', 'Stunned', 'Rooted', 'Marked', 'Sundered', 'Weakened',
+  'Burning', 'Chilled', 'Sloth', 'Soaked', 'Static', 'Blinded', 'Veiled',
+];
+
+// --- Environmental zones (MASTERPLAN §10, environment-matrix.md) ----------
+// A wizard occupies a zone when |arcPos - zone.center| <= radius. Zones are
+// shared: either player can exploit or be affected by any active zone.
+export const ZONE = {
+  maxPerPlayer: 2,        // §10 two active zones per player
+  radius: 0.55,           // arc half-width a zone covers
+  hourglassSlow: 0.25,    // Hourglass Field slows movement + projectiles 25%
+  frozenSlow: 0.22,       // Frozen Ground slows movement while standing on it
+  coverReduction: 0.5,    // Stone Wall cover reduces incoming projectile dmg
+  coverHp: 26,
+  durations: {
+    Oil: 7, Wet: 7, Fog: 6, Frozen: 3, Snare: 8, Cover: 8,
+    Hourglass: 6, Fire: 4, Gust: 0.6, Grounded: 1,
+  },
+};
+
+// --- Environmental reaction rules (environment-matrix.md) ----------------
+export const REACTION = {
+  cooldownS: 1.0,          // same reaction cannot trigger more than once/sec
+  maxLinks: 2,             // chains stop after two reaction links
+  flashFireDamage: 10,     // Oil + Ember -> Flash Fire area damage
+  quakeSlowS: 1.0,         // Wall + Quake rubble slow
+  frozenGroundSlowS: 3,    // Wet + Frost -> Frozen Ground slow surface
+};
+
+// Deterministic reaction priority (environment-matrix.md). Lower = earlier
+// when multiple reactions are legal in the same tick.
+export const REACTION_PRIORITY = [
+  'douse', 'ground', 'freeze', 'conduct', 'ignite', 'spread', 'cover',
+];

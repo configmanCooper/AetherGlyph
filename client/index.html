@@ -45,14 +45,21 @@
       <div id="player-status" class="status-row"></div>
     </div>
 
-    <!-- Round timer + pressure -->
+    <!-- Round timer + pressure + series score -->
     <div class="round-info">
       <span id="round-timer">1:45</span>
       <span id="pressure" class="pressure hidden">Arcane Pressure</span>
+      <span id="series-score" class="series hidden"></span>
     </div>
+
+    <!-- Active environmental zones -->
+    <div id="environment" class="environment"></div>
 
     <!-- Recognition diagnostics (dev / practice) -->
     <div id="diag" class="diag hidden"></div>
+
+    <!-- On-screen cast bar for the equipped loadout (Phase 2 primary input) -->
+    <div id="spellbar" class="spellbar"></div>
 
     <!-- Left movement control -->
     <div id="move-pad" class="control-zone move-pad" aria-label="Movement">
@@ -88,6 +95,7 @@
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
         <button class="menu-btn" data-action="practice">Practice (templates + diagnostics)</button>
         <button class="menu-btn" data-action="duel">Bot Duel</button>
+        <button class="menu-btn" data-action="loadout">Loadout builder</button>
         <button class="menu-btn" data-action="settings">Settings</button>
       </div>
       <p class="offline-note">Fully offline. No account required.</p>
@@ -98,8 +106,8 @@
     </div>
 
     <div class="panel hidden" id="panel-duel">
-      <h2>Bot Duel</h2>
-      <p>Face the Apprentice bot in a best-of-one round. Reduce the opponent to 0 health before the 105-second timer.</p>
+      <h2>Bot Duel — Best of Three</h2>
+      <p>Face the bot in a best-of-three series. Win two rounds to take the match. Your loadout is preserved between rounds; the arena resets.</p>
       <label class="field">Difficulty
         <select id="duel-diff">
           <option value="apprentice" selected>Apprentice</option>
@@ -108,8 +116,27 @@
           <option value="archmage">Archmage</option>
         </select>
       </label>
+      <label class="field">Opponent archetype
+        <select id="duel-opp"></select>
+      </label>
+      <p id="duel-loadout-summary" class="loadout-summary"></p>
       <div class="menu-list">
-        <button class="menu-btn" data-action="start-duel">Begin duel</button>
+        <button class="menu-btn" data-action="start-duel">Begin series</button>
+        <button class="menu-btn ghost" data-action="loadout">Edit my loadout</button>
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden wide" id="panel-loadout">
+      <h2>Loadout Builder</h2>
+      <p class="loadout-rules">8 spells · 14 points · max two 3-point spells · max three per school.</p>
+      <div class="loadout-presets" id="loadout-presets"></div>
+      <div id="loadout-status" class="loadout-status"></div>
+      <div id="loadout-picked" class="loadout-picked"></div>
+      <div id="loadout-catalog" class="loadout-catalog"></div>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="save-loadout">Save loadout</button>
+        <button class="menu-btn ghost" data-action="clear-loadout">Clear</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
     </div>
@@ -140,6 +167,7 @@
       <h2 id="result-title">Round complete</h2>
       <p id="result-text"></p>
       <div class="menu-list">
+        <button class="menu-btn hidden" id="btn-next-round" data-action="next-round">Next round</button>
         <button class="menu-btn" data-action="rematch">Rematch</button>
         <button class="menu-btn ghost" data-action="menu">Main menu</button>
       </div>

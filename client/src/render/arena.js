@@ -19,6 +19,11 @@ const SCHOOL_COLOR = {
   Gale: 0x9be8d8, Arcane: 0xb98bff, Umbra: 0x7a6f99, Prismatic: 0xffffff,
 };
 
+const ZONE_COLOR = {
+  Oil: 0x2a2a1a, Wet: 0x2f6fa8, Fog: 0x8a93a6, Frozen: 0x9fdcff, Snare: 0xb98bff,
+  Cover: 0x6a5a3a, Hourglass: 0xd8b24a, Fire: 0xff5a2a, Gust: 0xbfeee0, Grounded: 0x7a6a4a,
+};
+
 function wizardX(w) { return w.arcPos * ARC_W; }
 
 export class Arena {
@@ -40,6 +45,7 @@ export class Arena {
     this._buildHands();
 
     this.projMeshes = new Map(); // projectile id -> mesh
+    this.zoneMeshes = new Map(); // zone id -> mesh
     this.effects = [];           // transient effect meshes
     this.pShield = this._makeShield(0x4fd6c9); this.scene.add(this.pShield); this.pShield.visible = false;
     this.eShield = this._makeShield(0xb98bff); this.scene.add(this.eShield); this.eShield.visible = false;
@@ -181,6 +187,8 @@ export class Arena {
   reset() {
     for (const [, m] of this.projMeshes) this.scene.remove(m);
     this.projMeshes.clear();
+    for (const [, m] of this.zoneMeshes) this.scene.remove(m);
+    this.zoneMeshes.clear();
     for (const e of this.effects) this.scene.remove(e.mesh);
     this.effects = [];
   }
@@ -243,6 +251,9 @@ export class Arena {
     // Projectiles.
     this._syncProjectiles(sim, alpha);
 
+    // Environmental zones.
+    this._syncZones(sim);
+
     // Transient effects.
     this._updateEffects(dtMs);
 
@@ -291,6 +302,43 @@ export class Arena {
     }
   }
 
+  // Ground disks for active environmental zones (readable, generic visuals).
+  _syncZones(sim) {
+    const seen = new Set();
+    for (const z of sim.zones) {
+      seen.add(z.id);
+      let mesh = this.zoneMeshes.get(z.id);
+      const col = ZONE_COLOR[z.kind] || 0x8b6bff;
+      if (!mesh) {
+        const r = 1.4 + (z.radius || 0.55) * 3.4;
+        if (z.kind === 'Cover') {
+          mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(1.6, 1.1, 0.5),
+            new THREE.MeshStandardMaterial({ color: col, roughness: 1 }),
+          );
+          mesh.position.y = 0.55;
+        } else {
+          mesh = new THREE.Mesh(
+            new THREE.RingGeometry(Math.max(0.4, r - 0.5), r, 28),
+            new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+          );
+          mesh.rotation.x = -Math.PI / 2;
+          mesh.position.y = 0.04;
+        }
+        this.scene.add(mesh);
+        this.zoneMeshes.set(z.id, mesh);
+      }
+      const zx = (z.center || 0) * ARC_W;
+      mesh.position.x = z.kind === 'Cover' ? zx : 0;
+      mesh.position.z = z.kind === 'Cover' ? 0 : 0;
+      const fade = Math.min(1, z.ticks / Math.max(1, z.totalTicks || 1));
+      if (mesh.material.opacity !== undefined) mesh.material.opacity = 0.2 + fade * 0.4;
+    }
+    for (const [id, mesh] of this.zoneMeshes) {
+      if (!seen.has(id)) { this.scene.remove(mesh); this.zoneMeshes.delete(id); }
+    }
+  }
+
   // ---- event-driven effects ----
   handleEvents(events, sim) {
     for (const e of events) {
@@ -300,6 +348,10 @@ export class Arena {
         const reflector = sim.wizards[e.by];
         this._burst(e.by === 0 ? PLAYER_Z : ENEMY_Z, reflector, 0x4fd6c9);
       }
+      else if (e.type === 'reaction') { this.keyLight.intensity = 1.8; this._burst(0, null, 0xffd24a); }
+      else if (e.type === 'phoenixSave') this._burst(e.target === 0 ? PLAYER_Z : ENEMY_Z, sim.wizards[e.target], 0xffa030);
+      else if (e.type === 'blink' || e.type === 'decoyHit') this._burst(e.caster === 0 || e.target === 0 ? PLAYER_Z : ENEMY_Z, null, 0xb98bff);
+      else if (e.type === 'shield' || e.type === 'barrier' || e.type === 'zone') this.keyLight.intensity = 1.2;
       else if (e.type === 'roundEnd') this.keyLight.intensity = 1.6;
     }
   }
