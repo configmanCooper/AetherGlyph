@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0713" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Aetherglyph: Arcane Duels</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/client/vendor/three.module.js",
+      "@shared/": "/shared/src/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- Three.js first-person arena renders here -->
+  <canvas id="scene"></canvas>
+
+  <!-- ============================ HUD ============================ -->
+  <div id="hud" class="hud hidden" aria-hidden="true">
+    <!-- Opponent bar (top) -->
+    <div class="enemy-panel">
+      <div class="name-row"><span class="label">Opponent</span><span id="enemy-cast" class="cast-tell"></span></div>
+      <div class="bar health"><div id="enemy-health" class="fill"></div></div>
+      <div class="mini-row">
+        <div class="bar small aether"><div id="enemy-aether" class="fill"></div></div>
+        <div id="enemy-charges" class="charges"></div>
+      </div>
+      <div id="enemy-status" class="status-row"></div>
+    </div>
+
+    <!-- Player panel (bottom-left) -->
+    <div class="player-panel">
+      <div class="bar health"><div id="player-health" class="fill"></div></div>
+      <div class="mini-row">
+        <div class="bar small aether"><div id="player-aether" class="fill"></div></div>
+        <div id="player-charges" class="charges"></div>
+      </div>
+      <div id="player-status" class="status-row"></div>
+    </div>
+
+    <!-- Round timer + pressure -->
+    <div class="round-info">
+      <span id="round-timer">1:45</span>
+      <span id="pressure" class="pressure hidden">Arcane Pressure</span>
+    </div>
+
+    <!-- Recognition diagnostics (dev / practice) -->
+    <div id="diag" class="diag hidden"></div>
+
+    <!-- Left movement control -->
+    <div id="move-pad" class="control-zone move-pad" aria-label="Movement">
+      <div id="move-stick" class="stick"></div>
+      <div class="pad-hint">move</div>
+    </div>
+
+    <!-- Right draw pad -->
+    <div id="draw-pad" class="control-zone draw-pad" aria-label="Draw glyph">
+      <canvas id="draw-canvas"></canvas>
+      <div class="pad-hint">draw spell</div>
+    </div>
+
+    <!-- Center + side action buttons -->
+    <div class="action-buttons">
+      <button id="btn-focus" class="act-btn">Focus</button>
+      <button id="btn-brace" class="act-btn">Brace</button>
+      <button id="btn-sidestep" class="act-btn">Dodge</button>
+    </div>
+
+    <!-- Dev accessibility fallback: quick-cast the loadout with buttons/keys -->
+    <div id="devcast" class="devcast hidden"></div>
+
+    <button id="btn-menu" class="corner-btn" title="Menu">☰</button>
+  </div>
+
+  <!-- ========================= OVERLAYS ========================= -->
+  <div id="overlay" class="overlay">
+    <div class="panel" id="panel-main">
+      <h1>Aetherglyph</h1>
+      <p class="tagline">Arcane Duels — draw glyphs, cast spells, win the duel.</p>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="tutorial">Tutorial</button>
+        <button class="menu-btn" data-action="practice">Practice (templates + diagnostics)</button>
+        <button class="menu-btn" data-action="duel">Bot Duel</button>
+        <button class="menu-btn" data-action="settings">Settings</button>
+      </div>
+      <p class="offline-note">Fully offline. No account required.</p>
+      <p class="links">
+        <a href="/MASTERPLAN.md">Master plan</a> ·
+        <a href="/design/spells.csv">Spell roster</a>
+      </p>
+    </div>
+
+    <div class="panel hidden" id="panel-duel">
+      <h2>Bot Duel</h2>
+      <p>Face the Apprentice bot in a best-of-one round. Reduce the opponent to 0 health before the 105-second timer.</p>
+      <label class="field">Difficulty
+        <select id="duel-diff">
+          <option value="apprentice" selected>Apprentice</option>
+          <option value="adept">Adept</option>
+          <option value="magus">Magus</option>
+          <option value="archmage">Archmage</option>
+        </select>
+      </label>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="start-duel">Begin duel</button>
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panel-settings">
+      <h2>Settings</h2>
+      <label class="toggle"><input type="checkbox" id="set-lefthand" /> Left-handed layout</label>
+      <label class="toggle"><input type="checkbox" id="set-reduced" /> Reduced motion</label>
+      <label class="toggle"><input type="checkbox" id="set-audio" checked /> Audio</label>
+      <label class="toggle"><input type="checkbox" id="set-haptics" checked /> Haptics</label>
+      <label class="toggle"><input type="checkbox" id="set-devcast" /> Show dev quick-cast buttons</label>
+      <div class="menu-list">
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panel-tutorial">
+      <h2 id="tut-title">Tutorial</h2>
+      <p id="tut-text">…</p>
+      <div id="tut-glyph-hint" class="glyph-hint"></div>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="tut-begin">Begin lesson</button>
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panel-result">
+      <h2 id="result-title">Round complete</h2>
+      <p id="result-text"></p>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="rematch">Rematch</button>
+        <button class="menu-btn ghost" data-action="menu">Main menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script type="module" src="./src/app/main.js"></script>
+</body>
+</html>

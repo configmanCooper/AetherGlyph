@@ -1,0 +1,29 @@
+{
+  "name": "aetherglyph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aetherglyph: Arcane Duels — Android-first, draw-to-cast 1v1 wizard duel. Phase 1 offline vertical slice (vanilla ES modules + Three.js, no build step).",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "serve": "node server.js",
+    "gen:spells": "node scripts/generate-spells.js",
+    "vendor:three": "node scripts/copy-three.js",
+    "test": "node test/run.js",
+    "test:browser": "node test/browser/smoke.mjs",
+    "postinstall": "node scripts/copy-three.js",
+    "prepare:assets": "node scripts/generate-spells.js && node scripts/copy-three.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "three": "^0.160.1"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "puppeteer-core": "^25.3.0"
+  }
+}
