@@ -4,16 +4,25 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Phase 3 (authoritative online multiplayer) is implemented on top of the Phase
-1/2 offline slices.** Two devices can play a real best-of-three duel through an
-authoritative Express + Socket.IO server that owns every match simulation.
-Casting online is by drawing — the server reclassifies the gesture and is the
-sole authority over health, resources, spell ids, and results. All 40 spell
-gestures are now drawable. Planning artifacts remain authoritative for later
-phases.
+**Phase 4 (Capacitor Android / Google Play packaging) is implemented on top of
+the Phase 1–3 offline + authoritative-online slices.** The no-build web app is
+staged into a Capacitor `webDir` and built into a signable Android App Bundle
+(app id `com.configmancooper.aetherglyph`, API 24 → 36, landscape). Online play
+connects to a configurable authoritative service (default
+`https://aetherglyph.onrender.com`); same-origin web deployments stay same-origin.
+
+**Phase 3 (authoritative online multiplayer)** remains: two devices play a real
+best-of-three duel through an authoritative Express + Socket.IO server that owns
+every match simulation. Casting online is by drawing — the server reclassifies
+the gesture and is the sole authority over health, resources, spell ids, and
+results. All 40 spell gestures are drawable. Planning artifacts remain
+authoritative for later phases.
 
 - `MASTERPLAN.md` - authoritative product, game, technical, test, deployment, and release plan
 - `docs/DEPLOYMENT.md` - environment variables, Render blueprint, scaling limits
+- `docs/ANDROID.md` - Capacitor packaging, web staging, configurable service URL, scripts
+- `PUBLISHING-ANDROID.md` - build/sign/publish flow, Data Safety, release checklist
+- `store-listing-android.md` - Google Play listing copy
 - `render.yaml` - one-click Render deploy (single instance)
 - `design/spells.csv` - implementation-ready launch spell roster
 - `design/environment-matrix.md` - shared battlefield reactions and counter rules
@@ -72,6 +81,7 @@ npm test             # headless Node suite (spell gen, determinism incl. zones,
                      # template separation, shared net protocol/remap)
 npm run test:server  # authoritative server integration over socket.io-client
 npm run test:browser # OPTIONAL headless browser smoke via local Edge/Chrome (WebGL)
+npm run test:packaging # staged assets, no CDN, app id/version/API, ignored signing, service worker
 npm run gesture:audit # dev tool: gesture separation report (not part of npm test)
 ```
 
@@ -216,8 +226,58 @@ Run it and deploy: see `docs/DEPLOYMENT.md` and `render.yaml`.
   queue/room store (not implemented). Do not raise `numInstances`.
 - Snapshots are full (not delta-compressed) and rendered without client-side
   interpolation smoothing yet; both are natural follow-ups.
-- No Capacitor Android packaging yet (Milestone 6). The comprehensive solo
-  tutorial/practice expansion remains deferred.
+- The comprehensive solo tutorial/practice expansion remains deferred to the
+  final solo phase.
+
+## Phase 4 — Android / Play packaging (Milestone 6)
+
+Phase 4 packages the game for Google Play via Capacitor **without changing the
+no-build ES-module architecture** — the same `client/`, `shared/`, and `design/`
+run in the browser and in the app.
+
+- **Deterministic web staging.** `npm run stage:web` (`scripts/stage-web.js`)
+  assembles the Capacitor `webDir` (`www/`) from `client/` + `shared/` + `design/`
+  with a real root `index.html`, preserving the absolute `/client`, `/shared`,
+  `/design` layout so import maps and static paths resolve unchanged under the
+  native origin. `node_modules` is never copied; three.js and the Socket.IO client
+  are vendored locally (no CDN), so offline tutorial and bot modes need no network.
+- **Configurable authoritative service.** The packaged app defaults to
+  `https://aetherglyph.onrender.com`; same-origin web builds stay same-origin. A
+  persisted **Settings → Online service URL** override is validated (HTTPS always;
+  plain HTTP only for localhost/LAN) with a reset, plus **Delete my data**.
+- **PWA + optional service worker.** `manifest.webmanifest`, icons, and a
+  same-origin **production-only** service worker (`client/sw.js`) whose cache
+  version tracks the app version. It is never registered in the native shell or on
+  localhost, so Capacitor and dev cache iteration are unaffected.
+- **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
+  "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
+  `versionCode 400` / `versionName 0.4.0`, no cleartext production traffic,
+  `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
+  back-button + background/resume + haptics via `@capacitor/app` and
+  `@capacitor/haptics`.
+- **Scripts + signing.** `setup-android.ps1`, `sync-android.ps1`,
+  `build-android.ps1` reuse the shared JDK 17 / Android SDK. Release signing reads
+  an ignored `android/keystore.properties`; no secret is committed. Builds emit a
+  named debug APK plus a release APK/AAB (signed when a key exists, clearly
+  labelled unsigned otherwise) into `dist/`.
+- **Assets + store.** `npm run android:assets` generates the app icon, adaptive
+  fore/background, splash, Play 512 icon, and 1024×500 feature graphic;
+  `npm run android:screenshots` renders deterministic phone screenshots. Listing,
+  privacy, account-deletion, and Data Safety material are documented.
+
+Build/sign/publish: see `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.
+
+### Known Phase 4 limitations
+
+- **Single instance only** (unchanged): one process owns each live match in
+  memory. Do **not** raise `numInstances` in `render.yaml`; horizontal scaling
+  requires match-ownership leases + fencing tokens and a shared queue/room store,
+  which are not implemented.
+- Release artifacts are **unsigned until an upload key is created** with
+  `setup-android.ps1`; the exact signing step is documented and produces a signed
+  AAB on the next build.
+- The comprehensive solo tutorial/practice expansion is still deferred to the
+  final solo phase; Phase 4 does not expand it.
 
 ## Product decision
 

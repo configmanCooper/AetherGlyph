@@ -1,7 +1,10 @@
 # Aetherglyph — Deployment & Environment
 
-The Phase 3 build is a single Node service (Express + Socket.IO) that serves the
-static client **and** runs the authoritative 1v1 duel simulation.
+The service is a single Node process (Express + Socket.IO) that serves the static
+client **and** runs the authoritative 1v1 duel simulation. The packaged Android
+app (Phase 4) connects to this same service — by default
+`https://aetherglyph.onrender.com` — while same-origin web deployments stay
+same-origin. Packaging/build details: `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.
 
 ## Run locally
 

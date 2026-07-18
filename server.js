@@ -92,6 +92,9 @@ export function createGameServer(opts = {}) {
   app.use('/client', express.static(join(ROOT, 'client')));
   app.use('/design', express.static(join(ROOT, 'design')));
   app.get('/MASTERPLAN.md', (_req, res) => res.sendFile(join(ROOT, 'MASTERPLAN.md')));
+  // Play-facing legal pages at stable root URLs (also available under /client/).
+  app.get('/privacy.html', (_req, res) => res.sendFile(join(ROOT, 'client', 'privacy.html')));
+  app.get('/account-deletion.html', (_req, res) => res.sendFile(join(ROOT, 'client', 'account-deletion.html')));
   app.get('/', (_req, res) => res.redirect('/client/index.html'));
 
   // Compatibility gate: reject mismatched protocol/balance/roster up front with

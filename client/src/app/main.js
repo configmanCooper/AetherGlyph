@@ -10,6 +10,8 @@ import { MovementControl } from '../input/movement.js';
 import { LocalMatch } from '../game/localMatch.js';
 import { OnlineMatch } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
+import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
+import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact } from './native.js';
 import { LESSONS, guideFor } from '../tutorial/tutorial.js';
 
 import { Recognizer } from '@shared/gesture/recognizer.js';
@@ -51,7 +53,12 @@ let online = null;
 let onlineRoundIndex = 0;
 
 function haptic(kind) {
-  if (!settings.haptics || !navigator.vibrate) return;
+  if (!settings.haptics) return;
+  // Prefer native haptics (@capacitor/haptics) in the packaged app; fall back to
+  // the Web Vibration API in the browser.
+  const style = { accept: 'LIGHT', reject: 'MEDIUM', counter: 'MEDIUM', damage: 'HEAVY', round: 'HEAVY' }[kind] || 'LIGHT';
+  if (nativeImpact(style)) return;
+  if (!navigator.vibrate) return;
   const map = { accept: 12, reject: [8, 30, 8], counter: [20, 20, 20], damage: 40, round: [60, 40, 120] };
   navigator.vibrate(map[kind] || 10);
 }
@@ -448,7 +455,7 @@ function showOnlineError(msg) {
 
 async function ensureOnline() {
   if (online && online.connected) return online;
-  if (!online) { online = new OnlineMatch({ url: '', loadoutIds: playerIds }); wireOnlineCallbacks(online); }
+  if (!online) { online = new OnlineMatch({ url: effectiveServerUrl(), loadoutIds: playerIds }); wireOnlineCallbacks(online); }
   await online.connect();
   return online;
 }
@@ -621,18 +628,17 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-cancel') cancelOnline();
     else if (a === 'online-copy') copyRoomCode();
     else if (a === 'loadout') openLoadoutBuilder();
-    else if (a === 'settings') showPanel('panel-settings');
+    else if (a === 'settings') openSettings();
+    else if (a === 'server-save') saveServerUrl();
+    else if (a === 'server-reset') resetServerUrl();
+    else if (a === 'privacy') openPrivacy();
+    else if (a === 'delete-data') deleteMyData();
     else if (a === 'start-duel') startSeries($('#duel-diff').value);
     else if (a === 'tut-begin') { series = null; startMatch('tutorial'); }
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
     else if (a === 'next-round') startSeriesRound();
-    else if (a === 'back' || a === 'menu') {
-      running = false; match = null; series = null;
-      if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
-      mode = null; setNetStatus(null); hud.setSeries(null);
-      $('#hud').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
-    }
+    else if (a === 'back' || a === 'menu') returnToMainMenu();
     else if (a === 'rematch') {
       if (mode === 'online') {
         running = false; match = null; mode = null; setNetStatus(null);
@@ -662,6 +668,86 @@ $('#set-audio').addEventListener('change', (e) => { settings.audio = e.target.ch
 $('#set-haptics').addEventListener('change', (e) => { settings.haptics = e.target.checked; });
 $('#set-devcast').addEventListener('change', (e) => { settings.devcast = e.target.checked; applySettings(); });
 
+// ----------------------------------------------------- server URL + local data
+function openSettings() {
+  const input = $('#set-server-url');
+  if (input) input.value = getStoredServerUrl();
+  setServerStatus(describeServerTarget(), '');
+  showPanel('panel-settings');
+}
+function setServerStatus(msg, cls) {
+  const el = $('#server-url-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'server-status' + (cls ? ' ' + cls : '');
+}
+function saveServerUrl() {
+  const res = setStoredServerUrl($('#set-server-url').value);
+  if (!res.ok) { setServerStatus(res.error, 'err'); return; }
+  $('#set-server-url').value = res.url;
+  disposeOnline(); // reconnect to the new target on the next online action
+  setServerStatus(`Saved. ${describeServerTarget()}`, 'ok');
+  toast('Online service updated.');
+}
+function resetServerUrl() {
+  setStoredServerUrl('');
+  $('#set-server-url').value = '';
+  disposeOnline();
+  setServerStatus(`Reset. ${describeServerTarget()}`, 'ok');
+  toast('Using the default service.');
+}
+function openPrivacy() {
+  window.location.href = './privacy.html';
+}
+function deleteMyData() {
+  if (!window.confirm('Delete all local data (identity, name, settings, saved duel)? This cannot be undone.')) return;
+  if (online) { try { online.leave(); } catch { /* ignore */ } disposeOnline(); }
+  try {
+    ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-server-url'].forEach((k) => localStorage.removeItem(k));
+  } catch { /* ignore */ }
+  const su = $('#set-server-url'); if (su) su.value = '';
+  const on = $('#online-name'); if (on) on.value = '';
+  setServerStatus('Local data deleted. A fresh anonymous id is created on next online play.', 'ok');
+  toast('Your local data was deleted.');
+}
+
+// Full teardown back to the main menu (shared by the Back/Menu buttons and the
+// Android hardware back button).
+function returnToMainMenu() {
+  running = false; match = null; series = null;
+  if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
+  mode = null; setNetStatus(null); hud.setSeries(null);
+  $('#hud').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
+}
+
+// Android hardware/gesture back: close subpanels first, confirm before
+// abandoning a live online duel, otherwise pause/exit consistently.
+function nativeBack() {
+  const overlayShown = !$('#overlay').classList.contains('hidden');
+  if (overlayShown) {
+    const active = document.querySelector('#overlay .panel:not(.hidden)');
+    const id = active && active.id;
+    if (id === 'panel-online-wait') { cancelOnline(); return; }
+    if (!id || id === 'panel-main') {
+      if (mode === 'online' && online && online.inMatch
+        && !window.confirm('Leave Aetherglyph? Your online duel will be forfeited.')) return;
+      exitApp();
+      return;
+    }
+    returnToMainMenu(); // any other subpanel -> back to the main menu
+    return;
+  }
+  // A live match is on screen (overlay hidden).
+  if (mode === 'online' && online && online.inMatch) {
+    running = false; online.setActive(false);
+    if (window.confirm('Abandon this online duel? You will forfeit the match.')) returnToMainMenu();
+    else if (!document.hidden) { online.setActive(true); running = true; }
+    return;
+  }
+  // Offline match -> open the pause menu (mirrors the corner menu button).
+  running = false; showPanel('panel-main'); showOverlay(true);
+}
+
 // ------------------------------------------------------------------ misc
 let toastTimer = null;
 function toast(msg) {
@@ -673,19 +759,26 @@ function toast(msg) {
 }
 
 window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    pausedForVisibility = running;
+
+// Background/foreground handling shared by the browser Page Visibility API and
+// the native app lifecycle. Captures the pre-background running state once so a
+// duplicate background event (both APIs can fire) does not clobber resume.
+function onBackgroundChange(hidden) {
+  if (hidden) {
+    if (!pausedForVisibility) pausedForVisibility = running;
     running = false;
     if (mode === 'online' && online) online.setActive(false); // stop issuing inputs while backgrounded
-  } else if (mode === 'online' && online) {
-    online.setActive(true);
-    if (online.inMatch) { running = true; setNetStatus(online.connected ? 'connected' : 'reconnecting'); }
-  } else if (pausedForVisibility && match && !match.sim.ended) {
+  } else {
+    if (mode === 'online' && online) {
+      online.setActive(true);
+      if (online.inMatch) { running = true; setNetStatus(online.connected ? 'connected' : 'reconnecting'); }
+    } else if (pausedForVisibility && match && !match.sim.ended) {
+      running = true;
+    }
     pausedForVisibility = false;
-    running = true;
   }
-});
+}
+document.addEventListener('visibilitychange', () => onBackgroundChange(document.hidden));
 
 // ------------------------------------------------------------------ boot
 buildOpponentSelect();
@@ -703,3 +796,22 @@ if (storedResume && storedResume.token) {
   showPanel('panel-online-wait');
   ensureOnline().catch((err) => onOnlineError(err));
 }
+
+// ------------------------------------------------------- native shell + PWA
+// All no-ops in a plain browser; only active in the Capacitor Android app.
+if (isNativeApp) {
+  onBackButton(() => nativeBack());
+  onAppStateChange((isActive) => onBackgroundChange(!isActive));
+}
+
+// Optional production offline fallback for the SAME-ORIGIN web build only. Never
+// in the native shell (assets ship natively) and never on localhost/LAN dev, so
+// dev cache iteration is unaffected. Registered from /client/ => scope /client/.
+function registerServiceWorker() {
+  if (isNativeApp || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  const loc = window.location;
+  if (loc.protocol !== 'https:') return;
+  if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') return;
+  navigator.serviceWorker.register('./sw.js').catch(() => { /* fallback is best-effort */ });
+}
+registerServiceWorker();

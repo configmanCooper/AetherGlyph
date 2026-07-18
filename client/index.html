@@ -8,6 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Aetherglyph: Arcane Duels</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="stylesheet" href="./styles/style.css" />
   <script type="importmap">
   {
@@ -187,6 +189,26 @@
       <label class="toggle"><input type="checkbox" id="set-audio" checked /> Audio</label>
       <label class="toggle"><input type="checkbox" id="set-haptics" checked /> Haptics</label>
       <label class="toggle"><input type="checkbox" id="set-devcast" /> Show dev quick-cast buttons</label>
+
+      <div class="settings-section">
+        <label class="field">Online service URL
+          <input type="text" id="set-server-url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Default" />
+        </label>
+        <p id="server-url-status" class="server-status"></p>
+        <div class="menu-list compact">
+          <button class="menu-btn ghost" data-action="server-save">Save server</button>
+          <button class="menu-btn ghost" data-action="server-reset">Use default</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <p class="settings-note">Anonymous play — no account or sign-in. Your identity is a random id stored only on this device.</p>
+        <div class="menu-list compact">
+          <button class="menu-btn ghost" data-action="privacy">Privacy &amp; deletion</button>
+          <button class="menu-btn ghost" data-action="delete-data">Delete my data</button>
+        </div>
+      </div>
+
       <div class="menu-list">
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>

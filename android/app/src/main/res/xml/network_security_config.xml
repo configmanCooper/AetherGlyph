@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Production traffic is HTTPS-only (the authoritative Render service). Cleartext
+  HTTP is permitted ONLY to loopback/emulator-host addresses so a locally hosted
+  dev server on the same machine works. Arbitrary LAN cleartext is intentionally
+  NOT allowed in release builds; debug builds relax this via the debug manifest
+  overlay (app/src/debug/AndroidManifest.xml) for two-device Wi-Fi testing.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aetherglyph: Arcane Duels</string>
+    <string name="title_activity_main">Aetherglyph: Arcane Duels</string>
+    <string name="package_name">com.configmancooper.aetherglyph</string>
+    <string name="custom_url_scheme">com.configmancooper.aetherglyph</string>
+</resources>

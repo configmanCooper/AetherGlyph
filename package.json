@@ -1,9 +1,9 @@
 {
   "name": "aetherglyph",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Aetherglyph: Arcane Duels — Android-first, draw-to-cast 1v1 wizard duel. Phase 3 adds an authoritative online duel service (Express + Socket.IO) on top of the deterministic shared simulation. Vanilla ES modules + Three.js, no build step.",
+  "description": "Aetherglyph: Arcane Duels — Android-first, draw-to-cast 1v1 wizard duel. Phase 4 adds Capacitor Android/Play packaging (staged webDir, configurable Render service, signed AAB) on top of the Phase 3 authoritative online service and the deterministic shared simulation. Vanilla ES modules + Three.js, no build step.",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
@@ -12,9 +12,16 @@
     "vendor:three": "node scripts/copy-three.js",
     "vendor:socketio": "node scripts/copy-socketio.js",
     "gesture:audit": "node scripts/gesture-audit.js",
+    "stage:web": "node scripts/stage-web.js",
     "test": "node test/run.js",
     "test:server": "node test/server.test.js",
     "test:browser": "node test/browser/smoke.mjs",
+    "test:packaging": "node test/packaging.test.js",
+    "android:assets": "node scripts/gen-assets.cjs && capacitor-assets generate --android",
+    "android:screenshots": "node scripts/gen-screenshots.cjs",
+    "android:setup": "powershell -ExecutionPolicy Bypass -File ./setup-android.ps1",
+    "android:sync": "powershell -ExecutionPolicy Bypass -File ./sync-android.ps1",
+    "android:build": "powershell -ExecutionPolicy Bypass -File ./build-android.ps1",
     "postinstall": "node scripts/copy-three.js && node scripts/copy-socketio.js",
     "prepare:assets": "node scripts/generate-spells.js && node scripts/copy-three.js && node scripts/copy-socketio.js"
   },
@@ -22,13 +29,20 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/haptics": "^6.0.2",
     "express": "^4.19.2",
     "socket.io": "^4.8.3",
     "three": "^0.160.1"
   },
   "license": "UNLICENSED",
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.2.1",
     "puppeteer-core": "^25.3.0",
+    "sharp": "^0.33.5",
     "socket.io-client": "^4.8.3"
   },
   "optionalDependencies": {
