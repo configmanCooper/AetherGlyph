@@ -148,6 +148,19 @@ export function run() {
   eq(rGuide.currentObjective().expectSpell, 6, 'L03 advances to the Flame Wave objective');
   eq(guides.at(-1).spellId, 6, 'guide switches to Flame Wave for the new objective');
 
+  const l08Guides = [];
+  const rL08 = new TutorialRunner('L08', { seed: 2, onGuide: (g) => l08Guides.push(g) });
+  rL08.arm();
+  eq(l08Guides.at(-1).spellId, 31, 'L08 starts with the Oil Script guide');
+  rL08.objectiveStatus['oil-wash'] = true;
+  rL08._advanceGuideOnObjective(rL08.lesson.objectives[0]);
+  eq(l08Guides.at(-1).spellId, 32, 'L08 switches to Rain for the wash objective');
+
+  const l09Guides = [];
+  const rL09 = new TutorialRunner('L09', { seed: 2, onGuide: (g) => l09Guides.push(g) });
+  rL09.arm();
+  eq(l09Guides.at(-1).spellId, 2, 'L09 starts with Frost Lance before Frost Bind');
+
   // --- 9. best-of-three flow + checkpoints (Academy 16 / Final Exam) --------
   {
     const a16 = CAMPAIGN_BY_ID.A16;

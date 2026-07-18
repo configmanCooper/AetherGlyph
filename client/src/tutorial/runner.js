@@ -138,10 +138,23 @@ export class TutorialRunner {
   }
 
   _syncGuideToObjective(emit = true) {
-    const expected = this._currentExpectSpell();
+    const objective = this.currentObjective();
+    const expected = objective && objective.guideSpell != null
+      ? objective.guideSpell
+      : this._currentExpectSpell();
+    const objectiveIndex = objective ? this.lesson.objectives.indexOf(objective) : 0;
+    const expectedLoadoutSpell = !this.lesson.gauntlet
+      && expected != null && this.lesson.playerLoadout.includes(expected)
+      ? { id: expected, enterStage: 1, exitStage: 1 }
+      : null;
     const taught = (this.lesson.taughtSpells || []).find((t) =>
       typeof t === 'object' && t.id === expected)
+      || expectedLoadoutSpell
       || this.focusSpell
+      || (this.lesson.taughtSpells && this.lesson.taughtSpells[Math.min(
+        Math.max(0, objectiveIndex),
+        Math.max(0, this.lesson.taughtSpells.length - 1),
+      )])
       || (this.lesson.taughtSpells && this.lesson.taughtSpells[0])
       || null;
     this.focusSpell = taught;

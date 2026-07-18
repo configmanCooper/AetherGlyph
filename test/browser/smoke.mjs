@@ -122,8 +122,41 @@ try {
     saved: localStorage.getItem('aeg.solo.v1'),
   }));
   if (!tut.obj1) fail('tutorial: first objective not completed by real drawing');
-  if (!tut.guide || tut.guide === guideBefore) fail('tutorial: guide did not fade after an objective (' + guideBefore + ' -> ' + tut.guide + ')');
+  if (!/Dotted/.test(guideBefore) || !/Dotted/.test(tut.guide)) {
+    fail('tutorial: instructional guide must remain dotted (' + guideBefore + ' -> ' + tut.guide + ')');
+  }
   if (!tut.saved || !/PROLOGUE|L01/.test(tut.saved)) fail('tutorial: solo progress not persisted to aeg.solo.v1');
+  await page.click('#btn-menu');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
+  // Moving Line regression: Stone Shard must be visibly identified and drawn as
+  // a dotted template in the pad when the lesson starts.
+  await page.click('[data-action="tutorial"]');
+  await page.waitForSelector('#panel-tutorial:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-lesson="L02"]');
+  await page.waitForSelector('#panel-lesson-intro:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="tut-begin"]');
+  await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
+  const stoneGuide = await page.evaluate(() => {
+    const canvas = document.querySelector('#draw-canvas');
+    const ctx = canvas?.getContext('2d');
+    let painted = 0;
+    if (canvas && ctx) {
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) painted++;
+    }
+    return {
+      spell: canvas?.dataset.guideSpell,
+      stage: canvas?.dataset.guideStage,
+      coach: document.querySelector('#coach-guide')?.textContent || '',
+      hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+      painted,
+    };
+  });
+  if (stoneGuide.spell !== '4' || stoneGuide.stage !== 'dotted' || !/Dotted/.test(stoneGuide.coach)
+      || !/Stone Shard/i.test(stoneGuide.hint) || stoneGuide.painted < 20) {
+    fail('Moving Line did not show the Stone Shard dotted guide: ' + JSON.stringify(stoneGuide));
+  }
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 

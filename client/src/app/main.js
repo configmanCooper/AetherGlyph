@@ -12,7 +12,7 @@ import { OnlineMatch } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
 import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact } from './native.js';
-import { TutorialRunner, STATES, GUIDE_STAGE_NAMES } from '../tutorial/runner.js';
+import { TutorialRunner, STATES } from '../tutorial/runner.js';
 import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters,
   lessonUnlocked, lockReason, groupProgress, firstAvailableLessonId, EXAM_GROUPS } from '../tutorial/campaign.js';
 import {
@@ -66,6 +66,11 @@ function guideTemplateFor(spellId) {
   const key = GESTURE_KEYS[spellId];
   const variants = key ? GESTURE_TEMPLATES[key] : null;
   return variants ? variants[0] : null;
+}
+
+function setDrawHint(text) {
+  const hint = document.querySelector('#draw-pad .pad-hint');
+  if (hint) hint.textContent = text || 'draw spell';
 }
 
 // Best-of-three series (online only; the local bot-duel series was replaced by
@@ -209,6 +214,7 @@ function startLab() {
   $('#devcast').classList.toggle('hidden', !settings.devcast);
   gesture.recognizer = recognizer;
   gesture.setGuide(guideTemplateFor(playerLoadout[0].id), { stage: 0 });
+  setDrawHint('draw spell');
   toast('Glyph Laboratory — draw freely. No opponent.');
 }
 
@@ -269,6 +275,7 @@ function startPractice() {
   $('#devcast').classList.toggle('hidden', !settings.devcast);
   // Templates on = per-spell assistance (a guide) and an assisted coaching flag.
   gesture.setGuide(practice.templates ? guideTemplateFor(pLoadout[0].id) : null, { stage: 0 });
+  setDrawHint('draw spell');
   toast(`Practice vs ${PRACTICE_PROFILES[practice.difficulty].label} AI — draw to cast.`);
 }
 
@@ -541,13 +548,17 @@ function armTutorialLesson() {
   hud.setSeries(tutorial.bestOfThree ? tutorial.seriesScore : null, tutorial.seriesRound || 0);
   arena.reset();
   buildCoachPanel(tutorialLesson);
-  onTutorialGuide({ spellId: tutorial.focusSpell ? tutorial.focusSpell.id : null, stage: tutorial.guideStage });
   showOverlay(false);
   $('#hud').classList.remove('hidden');
   $('#spellbar').classList.add('hidden'); // tutorial casts by drawing only
   $('#devcast').classList.add('hidden');
   $('#coach').classList.remove('hidden');
   document.body.classList.add('mode-tutorial');
+  // The draw canvas has no layout size while the HUD is hidden. Resize and draw
+  // the lesson guide only after revealing it, otherwise the correct template is
+  // rendered into a 1x1 transparent canvas.
+  gesture.resize();
+  onTutorialGuide({ spellId: tutorial.focusSpell ? tutorial.focusSpell.id : null, stage: tutorial.guideStage });
   updateCoachState();
   toast(tutorialLesson.bestOfThree ? 'Best-of-three — win two rounds.' : (tutorialLesson.formal ? 'Formal duel — win the round.' : 'Draw to cast.'));
 }
@@ -579,7 +590,7 @@ function updateCoachObjectives() {
 function updateCoachState() {
   if (!tutorial) return;
   const gi = $('#coach-guide');
-  if (gi) gi.textContent = `Guide: ${GUIDE_STAGE_NAMES[tutorial.guideStage] || 'None'}`;
+  if (gi) gi.textContent = `Guide: ${tutorial.focusSpell ? 'Dotted' : 'None'}`;
   const failed = tutorial.state === STATES.ATTEMPT_FAILED;
   $('#coach-remediate').classList.toggle('hidden', !failed);
   const fr = $('#coach-fail');
@@ -629,8 +640,25 @@ function onTutorialReject(r) {
 }
 
 function onTutorialGuide(g) {
-  if (!g || g.spellId == null || g.stage >= 3) { gesture.setGuide(null); }
-  else gesture.setGuide(guideTemplateFor(g.spellId), { stage: g.stage, showGhost: g.stage === 0 });
+  const canvas = $('#draw-canvas');
+  if (!g || g.spellId == null) {
+    gesture.setGuide(null);
+    setDrawHint('draw without a guide');
+    if (canvas) {
+      delete canvas.dataset.guideSpell;
+      canvas.dataset.guideStage = 'none';
+    }
+  } else {
+    // Every instructional spell keeps a visible dotted template. Exam gauntlets
+    // remain guide-free because they intentionally provide no focus spell.
+    gesture.setGuide(guideTemplateFor(g.spellId), { stage: 1, showGhost: false });
+    const spell = SPELLS_BY_ID[g.spellId];
+    setDrawHint(`draw ${spell ? spell.name : 'spell'} — follow the dotted line`);
+    if (canvas) {
+      canvas.dataset.guideSpell = String(g.spellId);
+      canvas.dataset.guideStage = 'dotted';
+    }
+  }
   updateCoachState();
 }
 
