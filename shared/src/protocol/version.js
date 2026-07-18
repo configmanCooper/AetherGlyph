@@ -4,8 +4,8 @@
 import { SPELLS_SOURCE_CHECKSUM } from '../balance/spellData.generated.js';
 
 export const PROTOCOL_VERSION = 2;
-export const BALANCE_VERSION = 2;
-export const APP_PHASE = 4;
+export const BALANCE_VERSION = 3;
+export const APP_PHASE = 5;
 
 // The spell-data checksum ties the running build to a specific roster snapshot.
 export const ROSTER_CHECKSUM = SPELLS_SOURCE_CHECKSUM;

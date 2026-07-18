@@ -14,7 +14,7 @@ import {
 } from './constants.js';
 import { SPELLS_BY_ID } from '../balance/spellData.generated.js';
 import {
-  effectFor, categoryOf,
+  effectFor, categoryOf, isHeavyProjectile,
   PROJECTILE, SHIELD, BARRIER, REFLECT, HEX, BUFF, ZONE as ZONE_T,
   DISPEL, BLINK, CHANNEL, MIRROR, PHOENIX,
 } from './spellEffects.js';
@@ -49,6 +49,7 @@ function makeWizard(id, loadout, spawnArc) {
     shield: null,               // { absorb, ticks, frontal }
     barrier: null,              // { absorb, ticks }
     reflectTicks: 0,
+    deflectTicks: 0,           // Gust Wall light-projectile deflect window
     evadeTicks: 0,              // brief post-Blink evade window
     mirrorTicks: 0,             // Mirror Twin decoy still up
     phoenixUsed: false,         // Phoenix save spent this round
@@ -511,7 +512,12 @@ export class Sim {
     // Incoming water (Rain Glyph) immediately douses Burning + fire zones.
     let incoming = null;
     if (eff.zoneKind === 'Wet') incoming = 'water';
-    else if (eff.zoneKind === 'Gust') incoming = 'gust';
+    else if (eff.zoneKind === 'Gust') {
+      incoming = 'gust';
+      // Gust Wall raises a brief window that blows away LIGHT projectiles aimed
+      // at the caster (heavy shots punch through — see resolveProjectile).
+      if (eff.deflect) { w.deflectTicks = sToTicks(eff.deflectWindowS || 0); this.emit('gustWall', { caster: w.id }); }
+    }
     if (incoming) this.triggerReactions({ casterId: w.id, targetId: this.opponentOf(w.id).id, incoming, center: zone.center });
   }
 
@@ -719,6 +725,15 @@ export class Sim {
       return;
     }
 
+    // Gust Wall: a fresh wind wall blows away a LIGHT projectile before it lands.
+    // Heavy shots (Stone Shard, charged/area heavies) punch straight through, so
+    // Gust answers pokes, not committed heavy attacks (SOLO-MODES-PLAN §9 L10).
+    if (defender.deflectTicks > 0 && !isHeavyProjectile(eff)) {
+      defender.countersLanded += 1;
+      this.emit('deflect', { by: defender.id, spellId: p.spellId });
+      return;
+    }
+
     // Brief post-Blink evade makes any shot miss.
     if (defender.evadeTicks > 0) { this.emit('miss', { spellId: p.spellId, target: defender.id, reason: 'evade' }); return; }
 
@@ -826,6 +841,7 @@ export class Sim {
     if (w.shield) { w.shield.ticks -= 1; if (w.shield.ticks <= 0) w.shield = null; }
     if (w.barrier) { w.barrier.ticks -= 1; if (w.barrier.ticks <= 0) w.barrier = null; }
     if (w.reflectTicks > 0) w.reflectTicks -= 1;
+    if (w.deflectTicks > 0) w.deflectTicks -= 1;
     if (w.evadeTicks > 0) w.evadeTicks -= 1;
     if (w.mirrorTicks > 0) { w.mirrorTicks -= 1; if (w.mirrorTicks <= 0) this.emit('mirrorEnd', { caster: w.id }); }
     // Resonance expiry.
@@ -925,6 +941,14 @@ export class Sim {
         w.castsRejected += 1;
         this.emit('castRejected', { caster: w.id, spellId: intent.cast });
       }
+    } else if (intent.castReject != null && canAct && !w.casting && !w.channel && w.recoveryTicks <= 0) {
+      // A modelled failed gesture (Practice AI whose sampled gesture score fell
+      // below the recognizer threshold). It receives the SAME reject recovery and
+      // rejection counter a human's below-threshold trace would (§16) — never an
+      // Aether cost and never a cast.
+      w.recoveryTicks = Math.max(w.recoveryTicks, sToTicks(CAST.rejectRecoveryS));
+      w.castsRejected += 1;
+      this.emit('castRejected', { caster: w.id, spellId: intent.castReject });
     }
   }
 
@@ -1037,6 +1061,7 @@ export class Sim {
         shield: w.shield ? { absorb: w.shield.absorb, ticks: w.shield.ticks } : null,
         barrier: w.barrier ? { absorb: w.barrier.absorb, ticks: w.barrier.ticks } : null,
         reflectTicks: w.reflectTicks, tenacityTicks: w.tenacityTicks,
+        deflectTicks: w.deflectTicks,
         evadeTicks: w.evadeTicks, mirrorTicks: w.mirrorTicks,
         sidestepCharges: w.sidestepCharges, recoveryTicks: w.recoveryTicks,
         statuses: Object.fromEntries(Object.entries(w.statuses).map(([k, v]) => [k, { stacks: v.stacks, ticks: v.ticks }])),
@@ -1056,7 +1081,7 @@ export class Sim {
         w.casting ? w.casting.spellId : 0, w.casting ? w.casting.ticks : 0,
         w.channel ? w.channel.spellId : 0, w.channel ? w.channel.ticks : 0,
         w.focusing ? 1 : 0, w.braceTicks, w.reflectTicks, w.tenacityTicks,
-        w.evadeTicks, w.mirrorTicks,
+        w.deflectTicks, w.evadeTicks, w.mirrorTicks,
         w.shield ? q(w.shield.absorb, 100) : 0, w.barrier ? q(w.barrier.absorb, 100) : 0,
         w.sidestepCharges, w.recoveryTicks,
       );

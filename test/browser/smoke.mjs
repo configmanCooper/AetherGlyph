@@ -73,15 +73,36 @@ try {
   await page.click('#panel-online [data-action="back"]');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
-  // Tutorial smoke: open the hub, begin the Prologue, and complete the first
-  // guided objective through REAL pointer drawing. Assert the guide fades and
-  // that solo progress is persisted to local storage (aeg.solo.v1).
+  // Tutorial smoke: open the hub, begin the Prologue, complete the first-run
+  // interactive calibration by real drawing, then complete the first guided
+  // objective through REAL pointer drawing. Assert calibration + solo progress
+  // persist to local storage (aeg.solo.v1) and the guide fades.
   await page.click('[data-action="tutorial"]');
   await page.waitForSelector('#panel-tutorial:not(.hidden)', { timeout: 5000 });
   await page.click('[data-action="tut-continue"]');
   await page.waitForSelector('#panel-lesson-intro:not(.hidden)', { timeout: 5000 });
   await page.click('[data-action="tut-begin"]');
+
+  // First-run calibration: draw the three requested shapes on the calib pad.
+  await page.waitForSelector('#panel-calibrate:not(.hidden)', { timeout: 5000 });
+  const cpad = await page.$('#calib-canvas');
+  const cbox = await cpad.boundingBox();
+  async function calibStroke() {
+    const cy = cbox.y + cbox.height / 2;
+    await page.mouse.move(cbox.x + cbox.width * 0.2, cy);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(cbox.x + cbox.width * 0.2 + (cbox.width * 0.6) * (i / 8), cy);
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 180));
+  }
+  await calibStroke(); await calibStroke(); await calibStroke();
+
   await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
+  const calibDone = await page.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}').calibration; } catch { return null; }
+  });
+  if (!calibDone || calibDone.done !== true) fail('calibration was not captured/persisted (done flag): ' + JSON.stringify(calibDone));
+
   const guideBefore = await page.evaluate(() => document.querySelector('#coach-guide')?.textContent || '');
   const tpad = await page.$('#draw-canvas');
   const tbox = await tpad.boundingBox();
@@ -106,68 +127,72 @@ try {
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
-  // Glyph Laboratory (renamed from Practice; no opponent).
+  // Glyph Laboratory: no opponent (a recognizer/drill sandbox).
   await page.click('[data-action="lab"]');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
   await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
-  const labEnemy = await page.evaluate(() => document.querySelector('#enemy-health')?.style.width);
-  if (labEnemy !== '100%' && labEnemy !== '') { /* lab has no opponent pressure; enemy bar static */ }
+  const labInfo = await page.evaluate(() => (window.__aegTest ? window.__aegTest.info() : null));
+  if (!labInfo || labInfo.mode !== 'lab' || labInfo.botActive) fail('Glyph Laboratory should have no active opponent: ' + JSON.stringify(labInfo));
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
-  // Non-starter loadout path: open the builder, apply an archetype preset,
-  // save it, then start a best-of-three series against a chosen opponent.
+  // Non-starter loadout path: open the builder, apply an archetype preset, save.
   await page.click('[data-action="loadout"]');
   await page.waitForSelector('#panel-loadout:not(.hidden)', { timeout: 5000 });
   await page.waitForSelector('.preset-btn', { timeout: 5000 });
   await page.click('.preset-btn'); // apply the first curated preset (Ember Rush)
   await page.waitForSelector('.ls-ok', { timeout: 5000 }); // legal loadout confirmed
   await page.click('[data-action="save-loadout"]');
-  await page.waitForSelector('#panel-duel:not(.hidden)', { timeout: 5000 });
-  await page.click('[data-action="start-duel"]');
-  await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
-  await page.waitForSelector('#series-score:not(.hidden)', { timeout: 5000 });
-  await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
+  await page.waitForSelector('#panel-practice:not(.hidden)', { timeout: 5000 });
 
-  // Draw a horizontal flick (Ember Bolt) on the draw pad via pointer.
-  const pad = await page.$('#draw-canvas');
-  const box = await pad.boundingBox();
-  const y = box.y + box.height / 2;
-  async function drawLine(x0, x1) {
-    await page.mouse.move(box.x + x0, y);
+  // Practice vs AI: exactly Easy/Medium/Hard. Start a round on EACH difficulty,
+  // confirm the AI opponent is active, force the round to end, and see coaching.
+  const diffOptions = await page.evaluate(() => Array.from(document.querySelectorAll('#prac-diff option')).map((o) => o.value));
+  if (diffOptions.join(',') !== 'easy,medium,hard') fail('Practice must offer exactly easy,medium,hard: ' + diffOptions.join(','));
+
+  for (const diff of ['easy', 'medium', 'hard']) {
+    await page.select('#prac-diff', diff);
+    await page.click('[data-action="start-practice"]');
+    await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+    await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
+    const info = await page.evaluate(() => (window.__aegTest ? window.__aegTest.info() : null));
+    if (!info || info.mode !== 'practice' || !info.botActive || !info.hasBot || info.difficulty !== diff) {
+      fail(`Practice AI not active for ${diff}: ` + JSON.stringify(info));
+    }
+    // Draw a real glyph, then force the round to a finish and read the coaching.
+    const pad = await page.$('#draw-canvas');
+    const box = await pad.boundingBox();
+    const py = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width * 0.2, py);
     await page.mouse.down();
-    for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + x0 + (x1 - x0) * (i / 8), y);
+    for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width * 0.2 + (box.width * 0.6) * (i / 8), py);
     await page.mouse.up();
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 300));
+    await page.evaluate(() => window.__aegTest.forceEnd(0));
+    await page.waitForSelector('#panel-result:not(.hidden)', { timeout: 5000 });
+    await page.waitForSelector('#coach-report:not(.hidden)', { timeout: 5000 });
+    const coachText = await page.evaluate(() => document.querySelector('#coach-report')?.textContent || '');
+    if (!/Improve/.test(coachText) || !/Keep it up/.test(coachText)) fail(`coaching report missing for ${diff}: ` + coachText.slice(0, 120));
+    await page.click('#panel-result [data-action="menu"]');
+    await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+    if (diff !== 'hard') {
+      await page.click('[data-action="practice-ai"]');
+      await page.waitForSelector('#panel-practice:not(.hidden)', { timeout: 5000 });
+    }
   }
-  await drawLine(box.width * 0.2, box.width * 0.8);
-  await drawLine(box.width * 0.2, box.width * 0.8);
-
-  // Exercise the on-screen cast bar (a spell that has no drawn gesture yet).
-  const spellBtns = await page.$$('#spellbar .spell-btn');
-  for (let k = 0; k < Math.min(3, spellBtns.length); k++) {
-    await spellBtns[k].click();
-    await new Promise((r) => setTimeout(r, 120));
-  }
-
-  // Let the match run a bit.
-  await new Promise((r) => setTimeout(r, 2500));
 
   const state = await page.evaluate(() => ({
-    timer: document.querySelector('#round-timer')?.textContent,
-    enemyHp: document.querySelector('#enemy-health')?.style.width,
-    playerHp: document.querySelector('#player-health')?.style.width,
-    hudVisible: !document.querySelector('#hud')?.classList.contains('hidden'),
-    seriesVisible: !document.querySelector('#series-score')?.classList.contains('hidden'),
+    hudHidden: document.querySelector('#hud')?.classList.contains('hidden'),
+    onMain: !document.querySelector('#panel-main')?.classList.contains('hidden'),
     spellButtons: document.querySelectorAll('#spellbar .spell-btn').length,
+    practiceSaved: (() => { try { return JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}').practice; } catch { return null; } })(),
   }));
 
   if (errors.length) fail('console/page errors: ' + errors.slice(0, 4).join(' | '));
   if (http404.length) fail('unexpected 404s: ' + http404.slice(0, 4).join(' | '));
-  if (!state.hudVisible) fail('HUD not visible after starting duel');
-  if (!state.seriesVisible) fail('series score not shown in best-of-three');
+  if (!state.onMain) fail('did not return to the main menu after practice');
   if (state.spellButtons !== 8) fail('cast bar should have 8 equipped spells, has ' + state.spellButtons);
-  if (!state.timer || state.timer === '1:45') fail('round timer did not advance: ' + state.timer);
+  if (!state.practiceSaved || state.practiceSaved.difficulty !== 'hard') fail('practice settings not persisted to aeg.solo.v1: ' + JSON.stringify(state.practiceSaved));
 
   console.log('SMOKE PASS', JSON.stringify(state));
   await browser.close();

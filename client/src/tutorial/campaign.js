@@ -16,6 +16,7 @@
 
 import { canWizardCast } from './scriptBot.js';
 import { DuelBot } from '../../../shared/src/bot/bot.js';
+import { isHeavyProjectile } from '../../../shared/src/sim/spellEffects.js';
 import { PRESETS_BY_KEY } from '../../../shared/src/balance/loadouts.js';
 
 // --- solution helpers ------------------------------------------------------
@@ -333,27 +334,41 @@ export const CAMPAIGN = [
   {
     id: 'L10', chapter: 'core', title: 'Wind Answers', order: 10,
     narration: [
-      'Gust clears Fog and shifts Oil, but heavy attacks blow right through it.',
+      'Gust deflects a light bolt and clears Fog, but heavy attacks blow right through it.',
       'Visual effects never change how your glyph is read.',
-      'Clear the Fog with Gust, then dodge a heavy Stone Shard.',
+      'Clear the Fog, deflect a light bolt, then dodge a heavy Stone Shard.',
     ],
     timerEnabled: false, pressureEnabled: false,
-    playerLoadout: [35, 33], opponentLoadout: [4],
+    playerLoadout: [35, 33], opponentLoadout: [1, 4],
     taughtSpells: [{ id: 33, enterStage: 0, exitStage: 2 }, { id: 35, enterStage: 0, exitStage: 2 }],
     drills: [25, 29],
-    opponent: { type: 'script', config: { behavior: 'periodic', spellId: 4, startTick: 200, periodTicks: 150 } },
+    opponent: { type: 'script', config: { behavior: 'wind-drill', lightId: 1, heavyId: 4, heavyStartTick: 300, heavyPeriodTicks: 170 } },
     objectives: [
       { id: 'clear', text: 'Clear the Fog with Gust', predicate: 'reaction:ClearedAir' },
+      { id: 'deflect', text: 'Deflect a light projectile with Gust', predicate: 'deflect' },
       { id: 'dodge', text: 'Dodge a heavy Stone Shard', predicate: 'evade-spell:4' },
     ],
     remediation: ['slow-script'],
-    maxTicks: 2400,
+    maxTicks: 2600,
     solution: (sim, t) => {
+      const P = sim.wizards[0];
+      // Always survive an incoming heavy Stone Shard (Gust cannot stop it).
+      const heavy = enemyProj(sim, (p) => isHeavyProjectile(p.eff) && p.ticks <= 1);
+      if (heavy && P.sidestepCharges > 0 && !P.sidestepTimers.some((x) => x > 147)) {
+        return { sidestep: P.arcPos >= 0 ? -1 : 1 };
+      }
+      // 1. Clear the Fog with Gust (this also raises the deflect window).
       if (!t.facts.reactionsSetPlayer.has('ClearedAir')) {
         if (!playerZone(sim, 'Fog') && pc(sim, 35)) return { cast: 35, castQuality: 1 };
-        if (playerZone(sim, 'Fog') && pc(sim, 33)) return { cast: 33, castQuality: 1 };
+        if (playerZone(sim, 'Fog') && P.deflectTicks <= 0 && pc(sim, 33)) return { cast: 33, castQuality: 1 };
         return IDLE;
       }
+      // 2. Deflect a light bolt: raise a fresh Gust wall to blow away a poke.
+      if ((t.facts.deflectsBySelf || 0) < 1) {
+        if (P.deflectTicks <= 0 && pc(sim, 33)) return { cast: 33, castQuality: 1 };
+        return IDLE;
+      }
+      // 3. Dodge a heavy Stone Shard.
       if ((t.facts.evadesBySpell.get(4) || 0) < 1) return dodgeIntent(sim);
       return IDLE;
     },
@@ -396,7 +411,7 @@ export const CAMPAIGN = [
     narration: [
       'Build a legal loadout: eight spells, fourteen points, school and heavy limits.',
       'A full round adds the timer and Arcane Pressure. Win it fairly.',
-      'Defeat the fair Apprentice instructor in one legal round.',
+      'Defeat the fair Easy AI in one legal round.',
     ],
     formal: true,
     timerEnabled: true, pressureEnabled: true,
@@ -405,9 +420,9 @@ export const CAMPAIGN = [
     opponentLoadout: PRESETS_BY_KEY['tide-control'].ids.slice(),
     taughtSpells: [],
     drills: [],
-    opponent: { type: 'duel', difficulty: 'apprentice' },
+    opponent: { type: 'practice', difficulty: 'easy' },
     objectives: [
-      { id: 'win', text: 'Win a legal round against the Apprentice', predicate: 'win-round' },
+      { id: 'win', text: 'Win a legal round against the Easy AI', predicate: 'win-round' },
     ],
     reward: { rankedReady: true },
     remediation: ['retry'],
@@ -523,10 +538,10 @@ export const CAMPAIGN = [
 
   {
     id: 'A16', chapter: 'academy', title: 'The Eight Schools Examination', order: 16,
-    optional: true, formal: true,
+    optional: true, formal: true, bestOfThree: true,
     narration: [
       'Adapt across schools against a sharper opponent.',
-      'Win a legal round against the Adept instructor.',
+      'Win a best-of-three against the fair Medium AI — take two rounds.',
     ],
     timerEnabled: true, pressureEnabled: true,
     loadoutRule: 'legal',
@@ -534,22 +549,22 @@ export const CAMPAIGN = [
     opponentLoadout: PRESETS_BY_KEY['stone-warden'].ids.slice(),
     taughtSpells: [],
     drills: [],
-    opponent: { type: 'duel', difficulty: 'adept' },
+    opponent: { type: 'practice', difficulty: 'medium' },
     objectives: [
-      { id: 'win', text: 'Win a legal round against the Adept', predicate: 'win-round' },
+      { id: 'win', text: 'Win a best-of-three against the Medium AI', predicate: 'win-series' },
     ],
     remediation: ['retry'],
     solutionBot: 'archmage',
-    maxTicks: 6600,
+    maxTicks: 21000,
   },
 
   {
     id: 'EXAM', chapter: 'exam', title: 'Final Examination', order: 17,
-    optional: true, formal: true,
+    optional: true, formal: true, bestOfThree: true,
     narration: [
-      'The final examination: prove your mastery in a full legal duel.',
-      'A best-of-three and gesture gauntlet expand this scaffold in a later phase.',
-      'Defeat the Magus examiner in one legal round.',
+      'The final examination: prove your mastery in a best-of-three duel.',
+      'Take two rounds against the fair Medium examiner.',
+      'A Grandmaster retry against the Hard AI awaits the confident.',
     ],
     timerEnabled: true, pressureEnabled: true,
     loadoutRule: 'legal',
@@ -557,20 +572,22 @@ export const CAMPAIGN = [
     opponentLoadout: PRESETS_BY_KEY['gale-trickster'].ids.slice(),
     taughtSpells: [],
     drills: [],
-    // Scaffolded structure for later expansion (SOLO-MODES-PLAN §9 Final Exam).
+    // Scaffolded structure for later expansion (SOLO-MODES-PLAN §9 Final Exam):
+    // the gesture gauntlet and tactical scenarios remain future work; the core
+    // best-of-three duel is fully implemented here.
     stages: [
       { id: 'gauntlet', kind: 'gesture-gauntlet', note: 'draw 10 of 12 with no templates' },
       { id: 'scenarios', kind: 'tactical', note: 'pass 4 of 5 tactical scenarios' },
       { id: 'duel', kind: 'best-of-three', note: 'best-of-three vs Medium' },
       { id: 'grandmaster', kind: 'optional', note: 'optional retry vs Hard' },
     ],
-    opponent: { type: 'duel', difficulty: 'magus' },
+    opponent: { type: 'practice', difficulty: 'medium' },
     objectives: [
-      { id: 'win', text: 'Win a legal round against the Magus examiner', predicate: 'win-round' },
+      { id: 'win', text: 'Win a best-of-three against the Magus examiner', predicate: 'win-series' },
     ],
     remediation: ['retry'],
     solutionBot: 'archmage',
-    maxTicks: 6600,
+    maxTicks: 21000,
   },
 
   // --- secret trials (optional; cover roster 37-40) -------------------------

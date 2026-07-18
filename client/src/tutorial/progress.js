@@ -51,7 +51,18 @@ function defaultStorage() {
 
 // --- defaults --------------------------------------------------------------
 export function defaultCalibration() {
-  return { hand: 'right', guideScale: 0.84, comfortableDurationMs: 720 };
+  return { hand: 'right', guideScale: 0.84, comfortableDurationMs: 720, done: false };
+}
+
+export function defaultPractice() {
+  return {
+    difficulty: 'medium',
+    playerPreset: 'current',   // 'current' saved loadout, or a preset key
+    opponentPreset: 'auto',    // 'auto' (fair for difficulty) or a preset key
+    coaching: 'detailed',
+    timed: true,               // standard 105s + Arcane Pressure, or untimed
+    templates: false,          // assisted per-spell guides (off by default)
+  };
 }
 
 export function defaultProfile() {
@@ -67,8 +78,8 @@ export function defaultProfile() {
     secretsFound,                 // "37".."40" -> bool
     rankedReady: false,
     calibration: defaultCalibration(),
-    practice: { difficulty: 'medium', opponentPreset: 'auto', coaching: 'detailed' },
-    stats: { lessonAttempts: {}, rejectionReasons: {} },
+    practice: defaultPractice(),
+    stats: { lessonAttempts: {}, rejectionReasons: {}, practiceResults: {} },
   };
 }
 
@@ -92,6 +103,24 @@ function countMap(src) {
     for (const [k, v] of Object.entries(src)) {
       const n = Math.round(Number(v));
       if (Number.isFinite(n) && n > 0) out[String(k)] = n;
+    }
+  }
+  return out;
+}
+
+// Practice difficulty-comparison stats: { easy|medium|hard -> { played, won } }.
+// Assisted (template) rounds are never recorded here, so the comparison reflects
+// only unassisted play (SOLO-MODES-PLAN §3 templates note).
+function practiceResultsMap(src) {
+  const out = {};
+  if (isPlainObject(src)) {
+    for (const key of ['easy', 'medium', 'hard']) {
+      const v = src[key];
+      if (isPlainObject(v)) {
+        const played = Math.max(0, Math.round(Number(v.played) || 0));
+        const won = Math.max(0, Math.min(played, Math.round(Number(v.won) || 0)));
+        if (played > 0) out[key] = { played, won };
+      }
     }
   }
   return out;
@@ -140,19 +169,25 @@ export function validateProfile(input) {
     const dur = Math.round(Number(c.comfortableDurationMs));
     out.calibration.comfortableDurationMs = Number.isFinite(dur)
       ? Math.max(120, Math.min(6000, dur)) : d.calibration.comfortableDurationMs;
+    out.calibration.done = c.done === true;
   }
 
   if (isPlainObject(input.practice)) {
     const p = input.practice;
     out.practice.difficulty = DIFFICULTIES.has(p.difficulty) ? p.difficulty : d.practice.difficulty;
+    out.practice.playerPreset = typeof p.playerPreset === 'string' && p.playerPreset
+      ? p.playerPreset : d.practice.playerPreset;
     out.practice.opponentPreset = typeof p.opponentPreset === 'string' && p.opponentPreset
       ? p.opponentPreset : d.practice.opponentPreset;
     out.practice.coaching = COACHING.has(p.coaching) ? p.coaching : d.practice.coaching;
+    out.practice.timed = p.timed !== false;
+    out.practice.templates = p.templates === true;
   }
 
   if (isPlainObject(input.stats)) {
     out.stats.lessonAttempts = countMap(input.stats.lessonAttempts);
     out.stats.rejectionReasons = countMap(input.stats.rejectionReasons);
+    out.stats.practiceResults = practiceResultsMap(input.stats.practiceResults);
   }
 
   out.schemaVersion = SCHEMA_VERSION;
@@ -287,6 +322,27 @@ export function isSecretFound(profile, spellId) {
 export function setCalibration(profile, calibration) {
   const norm = validateProfile({ calibration }).calibration;
   profile.calibration = norm;
+  return profile;
+}
+
+// Persist the player's Practice vs AI settings (§12 practice block). Unknown or
+// malformed fields fall back to the defaults via validateProfile.
+export function setPractice(profile, practice) {
+  profile.practice = validateProfile({ practice }).practice;
+  return profile;
+}
+
+// Record a single (unassisted) Practice round outcome for the difficulty-comparison
+// stats. Assisted rounds are intentionally NOT recorded (they are excluded from the
+// comparison, SOLO-MODES-PLAN §3).
+export function recordPracticeResult(profile, difficulty, won, assisted = false) {
+  if (assisted) return profile;
+  if (!['easy', 'medium', 'hard'].includes(difficulty)) return profile;
+  if (!profile.stats.practiceResults) profile.stats.practiceResults = {};
+  const cur = profile.stats.practiceResults[difficulty] || { played: 0, won: 0 };
+  cur.played += 1;
+  if (won) cur.won += 1;
+  profile.stats.practiceResults[difficulty] = cur;
   return profile;
 }
 

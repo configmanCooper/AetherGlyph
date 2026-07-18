@@ -16,16 +16,21 @@ import { TutorialRunner, STATES, GUIDE_STAGE_NAMES } from '../tutorial/runner.js
 import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters } from '../tutorial/campaign.js';
 import {
   loadProfile, saveProfile, deleteProfile, completionPercent,
+  setPractice, recordPracticeResult,
 } from '../tutorial/progress.js';
 import { SECRETS } from '../tutorial/secrets.js';
+import { Calibration } from '../tutorial/calibration.js';
 
 import { Recognizer } from '@shared/gesture/recognizer.js';
 import { buildTemplates, GESTURE_TEMPLATES } from '@shared/gesture/templates.js';
 import {
-  starterLoadout, makeLoadout, presetLoadout, validateLoadout,
+  makeLoadout, validateLoadout,
   PRESETS, PRESETS_BY_KEY, STARTER_SPELL_IDS, GESTURE_KEYS,
 } from '@shared/balance/loadouts.js';
 import { SPELL_CATALOG, SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
+import { chooseOpponentLoadout, PRACTICE_PROFILES } from '@shared/bot/practiceBot.js';
+import { coachReport } from '@shared/analytics/coach.js';
+import { renderCoachReport } from '../ui/coach.js';
 import { versionTag } from '@shared/protocol/version.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -37,10 +42,9 @@ const audio = new Audio();
 
 const settings = { lefthand: false, reduced: false, audio: true, haptics: true, devcast: false };
 
-// Loadout + series state.
+// Loadout + practice state.
 let playerIds = STARTER_SPELL_IDS.slice();       // the equipped 8 spells (ids)
 let playerLoadout = makeLoadout(playerIds);
-let botKey = 'tide-control';
 let recognizer = null;
 
 let match = null;
@@ -49,6 +53,12 @@ let pausedForVisibility = false;
 let mode = null;
 let tutorial = null;        // active TutorialRunner (mode === 'tutorial')
 let tutorialLesson = null;  // its lesson definition
+let calibrator = null;      // active Calibration capture (first-run)
+
+// Practice vs AI configuration (persisted in aeg.solo.v1 under `practice`).
+let practice = null;        // loaded from the solo profile on boot
+let practiceSeed = null;    // the seed the panel previewed the opponent with
+let lastCoach = null;       // last coaching report (for summary/detailed re-render)
 
 // A guide template path (0..100 space) for a spell id, for the tutorial/lab pad.
 function guideTemplateFor(spellId) {
@@ -57,8 +67,9 @@ function guideTemplateFor(spellId) {
   return variants ? variants[0] : null;
 }
 
-// Best-of-three series.
-let series = null; // { score:[0,0], round:0, difficulty, botKey, baseSeed }
+// Best-of-three series (online only; the local bot-duel series was replaced by
+// single-round Practice vs AI).
+let series = null;
 
 // Online duel session (OnlineMatch adapter). `match` points at it while online.
 let online = null;
@@ -113,7 +124,7 @@ function rebuildForLoadout() {
   gesture.recognizer = recognizer;
   hud.buildSpellbar(playerLoadout, (id) => castSpell(id, 1));
   buildDevcast();
-  updateDuelSummary();
+  updatePracticeSummaries();
 }
 
 const movement = new MovementControl($('#move-pad'), $('#move-stick'), dummyInput, { lefthand: settings.lefthand });
@@ -172,22 +183,22 @@ function applyInputBridge() {
   if (dummyInput.sidestep !== 0) { match.input.sidestep = dummyInput.sidestep; dummyInput.sidestep = 0; }
 }
 
-// Start a single practice/tutorial round (starter loadout smoke path).
-function startMatch(newMode, opts = {}) {
-  mode = newMode;
+// Glyph Laboratory: no opponent, no combat pressure (untimed sandbox).
+function startLab() {
+  mode = 'lab';
+  series = null;
   match = new LocalMatch({
-    mode: newMode,
-    difficulty: opts.difficulty || 'apprentice',
-    botActive: newMode === 'duel',
+    mode: 'lab',
+    botActive: false,
     playerLoadout,
-    botLoadout: newMode === 'duel' ? presetLoadout(botKey) : starterLoadout(),
-    seed: opts.seed,
-    onEnd: (sim) => onRoundEnd(sim),
+    timed: false,
+    seed: (Date.now() & 0x7fffffff) >>> 0,
+    onEnd: null,
   });
   running = true;
-  hud.showDiag = (newMode === 'practice');
+  hud.showDiag = true;
   hud.setDiag(null);
-  hud.setSeries(newMode === 'duel' && series ? series.score : null, series ? series.round : 0);
+  hud.setSeries(null);
   arena.reset();
   showOverlay(false);
   $('#hud').classList.remove('hidden');
@@ -195,62 +206,94 @@ function startMatch(newMode, opts = {}) {
   document.body.classList.remove('mode-tutorial');
   $('#spellbar').classList.remove('hidden');
   $('#devcast').classList.toggle('hidden', !settings.devcast);
-  gesture.recognizer = recognizer; // restore the full player-loadout recognizer (tutorials scope it)
-  gesture.setGuide(newMode === 'practice' ? guideTemplateFor(playerLoadout[0].id) : null, { stage: 0 });
-  toast(newMode === 'duel' ? 'Duel! Draw or tap a spell.' : 'Glyph Laboratory — draw freely.');
+  gesture.recognizer = recognizer;
+  gesture.setGuide(guideTemplateFor(playerLoadout[0].id), { stage: 0 });
+  toast('Glyph Laboratory — draw freely. No opponent.');
 }
 
-// Start a best-of-three series against the bot.
-function startSeries(difficulty) {
-  series = { score: [0, 0], round: 0, difficulty, botKey, baseSeed: (Date.now() & 0x7fffffff) >>> 0 };
-  startSeriesRound();
-}
-function startSeriesRound() {
-  const seed = (series.baseSeed + series.round * 0x9e3779b9) >>> 0;
-  startMatch('duel', { difficulty: series.difficulty, seed });
+// Resolve the player + opponent loadouts for the configured practice round, then
+// launch a single fair Practice vs AI round.
+function resolvePracticeSeed() {
+  if (practice.fixedSeed != null && Number.isFinite(practice.fixedSeed)) return practice.fixedSeed >>> 0;
+  return (Date.now() & 0x7fffffff) >>> 0;
 }
 
-function onRoundEnd(sim) {
+function resolvePlayerPracticeIds() {
+  if (practice.playerPreset && practice.playerPreset !== 'current' && PRESETS_BY_KEY[practice.playerPreset]) {
+    return PRESETS_BY_KEY[practice.playerPreset].ids.slice();
+  }
+  return playerIds.slice();
+}
+
+function resolveOpponentPracticeIds(playerPracticeIds, seed) {
+  if (practice.opponentPreset && practice.opponentPreset !== 'auto' && PRESETS_BY_KEY[practice.opponentPreset]) {
+    return PRESETS_BY_KEY[practice.opponentPreset].ids.slice();
+  }
+  // Auto: a legal loadout chosen fairly for the difficulty vs the visible build.
+  return chooseOpponentLoadout(practice.difficulty, playerPracticeIds, (seed ^ 0x5a5a) >>> 0);
+}
+
+function startPractice() {
+  mode = 'practice';
+  series = null;
+  const seed = practiceSeed != null ? practiceSeed : resolvePracticeSeed();
+  const playerPracticeIds = resolvePlayerPracticeIds();
+  const oppIds = resolveOpponentPracticeIds(playerPracticeIds, seed);
+  const pLoadout = makeLoadout(playerPracticeIds);
+  const bLoadout = makeLoadout(oppIds);
+  // Scope the recognizer to the loadout actually used this round.
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(pLoadout);
+
+  match = new LocalMatch({
+    mode: 'practice',
+    difficulty: practice.difficulty,
+    playerLoadout: pLoadout,
+    botLoadout: bLoadout,
+    timed: practice.timed,
+    assisted: practice.templates,
+    seed,
+    onEnd: (sim) => onPracticeEnd(sim),
+  });
+  running = true;
+  hud.showDiag = true;
+  hud.setDiag(null);
+  hud.setSeries(null);
+  arena.reset();
+  showOverlay(false);
+  $('#hud').classList.remove('hidden');
+  $('#coach').classList.add('hidden');
+  $('#coach-report').classList.add('hidden');
+  document.body.classList.remove('mode-tutorial');
+  $('#spellbar').classList.remove('hidden');
+  $('#devcast').classList.toggle('hidden', !settings.devcast);
+  // Templates on = per-spell assistance (a guide) and an assisted coaching flag.
+  gesture.setGuide(practice.templates ? guideTemplateFor(pLoadout[0].id) : null, { stage: 0 });
+  toast(`Practice vs ${PRACTICE_PROFILES[practice.difficulty].label} AI — draw to cast.`);
+}
+
+function onPracticeEnd(sim) {
   running = false;
   const win = sim.winner === 0;
   audio.roundEnd(win); haptic('round');
 
-  if (mode === 'duel' && series) {
-    if (sim.winner === 0) series.score[0] += 1;
-    else if (sim.winner === 1) series.score[1] += 1;
-    series.round += 1;
-    hud.setSeries(series.score, series.round - 1);
+  // Build the local coaching report from the non-draining event history.
+  const report = coachReport(match.coachLog());
+  lastCoach = report;
 
-    const seriesWin = series.score[0] >= 2;
-    const seriesLoss = series.score[1] >= 2;
-    const done = seriesWin || seriesLoss || series.round >= 3;
-    const roundTitle = sim.winner === 'draw' ? 'Round drawn' : win ? 'Round won' : 'Round lost';
+  // Record the difficulty-comparison stat (assisted rounds are excluded).
+  const profile = soloProfile();
+  recordPracticeResult(profile, practice.difficulty, win, practice.templates);
+  saveProfile(profile, localStorage);
 
-    if (done) {
-      const finalWin = series.score[0] > series.score[1];
-      const finalDraw = series.score[0] === series.score[1];
-      $('#result-title').textContent = finalDraw ? 'Series drawn' : finalWin ? 'Series won!' : 'Series lost';
-      $('#result-text').textContent = `Final score ${series.score[0]}–${series.score[1]}.`;
-      $('#btn-next-round').classList.add('hidden');
-      series = null;
-    } else {
-      $('#result-title').textContent = roundTitle;
-      $('#result-text').textContent =
-        `Series ${series.score[0]}–${series.score[1]}. ` +
-        `HP ${Math.round(sim.wizards[0].health)} vs ${Math.round(sim.wizards[1].health)}.`;
-      $('#btn-next-round').classList.remove('hidden');
-    }
-    showPanel('panel-result'); showOverlay(true);
-    return;
-  }
-
-  // Practice single round.
   const title = sim.winner === 'draw' ? 'Draw' : win ? 'Victory' : 'Defeat';
-  $('#result-title').textContent = title;
+  $('#result-title').textContent = `${title} · ${PRACTICE_PROFILES[practice.difficulty].label} AI`;
   $('#result-text').textContent =
-    `${sim.endReason === 'timer' ? 'Time!' : 'Knockout!'} You ${win ? 'won' : sim.winner === 'draw' ? 'drew' : 'lost'} — ` +
+    `${sim.endReason === 'timer' ? 'Time!' : 'Knockout!'} ` +
     `HP ${Math.round(sim.wizards[0].health)} vs ${Math.round(sim.wizards[1].health)}.`;
+  renderCoachReport($('#coach-report'), report, { detail: practice.coaching });
   $('#btn-next-round').classList.add('hidden');
+  const rb = document.querySelector('#panel-result [data-action="rematch"]');
+  if (rb) rb.textContent = 'Practice again';
   showPanel('panel-result'); showOverlay(true);
 }
 
@@ -333,9 +376,20 @@ function startTutorialLesson(lessonId) {
     onReject: (r) => onTutorialReject(r),
     onComplete: (res) => onTutorialComplete(res),
     onGuide: (g) => onTutorialGuide(g),
+    onSeriesRound: (info) => onTutorialSeriesRound(info),
   });
 
   showLessonIntro(lesson);
+}
+
+// Best-of-three round result (Academy 16 / Final Exam): update the series score
+// and toast a checkpoint between rounds.
+function onTutorialSeriesRound(info) {
+  hud.setSeries(info.score, info.round);
+  if (!info.decided) {
+    audio.roundEnd(info.score[0] > info.score[1]);
+    toast(`Round ${info.round} done — series ${info.score[0]}–${info.score[1]}. Next round…`);
+  }
 }
 
 // Narration is shown BEFORE input becomes active (never over the draw pad).
@@ -358,19 +412,72 @@ function showLessonIntro(lesson) {
   showOverlay(true);
 }
 
-// Begin the active lesson: (optional) calibration, arm the sim, show HUD + coach.
+// Begin the active lesson: run first-run calibration if needed, then arm the sim.
 function beginTutorialLesson() {
   if (!tutorial) return;
   tutorial.begin();
   if (tutorial.state === STATES.CALIBRATE) {
-    // Lightweight first-run calibration: capture handedness + a comfort default.
-    tutorial.calibrate({ hand: settings.lefthand ? 'left' : 'right' });
+    const cal = tutorial.profile.calibration || {};
+    // Only the FIRST run captures the interactive line/circle/V; later lessons
+    // reuse the stored comfort values without re-prompting.
+    if (cal.done) {
+      tutorial.calibrate({ ...cal, hand: settings.lefthand ? 'left' : 'right' });
+      armTutorialLesson();
+    } else {
+      runCalibration();
+    }
+    return;
   }
+  armTutorialLesson();
+}
+
+// Interactive first-run calibration: draw a line, a circle, and a V. The result
+// tunes guide sizing + comfort only (recognition thresholds are unchanged).
+function runCalibration() {
+  showPanel('panel-calibrate');
+  showOverlay(true);
+  const canvas = $('#calib-canvas');
+  calibrator = new Calibration(canvas, {
+    reduced: settings.reduced,
+    onStep: (label, i, n) => {
+      $('#calib-step').textContent = label;
+      $('#calib-progress').textContent = `${i + 1} / ${n}`;
+    },
+    onComplete: (result) => finishCalibration(result),
+  });
+  // Defer start until the panel is laid out so the canvas has a size.
+  requestAnimationFrame(() => { calibrator.start(); });
+}
+
+function finishCalibration(result) {
+  const hand = settings.lefthand ? 'left' : 'right';
+  if (tutorial) tutorial.calibrate({ ...result, hand });
+  applyCalibration(result);
+  calibrator = null;
+  armTutorialLesson();
+}
+
+function skipCalibration() {
+  const hand = settings.lefthand ? 'left' : 'right';
+  const cal = tutorial ? (tutorial.profile.calibration || {}) : {};
+  if (tutorial) tutorial.calibrate({ guideScale: cal.guideScale, comfortableDurationMs: cal.comfortableDurationMs, hand, done: true });
+  applyCalibration(cal);
+  calibrator = null;
+  armTutorialLesson();
+}
+
+function applyCalibration(cal) {
+  if (cal && Number.isFinite(cal.guideScale)) gesture.setGuideScale(cal.guideScale);
+}
+
+// Arm the sim + show HUD/coach for the current tutorial lesson (post-calibration).
+function armTutorialLesson() {
+  if (!tutorial) return;
   match = tutorial;
   running = true;
   hud.showDiag = false;
   hud.setDiag(null);
-  hud.setSeries(null);
+  hud.setSeries(tutorial.bestOfThree ? tutorial.seriesScore : null, tutorial.seriesRound || 0);
   arena.reset();
   buildCoachPanel(tutorialLesson);
   onTutorialGuide({ spellId: tutorial.focusSpell ? tutorial.focusSpell.id : null, stage: tutorial.guideStage });
@@ -381,7 +488,7 @@ function beginTutorialLesson() {
   $('#coach').classList.remove('hidden');
   document.body.classList.add('mode-tutorial');
   updateCoachState();
-  toast(tutorialLesson.formal ? 'Formal duel — win the round.' : 'Draw to cast.');
+  toast(tutorialLesson.bestOfThree ? 'Best-of-three — win two rounds.' : (tutorialLesson.formal ? 'Formal duel — win the round.' : 'Draw to cast.'));
 }
 
 function buildCoachPanel(lesson) {
@@ -434,13 +541,17 @@ function onTutorialState(s) {
   // A lost round (formal duel, or a rare teaching-lesson death) is not a mere
   // recognition failure — surface the result panel with a clean replay path so
   // the player is never stuck on an ended simulation.
-  if (s === STATES.ATTEMPT_FAILED && tutorial && tutorial.failReason === 'round-lost') {
+  if (s === STATES.ATTEMPT_FAILED && tutorial && (tutorial.failReason === 'round-lost' || tutorial.failReason === 'series-lost')) {
     running = false;
-    $('#result-title').textContent = `${tutorialLesson.title} — round lost`;
-    $('#result-text').textContent = 'The round ended before you met the objectives. Replay the lesson to try again.';
+    const seriesLost = tutorial.failReason === 'series-lost';
+    $('#result-title').textContent = `${tutorialLesson.title} — ${seriesLost ? 'series lost' : 'round lost'}`;
+    $('#result-text').textContent = seriesLost
+      ? `The best-of-three ended ${tutorial.seriesScore[0]}–${tutorial.seriesScore[1]}. Replay the lesson to try again.`
+      : 'The round ended before you met the objectives. Replay the lesson to try again.';
     $('#btn-next-round').classList.add('hidden');
     const rb = document.querySelector('#panel-result [data-action="rematch"]');
     if (rb) rb.textContent = 'Replay lesson';
+    $('#coach-report').classList.add('hidden');
     showPanel('panel-result'); showOverlay(true);
   }
 }
@@ -480,6 +591,7 @@ function onTutorialComplete(res) {
   else nextBtn.classList.add('hidden');
   const rematchBtn = document.querySelector('#panel-result [data-action="rematch"]');
   if (rematchBtn) rematchBtn.textContent = 'Replay lesson';
+  $('#coach-report').classList.add('hidden');
   showPanel('panel-result'); showOverlay(true);
   // remember next lesson for the Continue button
   window.__tutNext = nextId;
@@ -548,25 +660,95 @@ requestAnimationFrame(frame);
 // ------------------------------------------------------------------ loadout builder
 let draftIds = [];
 
-function updateDuelSummary() {
-  const el = $('#duel-loadout-summary');
-  if (!el) return;
-  const names = playerLoadout.map((s) => s.name).join(', ');
-  const pts = playerLoadout.reduce((a, s) => a + s.loadout_points, 0);
-  el.textContent = `Your loadout (${pts} pts): ${names}`;
+// ------------------------------------------------------------------ practice vs AI
+// Fill the player + opponent selects (once) and reflect saved settings.
+function buildPracticeSelects() {
+  const player = $('#prac-player');
+  const opp = $('#prac-opp');
+  if (player && !player.dataset.built) {
+    const cur = document.createElement('option'); cur.value = 'current'; cur.textContent = 'Current loadout'; player.appendChild(cur);
+    for (const p of PRESETS) { const o = document.createElement('option'); o.value = p.key; o.textContent = p.name; player.appendChild(o); }
+    player.dataset.built = '1';
+    player.addEventListener('change', (e) => { practice.playerPreset = e.target.value; onPracticeConfigChange(); });
+  }
+  if (opp && !opp.dataset.built) {
+    const auto = document.createElement('option'); auto.value = 'auto'; auto.textContent = 'Auto (fair for difficulty)'; opp.appendChild(auto);
+    for (const p of PRESETS) { const o = document.createElement('option'); o.value = p.key; o.textContent = p.name; opp.appendChild(o); }
+    opp.dataset.built = '1';
+    opp.addEventListener('change', (e) => { practice.opponentPreset = e.target.value; onPracticeConfigChange(); });
+  }
+  wirePracticeControls();
 }
 
-function buildOpponentSelect() {
-  const sel = $('#duel-opp');
-  if (!sel) return;
-  sel.innerHTML = '';
-  for (const p of PRESETS) {
-    const opt = document.createElement('option');
-    opt.value = p.key; opt.textContent = p.name;
-    if (p.key === botKey) opt.selected = true;
-    sel.appendChild(opt);
+let _pracWired = false;
+function wirePracticeControls() {
+  if (_pracWired) return;
+  _pracWired = true;
+  $('#prac-diff').addEventListener('change', (e) => { practice.difficulty = e.target.value; onPracticeConfigChange(); });
+  $('#prac-timed').addEventListener('change', (e) => { practice.timed = e.target.value !== 'untimed'; onPracticeConfigChange(); });
+  $('#prac-coaching').addEventListener('change', (e) => { practice.coaching = e.target.value; onPracticeConfigChange(); });
+  $('#prac-templates').addEventListener('change', (e) => { practice.templates = e.target.checked; onPracticeConfigChange(); });
+  $('#prac-fixseed').addEventListener('change', (e) => {
+    const box = $('#prac-seed'); box.disabled = !e.target.checked;
+    practice.fixedSeed = e.target.checked ? (parseInt(box.value, 10) || 0) : null;
+    onPracticeConfigChange();
+  });
+  $('#prac-seed').addEventListener('change', (e) => {
+    if ($('#prac-fixseed').checked) { practice.fixedSeed = parseInt(e.target.value, 10) || 0; onPracticeConfigChange(); }
+  });
+}
+
+function reflectPracticeControls() {
+  $('#prac-diff').value = practice.difficulty;
+  $('#prac-player').value = PRESETS_BY_KEY[practice.playerPreset] ? practice.playerPreset : 'current';
+  $('#prac-opp').value = PRESETS_BY_KEY[practice.opponentPreset] ? practice.opponentPreset : 'auto';
+  $('#prac-timed').value = practice.timed ? 'timed' : 'untimed';
+  $('#prac-coaching').value = practice.coaching;
+  $('#prac-templates').checked = !!practice.templates;
+  const fixed = practice.fixedSeed != null;
+  $('#prac-fixseed').checked = fixed;
+  $('#prac-seed').disabled = !fixed;
+  if (fixed) $('#prac-seed').value = String(practice.fixedSeed);
+}
+
+function openPractice() {
+  buildPracticeSelects();
+  reflectPracticeControls();
+  onPracticeConfigChange();
+  showPanel('panel-practice');
+}
+
+// Persist settings and refresh the (shown-by-default) opponent + player preview.
+function onPracticeConfigChange() {
+  const profile = soloProfile();
+  setPractice(profile, {
+    difficulty: practice.difficulty, playerPreset: practice.playerPreset,
+    opponentPreset: practice.opponentPreset, coaching: practice.coaching,
+    timed: practice.timed, templates: practice.templates,
+  });
+  saveProfile(profile, localStorage);
+  // Fix a seed for the preview so the shown opponent matches the round we start.
+  practiceSeed = resolvePracticeSeed();
+  updatePracticeSummaries();
+}
+
+function updatePracticeSummaries() {
+  const oppEl = $('#prac-opp-preview');
+  const pEl = $('#prac-player-summary');
+  if (!practice) return;
+  const playerPracticeIds = resolvePlayerPracticeIds();
+  if (pEl) {
+    const names = makeLoadout(playerPracticeIds).map((s) => s.name).join(', ');
+    const pts = playerPracticeIds.reduce((a, id) => a + (SPELLS_BY_ID[id]?.loadout_points || 0), 0);
+    pEl.textContent = `Your loadout (${pts} pts): ${names}`;
   }
-  sel.addEventListener('change', (e) => { botKey = e.target.value; });
+  if (oppEl) {
+    const seed = practiceSeed != null ? practiceSeed : resolvePracticeSeed();
+    const oppIds = resolveOpponentPracticeIds(playerPracticeIds, seed);
+    const names = oppIds.map((id) => SPELLS_BY_ID[id]?.name).join(', ');
+    const auto = practice.opponentPreset === 'auto';
+    oppEl.innerHTML = `<strong>Opponent${auto ? ' (auto)' : ''}:</strong> ${names}`;
+  }
 }
 
 function openLoadoutBuilder() {
@@ -649,7 +831,7 @@ function saveLoadout() {
   playerIds = draftIds.slice();
   rebuildForLoadout();
   toast('Loadout saved.');
-  showPanel('panel-duel');
+  openPractice();
 }
 
 // ------------------------------------------------------------------ online duel
@@ -795,6 +977,7 @@ function onOnlineMatchEnd(p) {
   const score = Array.isArray(p.score) ? `${p.score[0]}–${p.score[1]}` : '';
   $('#result-text').textContent = `Online duel${score ? ` ${score}` : ''}${reason}.`;
   $('#btn-next-round').classList.add('hidden');
+  $('#coach-report').classList.add('hidden');
   setNetStatus(null);
   showPanel('panel-result'); showOverlay(true);
 }
@@ -859,9 +1042,9 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     audio.unlock();
     const a = btn.dataset.action;
     if (a === 'tutorial') openTutorialHub();
-    else if (a === 'lab') { series = null; startMatch('practice'); }
-    else if (a === 'practice-ai') toast('Practice vs AI (Easy/Medium/Hard) arrives in the next phase.');
-    else if (a === 'duel') { updateDuelSummary(); showPanel('panel-duel'); }
+    else if (a === 'lab') startLab();
+    else if (a === 'practice-ai') openPractice();
+    else if (a === 'start-practice') startPractice();
     else if (a === 'online') openOnline();
     else if (a === 'online-quick') startOnlineAction('quick');
     else if (a === 'online-create') startOnlineAction('create');
@@ -874,23 +1057,24 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'server-reset') resetServerUrl();
     else if (a === 'privacy') openPrivacy();
     else if (a === 'delete-data') deleteMyData();
-    else if (a === 'start-duel') startSeries($('#duel-diff').value);
     else if (a === 'tut-continue') startTutorialLesson(soloProfile().currentLessonId);
     else if (a === 'tut-begin') beginTutorialLesson();
     else if (a === 'tut-showme') tutorialShowMe();
     else if (a === 'tut-tryagain') tutorialTryAgain();
+    else if (a === 'calib-skip') skipCalibration();
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
-    else if (a === 'next-round') { if (mode === 'tutorial') continueTutorial(); else startSeriesRound(); }
+    else if (a === 'next-round') { if (mode === 'tutorial') continueTutorial(); }
     else if (a === 'back' || a === 'menu') returnToMainMenu();
     else if (a === 'rematch') {
+      $('#coach-report').classList.add('hidden');
       if (mode === 'tutorial') { if (tutorialLesson) startTutorialLesson(tutorialLesson.id); }
       else if (mode === 'online') {
         running = false; match = null; mode = null; setNetStatus(null);
         hud.setSeries(null); $('#hud').classList.add('hidden');
         openOnline(); showOverlay(true);
-      } else if (mode === 'duel') startSeries($('#duel-diff').value);
-      else startMatch(mode);
+      } else if (mode === 'practice') startPractice();
+      else startLab();
     }
   });
 });
@@ -951,27 +1135,29 @@ function openPrivacy() {
   window.location.href = './privacy.html';
 }
 function deleteMyData() {
-  if (!window.confirm('Delete all local data? This erases your device identity, name, settings, saved duel, and your solo progress — tutorial completion, calibration, medals, secret-clue and secret-spell discoveries, and local coaching statistics. This cannot be undone.')) return;
+  if (!window.confirm('Delete all local data? This erases your device identity, name, settings, and your solo progress — tutorial completion, calibration, medals, secret-clue and secret-spell discoveries, Practice vs AI settings and results, and local coaching statistics. This cannot be undone.')) return;
   if (online) { try { online.leave(); } catch { /* ignore */ } disposeOnline(); }
   try {
     ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-server-url'].forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
-  try { deleteProfile(localStorage); } catch { /* ignore */ } // solo progress / calibration / medals / clues / secrets / coaching stats
+  try { deleteProfile(localStorage); } catch { /* ignore */ } // solo progress / calibration / medals / clues / secrets / practice settings + results / coaching stats
   tutorial = null; tutorialLesson = null;
+  initPractice();
   const su = $('#set-server-url'); if (su) su.value = '';
   const on = $('#online-name'); if (on) on.value = '';
-  setServerStatus('Local data deleted, including solo progress, calibration, medals, clues, secret discoveries, and coaching stats.', 'ok');
+  setServerStatus('Local data deleted, including solo progress, calibration, medals, clues, secret discoveries, Practice settings + results, and coaching stats.', 'ok');
   toast('Your local data was deleted.');
 }
 
 // Full teardown back to the main menu (shared by the Back/Menu buttons and the
 // Android hardware back button).
 function returnToMainMenu() {
-  running = false; match = null; series = null; tutorial = null; tutorialLesson = null;
+  running = false; match = null; series = null; tutorial = null; tutorialLesson = null; calibrator = null;
   if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
   mode = null; setNetStatus(null); hud.setSeries(null);
   gesture.setGuide(null);
   document.body.classList.remove('mode-tutorial');
+  $('#coach-report').classList.add('hidden');
   $('#hud').classList.add('hidden'); $('#coach').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
 }
 
@@ -1040,11 +1226,33 @@ function onBackgroundChange(hidden) {
 document.addEventListener('visibilitychange', () => onBackgroundChange(document.hidden));
 
 // ------------------------------------------------------------------ boot
-buildOpponentSelect();
+function initPractice() {
+  const profile = soloProfile();
+  practice = { ...profile.practice, fixedSeed: null };
+  practiceSeed = null;
+  // Apply the stored calibration guide size to the pad up front.
+  if (profile.calibration && Number.isFinite(profile.calibration.guideScale)) {
+    gesture.setGuideScale(profile.calibration.guideScale);
+  }
+}
+initPractice();
 rebuildForLoadout();
 console.log('Aetherglyph client', versionTag());
 showOverlay(true);
 showPanel('panel-main');
+
+// Minimal, harmless test hook for the headless browser smoke (test/browser).
+// It only inspects or ends the CURRENT offline local match early — it cannot
+// touch an authoritative online match (that Sim lives on the server), so it
+// gives no gameplay advantage. Never referenced by normal play.
+if (typeof window !== 'undefined') {
+  window.__aegTest = {
+    info: () => ({ mode, difficulty: match && match.difficulty, botActive: !!(match && match.botActive), hasBot: !!(match && match.bot) }),
+    forceEnd: (winner = 0) => {
+      try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }
+    },
+  };
+}
 
 const storedResume = loadResume();
 if (storedResume && storedResume.token) {

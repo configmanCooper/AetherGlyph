@@ -1,9 +1,10 @@
 'use strict';
 
 // gen-screenshots.cjs — deterministic-ish Play Store phone screenshots rendered
-// from the real client (title, loadout builder, and a live bot duel) via the
-// locally installed Edge/Chrome using puppeteer-core (already a dev dependency;
-// no Chromium download). Best-effort: if no browser is found it exits cleanly.
+// from the real client (title, loadout builder, and a live Practice vs AI round)
+// via the locally installed Edge/Chrome using puppeteer-core (already a dev
+// dependency; no Chromium download). Best-effort: if no browser is found it exits
+// cleanly.
 //
 // Output: play-assets/screenshots/*.png at 1600x900 (landscape phone).
 // Run: `npm run android:screenshots`.
@@ -72,10 +73,11 @@ async function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
     await wait(400);
     await page.screenshot({ path: path.join(out, '02-loadout.png') });
     await page.click('[data-action="save-loadout"]');
-    await page.waitForSelector('#panel-duel:not(.hidden)', { timeout: 5000 });
+    await page.waitForSelector('#panel-practice:not(.hidden)', { timeout: 5000 });
 
-    // A live bot duel: start the series, draw a couple of glyphs, let it run.
-    await page.click('[data-action="start-duel"]');
+    // A live Practice vs AI round: pick Medium, start, draw a couple of glyphs.
+    await page.select('#prac-diff', 'medium').catch(() => {});
+    await page.click('[data-action="start-practice"]');
     await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
     await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
     const pad = await page.$('#draw-canvas');

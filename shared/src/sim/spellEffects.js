@@ -129,7 +129,7 @@ export const SPELL_EFFECTS = {
   // === Environmental (6) ===================================================
   31: { type: ZONE, zoneKind: 'Oil', school: 'Ember' }, // Oil Script
   32: { type: ZONE, zoneKind: 'Wet', dousesBurning: true, school: 'Tide' }, // Rain Glyph
-  33: { type: ZONE, zoneKind: 'Gust', deflect: true, movesZones: true, school: 'Gale' }, // Gust Wall
+  33: { type: ZONE, zoneKind: 'Gust', deflect: true, deflectWindowS: 1.2, movesZones: true, school: 'Gale' }, // Gust Wall
   34: { // Quake — area damage + interrupt + destroy cover
     type: PROJECTILE, damage: 10, interrupt: true, destroysCover: true, status: null, charges: 1,
     travelS: 0.2, homing: 0, dodgeRadius: 0.5, area: true, school: 'Stone', reflectable: false,
@@ -149,6 +149,22 @@ export const SPELL_EFFECTS = {
 
 export function effectFor(spellId) {
   return SPELL_EFFECTS[spellId] || null;
+}
+
+// A "heavy" projectile blows straight through a Gust Wall (Stone Shard, the
+// charge-cost heavies, and wide area shots). Light single-target bolts are the
+// ones a Gust Wall can deflect (SOLO-MODES-PLAN §9 Lesson 10; spells.csv Gust
+// Wall counters "Stone Shard; heavy projectile"). Derived from effect shape so
+// no per-spell flag can drift: charged, piercing, or area shots are heavy.
+export function isHeavyProjectile(eff) {
+  if (!eff || eff.type !== PROJECTILE) return false;
+  return !!eff.heavy || !!eff.area || !!eff.piercing || (eff.charges || 0) >= 1;
+}
+
+// A light projectile is any non-heavy travelling shot — the class a Gust Wall
+// deflects. Kept as its own predicate so callers read clearly.
+export function isLightProjectile(eff) {
+  return !!eff && eff.type === PROJECTILE && !isHeavyProjectile(eff);
 }
 
 // Broad category of an effect for bot reasoning / HUD grouping.

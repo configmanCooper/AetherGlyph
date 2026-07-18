@@ -6,7 +6,6 @@
 //     (no soft locks, never auto-casts),
 //   - pause freezes the sim and arming writes a checkpoint,
 //   - same seed + same student replays identically.
-
 import { createHarness } from './tiny.js';
 import { TutorialRunner, STATES } from '../client/src/tutorial/runner.js';
 import { CAMPAIGN, CAMPAIGN_BY_ID, makeStudent } from '../client/src/tutorial/campaign.js';
@@ -148,6 +147,36 @@ export function run() {
   rGuide._advanceGuideOnObjective(rGuide.lesson.objectives[0]);
   eq(rGuide.currentObjective().expectSpell, 6, 'L03 advances to the Flame Wave objective');
   eq(guides.at(-1).spellId, 6, 'guide switches to Flame Wave for the new objective');
+
+  // --- 9. best-of-three flow + checkpoints (Academy 16 / Final Exam) --------
+  {
+    const a16 = CAMPAIGN_BY_ID.A16;
+    ok(a16.bestOfThree === true, 'Academy 16 is a best-of-three lesson');
+    ok(CAMPAIGN_BY_ID.EXAM.bestOfThree === true, 'the Final Exam is a best-of-three lesson');
+
+    // Winning two rounds succeeds; the runner re-arms + checkpoints between rounds.
+    const rounds = [];
+    const store = memoryStorage();
+    const prof = defaultProfile();
+    const r = new TutorialRunner(a16, { seed: 5, profile: prof, storage: store, onSeriesRound: (i) => rounds.push(i) });
+    r.arm();
+    eq(loadProfile(store).currentLessonId, 'A16', 'arming a bestOfThree lesson checkpoints the profile');
+    r.sim.endMatch(0, 'health'); r._handleSeriesRoundEnd(); // player wins round 1
+    eq(r.seriesScore[0], 1, 'a player round win advances the series score');
+    ok(r.state === STATES.ACTIVE && r.sim && !r.sim.ended, 'the runner re-arms a fresh round after an undecided round');
+    r.sim.endMatch(0, 'health'); r._handleSeriesRoundEnd(); // player wins round 2 -> series
+    ok(r.state === STATES.SUCCESS, 'winning two rounds completes the best-of-three');
+    ok(rounds.length === 2 && rounds[1].decided && rounds[1].won, 'the final series-round callback reports a decided win');
+
+    // Losing two rounds fails with series-lost (no soft lock); retry restarts 0–0.
+    const rl = new TutorialRunner(a16, { seed: 6 });
+    rl.arm();
+    rl.sim.endMatch(1, 'health'); rl._handleSeriesRoundEnd();
+    rl.sim.endMatch(1, 'health'); rl._handleSeriesRoundEnd();
+    ok(rl.state === STATES.ATTEMPT_FAILED && rl.failReason === 'series-lost', 'losing two rounds fails the series (series-lost)');
+    rl.retry();
+    ok(rl.seriesScore[0] === 0 && rl.seriesScore[1] === 0 && rl.state === STATES.ACTIVE, 'retry restarts the series at 0–0');
+  }
 
   return report('tutorialRunner');
 }

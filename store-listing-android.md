@@ -21,8 +21,11 @@ raise stone cover, and chain elemental reactions your rival can exploit too.
   offense, defense, control, buffs, and environmental zones — or start from a
   curated archetype (Ember Rush, Tide Control, Storm Tempo, Stone Warden, and
   more).
-- **Offline tutorial & bot practice.** Learn every gesture and duel four bot
-  difficulties (Apprentice → Archmage) with no connection required.
+- **Offline tutorial, Practice vs AI & Glyph Laboratory.** Learn every gesture in
+  a checkpointed campaign, then practise a single round against a fair Easy,
+  Medium, or Hard AI with a post-round coaching report — all with no connection
+  required. The AI plays by the exact same rules, resources, and drawn glyphs you
+  do; only its reaction speed, planning, and knowledge change.
 - **Authoritative online duels.** Best-of-three matches against another device —
   Quick Match (ranked), Create Private Duel, or Join Code. The server owns every
   simulation and validates every drawn cast, so results are fair.
@@ -32,8 +35,8 @@ raise stone cover, and chain elemental reactions your rival can exploit too.
 One-time purchase. **No ads. No in-app purchases. No pay-to-win.** No accounts and
 no free-text chat — your identity is a random, device-local id.
 
-An internet connection is required for online duels; the tutorial and bot
-practice work fully offline.
+An internet connection is required for online duels; the tutorial, Practice vs AI,
+and Glyph Laboratory work fully offline.
 
 ## Category
 Games → Strategy

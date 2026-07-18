@@ -4,37 +4,62 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Solo Phase A (offline tutorial/campaign foundation) is implemented** on top of
-the Phase 1–4 slices. The old three-item tutorial stub is replaced by a fully
-offline, single-player campaign that teaches the real production rules with real
-drawn gestures: a Prologue, twelve core Lessons, four Academy lessons, a final-
-exam scaffold, public-spell drills, and four secret trials that together cover
-every spell id 1–40. It runs on the real shared `Sim`, the production recognizer,
-and real spell effects/statuses/reactions — no tap-to-complete shortcuts. A
-deterministic `TutorialRunner` state machine (INTRO → CALIBRATE → ARMING → ACTIVE
-→ ATTEMPT_FAILED → REMEDIATE → SUCCESS → PAUSED) consumes simulation events, a
-scripted instructor (`ScriptBot`) creates legal teaching moments, and a versioned
-local profile (`aeg.solo.v1`) checkpoints progress, calibration, per-spell guide
-stages, medals, clues, secret discoveries, ranked-readiness, and coaching stats
-with validation, migration, corruption recovery, and Delete My Data support. The
-progressive guide fades Full → Dotted → Start → None. Lesson 12 unlocks ranked
-readiness; optional academies, medals, and secrets never gate it. *Practice vs AI
-(Easy/Medium/Hard) and post-match coaching are the next phase and are present only
-as menu naming hooks.*
+**Version 1.0.0 — feature complete.** The final solo phase (Practice vs AI +
+coaching) is implemented on top of the offline campaign, the authoritative online
+service, and the deterministic shared simulation.
 
-**Phase 4 (Capacitor Android / Google Play packaging) is implemented on top of
-the Phase 1–3 offline + authoritative-online slices.** The no-build web app is
-staged into a Capacitor `webDir` and built into a signable Android App Bundle
-(app id `com.configmancooper.aetherglyph`, API 24 → 36, landscape). Online play
-connects to a configurable authoritative service (default
-`https://aetherglyph.onrender.com`); same-origin web deployments stay same-origin.
+**Practice vs AI (Solo Phase B) is implemented.** A fully offline single-player
+mode offers exactly **Easy, Medium, Hard** against a *fair* AI: every tier drives
+the same `Sim` intent path, spends the same resources, obeys the same cooldowns,
+charges, Tenacity, zone limits, and loadout rules, draws glyphs through the same
+gesture-execution model (a sampled score → the shared `qualityFromScore` potency
+mapping, or a below-threshold miss that gets the same reject recovery as the
+player), and uses only legal loadouts. Difficulty differs solely through
+perception delay (Hard ≥150 ms, Medium ≥280 ms, Easy ≥450 ms), planning horizon,
+tier-gated combo/counter knowledge, legal loadout construction (Easy beginner
+preset, Medium soft-counter preset, Hard bounded deterministic counter-build with
+a legal-preset fallback), observed-event adaptation, plausible mistakes, and
+gesture misses — never stats, hidden state, instant reactions, or perfect casts.
+A single round with player/opponent loadout selection (opponent shown by default),
+standard/untimed, optional fixed seed, and templates-off-by-default (assisted
+rounds are marked assisted and excluded from difficulty stats). A pure coaching
+reducer (`shared/src/analytics/coach.js`) turns a non-draining round event log
+into a local report — casting accuracy, damage/Aether, defensive plays, Focus /
+charges, setups, zones/reactions, one improvement and one positive reinforcement —
+storing no raw gesture traces. **Glyph Laboratory** remains the no-opponent
+recognizer sandbox; **Online Duel** is unchanged and separate.
 
-**Phase 3 (authoritative online multiplayer)** remains: two devices play a real
+**Solo Phase A (offline tutorial/campaign)** teaches the real production rules with
+real drawn gestures: a Prologue, twelve core Lessons, four Academy lessons, a
+final exam, public-spell drills, and four secret trials covering every spell id
+1–40. It runs on the real shared `Sim`, the production recognizer, and real spell
+effects/statuses/reactions — no tap-to-complete shortcuts. A deterministic
+`TutorialRunner` (INTRO → CALIBRATE → ARMING → ACTIVE → ATTEMPT_FAILED → REMEDIATE
+→ SUCCESS → PAUSED) consumes simulation events; first run captures an interactive
+line/circle/V calibration that tunes guide sizing/comfort only (recognition
+thresholds are unchanged); a scripted instructor (`ScriptBot`) creates legal
+teaching moments; Academy 16 and the Final Exam run a real **best-of-three** vs
+the fair Medium AI with between-round checkpoints; and a versioned local profile
+(`aeg.solo.v1`) checkpoints progress, calibration, guide stages, medals, clues,
+secret discoveries, ranked-readiness, Practice settings/results, and coaching
+stats with validation, migration, corruption recovery, and Delete My Data support.
+Gust Wall now actually deflects light projectiles in the Sim (heavy shots punch
+through), so Lesson 10 tests it honestly. Lesson 12 unlocks ranked readiness;
+optional academies, medals, and secrets never gate it.
+
+**Capacitor Android / Google Play packaging** stages the no-build web app into a
+Capacitor `webDir` and builds a signable Android App Bundle (app id
+`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10000 /
+versionName 1.0.0). Online play connects to a configurable authoritative service
+(default `https://aetherglyph.onrender.com`); same-origin web deployments stay
+same-origin.
+
+**Authoritative online multiplayer** remains: two devices play a real
 best-of-three duel through an authoritative Express + Socket.IO server that owns
-every match simulation. Casting online is by drawing — the server reclassifies
-the gesture and is the sole authority over health, resources, spell ids, and
-results. All 40 spell gestures are drawable. Planning artifacts remain
-authoritative for later phases.
+every match simulation. Casting online is by drawing — the server reclassifies the
+gesture (using the same shared `qualityFromScore` mapping) and is the sole
+authority over health, resources, spell ids, and results. All 40 spell gestures
+are drawable.
 
 - `MASTERPLAN.md` - authoritative product, game, technical, test, deployment, and release plan
 - `design/SOLO-MODES-PLAN.md` - solo tutorial / Practice-vs-AI / Glyph Laboratory plan
@@ -78,9 +103,11 @@ Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT
 - Starter loadout (8 spells): Ember Bolt (→ flick), Frost Lance (↑ line),
   Stone Shard (V), Spark Dart (zigzag), Concussive Blast (arc), Ward (bracket),
   Barrier Dome (circle), Reflect (check mark).
-- Modes: **Tutorial** (guided glyph lessons), **Practice** (free draw + recognizer
-  diagnostics), **Bot Duel** (best-of-three vs Apprentice→Archmage), **Online Duel**
-  (best-of-three vs another device: Quick Match, Create Private Duel, or Join Code).
+- Modes: **Tutorial** (guided glyph lessons + first-run calibration), **Practice
+  vs AI** (single offline round vs a fair Easy/Medium/Hard AI with post-round
+  coaching), **Glyph Laboratory** (free draw + recognizer diagnostics, no
+  opponent), **Online Duel** (best-of-three vs another device: Quick Match, Create
+  Private Duel, or Join Code).
 - **Loadout builder**: pick from all 40 spells or an archetype preset (Ember Rush,
   Tide Control, Storm Tempo, Stone Warden, Gale Trickster, Arcane Combo, Umbra
   Attrition, Prismatic Hybrid); live 14-point / school / heavy validation.
@@ -271,7 +298,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 400` / `versionName 0.4.0`, no cleartext production traffic,
+  `versionCode 10000` / `versionName 1.0.0`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume + haptics via `@capacitor/app` and
   `@capacitor/haptics`.
@@ -296,8 +323,35 @@ Build/sign/publish: see `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.
 - Release artifacts are **unsigned until an upload key is created** with
   `setup-android.ps1`; the exact signing step is documented and produces a signed
   AAB on the next build.
-- The comprehensive solo tutorial/practice expansion is still deferred to the
-  final solo phase; Phase 4 does not expand it.
+
+## Solo Phase B — Practice vs AI + coaching (1.0)
+
+The final feature phase adds the fair Practice AI, post-round coaching, interactive
+calibration, best-of-three exams, and the real Gust Wall deflection. New shared
+modules: `shared/src/bot/practiceBot.js` (Easy/Medium/Hard), `shared/src/bot/combos.js`
+(tier-gated combo/counter knowledge), `shared/src/gesture/quality.js` (the single
+`qualityFromScore` mapping reused by player, server, and AI), and
+`shared/src/analytics/coach.js` (pure coaching reducer). New client modules:
+`client/src/ui/coach.js` and `client/src/tutorial/calibration.js`. Tests:
+`test/practiceBot.test.js` (fairness, determinism, legal loadouts, non-zero miss
+rates, perception isolation, mirrored difficulty ordering Hard>Medium>Easy),
+`test/coaching.test.js`, and `test/gust.test.js`.
+
+### Fairness results (deterministic, `test/practiceBot.test.js`)
+
+Across mirrored seeded matches with several equal loadouts: **Hard beats Easy ~92%**,
+**Hard beats Medium ~70%**, **Medium beats Easy ~87%**; the ordering does not
+reverse when sides swap. Empirical gesture-miss rates are **Easy ~0.34 ≫ Medium
+~0.07 ≫ Hard ~0.03 > 0**. Ordering comes from decision profiles, not stat tuning.
+
+### Known 1.0 limitations
+
+- **Single instance only** (unchanged): one process owns each live match in
+  memory. Do **not** raise `numInstances` in `render.yaml`.
+- The Final Exam's gesture gauntlet and five tactical scenarios remain a scaffold;
+  its core **best-of-three vs the Medium AI is fully implemented** (as is Academy
+  16's). The optional Grandmaster-vs-Hard retry is narrated but not yet a separate
+  stage.
 
 ## Product decision
 

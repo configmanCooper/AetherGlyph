@@ -11,6 +11,7 @@
 // bounded trace is classified locally so client prediction matches the server.
 
 import { boundTrace } from '@shared/protocol/net.js';
+import { qualityFromScore } from '@shared/gesture/quality.js';
 
 export class GestureInput {
   constructor(canvas, opts = {}) {
@@ -37,6 +38,7 @@ export class GestureInput {
     // uses no guide (stage None), so the default keeps online behaviour intact.
     this.guide = null;
     this.guideStage = 3;
+    this.guideScale = 1;       // set from calibration; scales guide size only
     this.onDiag = opts.onDiag || (() => {});
     this.lastDiag = null;      // fresh trace diagnostics (last recognition result)
     this._ghost = null;        // { start, durationMs } while a ghost demo animates
@@ -49,6 +51,14 @@ export class GestureInput {
 
   setRecognizer(r) { this.recognizer = r; }
   setReduced(v) { this.reduced = v; if (v) this._stopGhost(); this._redraw(); }
+
+  // Calibration-derived guide size (0.4..1.5). Sizes the on-pad guides only; it
+  // never affects recognition (thresholds are unchanged).
+  setGuideScale(s) {
+    const n = Number(s);
+    this.guideScale = Number.isFinite(n) ? Math.max(0.4, Math.min(1.5, n)) : 1;
+    this._redraw();
+  }
 
   // Set (or clear) the guide template. opts.stage 0..3 (default: Full when a path
   // is given, None when cleared). A Full guide plays one ghost demonstration
@@ -179,9 +189,9 @@ export class GestureInput {
     this.lastDiag = diag;
     this.onDiag(diag, trace);
     if (diag.accepted) {
-      const q = 0.9 + Math.min(1, Math.max(0, (diag.best.score - 0.6) / 0.4)) * 0.15; // 0.90..1.05
+      const q = qualityFromScore(diag.best.score); // shared potency mapping (0.90..1.05)
       this.haptics('accept');
-      this.onCast(diag.spellId, Math.min(1.05, q), diag, trace);
+      this.onCast(diag.spellId, q, diag, trace);
     } else {
       this.haptics('reject');
       this.onReject(diag, trace);
@@ -213,9 +223,10 @@ export class GestureInput {
   // direction — SOLO-MODES-PLAN §5).
   _guideXY(r) {
     const pad = 0.16;
+    const span = (1 - 2 * pad) * (this.guideScale || 1);
     return {
-      sx: (v) => (pad + (v / 100) * (1 - 2 * pad)) * r.width,
-      sy: (v) => (pad + (v / 100) * (1 - 2 * pad)) * r.height,
+      sx: (v) => (0.5 + (v / 100 - 0.5) * span) * r.width,
+      sy: (v) => (0.5 + (v / 100 - 0.5) * span) * r.height,
     };
   }
 

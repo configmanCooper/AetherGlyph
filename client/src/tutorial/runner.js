@@ -16,6 +16,8 @@ import { Sim } from '../../../shared/src/sim/sim.js';
 import { TICK_HZ } from '../../../shared/src/sim/constants.js';
 import { makeLoadout } from '../../../shared/src/balance/loadouts.js';
 import { DuelBot } from '../../../shared/src/bot/bot.js';
+import { PracticeBot } from '../../../shared/src/bot/practiceBot.js';
+import { qualityFromScore } from '../../../shared/src/gesture/quality.js';
 import { ObjectiveTracker, evaluatePredicate, parsePredicate } from './objectives.js';
 import { makeScriptBot } from './scriptBot.js';
 import { evaluateMedal } from './medals.js';
@@ -46,6 +48,7 @@ export const REJECT_MESSAGES = {
   'wrong-spell': 'That was a valid glyph, but this objective needs the highlighted spell.',
   'no-templates': 'Internal content error; this lesson is unavailable.',
   'round-lost': 'The round ended before you met the objectives. Try again.',
+  'series-lost': 'The best-of-three ended in the AI\'s favour. Replay to try again.',
 };
 
 // Guide stage names (0 Full .. 3 None).
@@ -89,6 +92,13 @@ export class TutorialRunner {
     this.events = [];
     this.result = null;
 
+    // Best-of-three series state (Academy 16, Final Exam). A bestOfThree lesson
+    // runs up to three fresh rounds with the SAME loadouts; the player must win
+    // two. Between rounds the runner checkpoints the profile and re-arms.
+    this.bestOfThree = !!lesson.bestOfThree;
+    this.seriesScore = [0, 0]; // [player, bot] round wins
+    this.seriesRound = 0;
+
     // Guide stages are tracked per taught spell so multi-spell lessons can switch
     // the pad to the spell required by the current objective.
     this.guideStages = new Map();
@@ -105,6 +115,7 @@ export class TutorialRunner {
     this.onReject = opts.onReject || null;
     this.onComplete = opts.onComplete || null;
     this.onGuide = opts.onGuide || null;
+    this.onSeriesRound = opts.onSeriesRound || null;
   }
 
   // ------------------------------------------------------------- state helpers
@@ -194,6 +205,10 @@ export class TutorialRunner {
 
   _buildOpponent(opponent) {
     if (!opponent) return makeScriptBot(this.botId, { behavior: 'idle' });
+    if (opponent.type === 'practice') {
+      // The fair Practice AI (Easy/Medium/Hard) — identical to Practice vs AI.
+      return new PracticeBot(this.botId, { difficulty: opponent.difficulty || 'medium', seed: (this.seed ^ 0x5a5a) >>> 0 });
+    }
     if (opponent.type === 'duel') {
       return new DuelBot(this.botId, { difficulty: opponent.difficulty || 'apprentice', seed: (this.seed ^ 0x5a5a) >>> 0 });
     }
@@ -210,8 +225,8 @@ export class TutorialRunner {
     const diag = this.recognizer.recognize(points);
     this.lastDiag = diag;
     if (diag.accepted) {
-      const q = 0.9 + Math.min(1, Math.max(0, (diag.best.score - 0.6) / 0.4)) * 0.15;
-      return this._acceptCast(diag.spellId, Math.min(1.05, q), diag);
+      const q = qualityFromScore(diag.best.score);
+      return this._acceptCast(diag.spellId, q, diag);
     }
     return this._rejectAttempt(diag.reason, diag);
   }
@@ -281,6 +296,8 @@ export class TutorialRunner {
     this.failReason = null;
     this.events = [];
     this.acc = 0;
+    this.seriesScore = [0, 0];
+    this.seriesRound = 0;
     this.guideStages.clear();
     for (const taught of this.lesson.taughtSpells || []) {
       if (typeof taught === 'object') this.guideStages.set(taught.id, taught.enterStage ?? 0);
@@ -343,10 +360,56 @@ export class TutorialRunner {
     for (const e of evs) this.events.push(e);
     this.tracker.update(evs, this.sim);
     this._evaluateObjectives();
-    if (this.sim.ended && this.state !== STATES.SUCCESS && !this.objectivesComplete()) {
-      this._fail('round-lost');
+    if (this.sim.ended && this.state !== STATES.SUCCESS) {
+      if (this.bestOfThree) this._handleSeriesRoundEnd();
+      else if (!this.objectivesComplete()) this._fail('round-lost');
     }
     return evs;
+  }
+
+  // Best-of-three: record the finished round, then either decide the series
+  // (win → success, loss → fail) or checkpoint and re-arm the next round.
+  _handleSeriesRoundEnd() {
+    const winner = this.sim.winner;
+    if (winner === this.playerId) this.seriesScore[0] += 1;
+    else if (winner === this.botId) this.seriesScore[1] += 1;
+    this.seriesRound += 1;
+
+    const need = 2, maxRounds = 3;
+    const decided = this.seriesScore[0] >= need || this.seriesScore[1] >= need || this.seriesRound >= maxRounds;
+    const won = this.seriesScore[0] > this.seriesScore[1];
+
+    if (this.onSeriesRound) {
+      this.onSeriesRound({ score: [...this.seriesScore], round: this.seriesRound, decided, won });
+    }
+
+    if (decided) {
+      this.tracker.facts.seriesWon = won;
+      this.tracker.facts.seriesDecided = true;
+      this._evaluateObjectives();
+      if (!won && this.state !== STATES.SUCCESS) this._fail('series-lost');
+    } else {
+      this._armNextSeriesRound();
+    }
+  }
+
+  // Re-arm a fresh round with the SAME loadouts and a varied deterministic seed,
+  // preserving the series score. Checkpoints the profile between rounds.
+  _armNextSeriesRound() {
+    this.seed = (this.seed + 0x9e3779b9) >>> 0;
+    const lesson = this.lesson;
+    this.sim = new Sim({
+      seed: this.seed,
+      loadouts: [makeLoadout(lesson.playerLoadout), makeLoadout(lesson.opponentLoadout)],
+      rules: { timer: !!lesson.timerEnabled, pressure: !!lesson.pressureEnabled },
+    });
+    this._applyArena(lesson.arena);
+    this.bot = this._buildOpponent(lesson.opponent);
+    this.tracker.reset();
+    this.tracker.update([], this.sim);
+    this.acc = 0;
+    if (this.profile && this.storage) saveProfile(this.profile, this.storage); // checkpoint
+    this._setState(STATES.ACTIVE);
   }
 
   _evaluateObjectives() {

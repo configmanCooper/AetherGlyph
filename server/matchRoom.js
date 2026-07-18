@@ -13,7 +13,7 @@ import { Series, SERIES } from '../shared/src/sim/match.js';
 import { Recognizer } from '../shared/src/gesture/recognizer.js';
 import { buildTemplates } from '../shared/src/gesture/templates.js';
 import { validateLoadout, makeLoadout } from '../shared/src/balance/loadouts.js';
-import { CAST } from '../shared/src/sim/constants.js';
+import { qualityFromScore } from '../shared/src/gesture/quality.js';
 import { EVENTS, ERR } from '../shared/src/protocol/events.js';
 import {
   NET, remapSnapshotForSlot, remapEventsForSlot, validateTraceEnvelope,
@@ -29,12 +29,9 @@ const INTERMISSION_MS = 2800;
 // own loadout. Building it once keeps classification deterministic + cheap.
 const BASE_RECOGNIZER = new Recognizer(buildTemplates());
 
-// Map a recognition quality score (0.60..1.0) to potency (0.90..1.05), matching
-// the client-side mapping so prediction agrees with authority.
-function qualityFromScore(score) {
-  const q = 0.9 + Math.min(1, Math.max(0, (score - 0.6) / 0.4)) * 0.15;
-  return Math.min(CAST.maxPotency, Math.max(CAST.minPotency, q));
-}
+// Map a recognition quality score to potency via the shared single-source
+// mapping (shared/src/gesture/quality.js), so the server, client prediction,
+// and Practice AI can never drift apart on potency math.
 
 function freshSeatRuntime() {
   return {

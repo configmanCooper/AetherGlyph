@@ -54,6 +54,9 @@ const requiredStaged = [
   'client/src/tutorial/scriptBot.js',
   'client/src/tutorial/medals.js',
   'client/src/tutorial/secrets.js',
+  'client/src/tutorial/calibration.js',
+  'client/src/ui/coach.js',
+  'client/src/game/localMatch.js',
   'client/styles/style.css',
   'client/manifest.webmanifest',
   'client/sw.js',
@@ -65,6 +68,10 @@ const requiredStaged = [
   'client/vendor/three.module.js',
   'client/vendor/socket.io.esm.min.js',
   'shared/src/balance/spellData.generated.js',
+  'shared/src/bot/practiceBot.js',
+  'shared/src/bot/combos.js',
+  'shared/src/gesture/quality.js',
+  'shared/src/analytics/coach.js',
   'shared/src/protocol/version.js',
   'design/spells.csv',
 ];
@@ -116,7 +123,7 @@ ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.inclu
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 400'), 'gradle versionCode 400');
+ok(appGradle.includes('versionCode 10000'), 'gradle versionCode 10000');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');

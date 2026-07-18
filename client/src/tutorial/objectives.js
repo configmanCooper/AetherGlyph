@@ -48,6 +48,8 @@ export class ObjectiveTracker {
       coverDestroyedByPlayer: 0,                       // opp cover destroyed by player
       evadesBySelf: 0,                                 // incoming shots that missed player
       evadesBySpell: new Map(),                        // spellId -> miss count on player
+      deflectsBySelf: 0,                               // Gust Wall deflections by player
+      deflectsBySpell: new Map(),                      // spellId -> deflect count by player
       sidestepsBySelf: 0,
       blinkBySelf: 0,
       focusCompletesBySelf: 0,
@@ -71,6 +73,8 @@ export class ObjectiveTracker {
       focusBehindCover: false,
       roundWinner: null,
       roundEnded: false,
+      seriesWon: false,     // best-of-three decided in the player's favour
+      seriesDecided: false,
     };
     this._prev = null; // previous snapshot slice for delta computation
   }
@@ -132,6 +136,12 @@ export class ObjectiveTracker {
           if (e.target === P) {
             f.evadesBySelf += 1;
             if (e.spellId != null) f.evadesBySpell.set(e.spellId, (f.evadesBySpell.get(e.spellId) || 0) + 1);
+          }
+          break;
+        case 'deflect':
+          if (e.by === P) {
+            f.deflectsBySelf += 1;
+            if (e.spellId != null) f.deflectsBySpell.set(e.spellId, (f.deflectsBySpell.get(e.spellId) || 0) + 1);
           }
           break;
         case 'sidestep':
@@ -276,6 +286,10 @@ export const OBJECTIVE_PREDICATES = {
   'evade': (ctx, [n]) => ctx.facts.evadesBySelf >= num(n, 1),
   // Player evaded a specific spell N times.
   'evade-spell': (ctx, [id, n]) => (ctx.facts.evadesBySpell.get(Number(id)) || 0) >= num(n, 1),
+  // Player deflected a light projectile with Gust Wall N times.
+  'deflect': (ctx, [n]) => ctx.facts.deflectsBySelf >= num(n, 1),
+  // Player deflected a specific light spell N times.
+  'deflect-spell': (ctx, [id, n]) => (ctx.facts.deflectsBySpell.get(Number(id)) || 0) >= num(n, 1),
   // Player used Sidestep N times.
   'sidestep': (ctx, [n]) => ctx.facts.sidestepsBySelf >= num(n, 1),
   // Player used Blink.
@@ -316,6 +330,8 @@ export const OBJECTIVE_PREDICATES = {
   'reflect': (ctx) => ctx.facts.reflectsBySelf >= 1,
   // Player won the round (formal duel / exam).
   'win-round': (ctx) => ctx.facts.roundEnded && ctx.facts.roundWinner === ctx.playerId,
+  // Player won a best-of-three series (set by the runner when the series decides).
+  'win-series': (ctx) => ctx.facts.seriesWon === true,
 
   // --- medal / mastery constraints (optional; never gate ranked) ---
   // The player never suffered a given status (e.g. conduct without being Soaked).

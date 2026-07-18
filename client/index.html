@@ -112,37 +112,60 @@
       <p class="tagline">Arcane Duels — draw glyphs, cast spells, win the duel.</p>
       <div class="menu-list">
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
-        <button class="menu-btn" data-action="practice-ai" aria-disabled="true">Practice vs AI <span class="soon">soon</span></button>
+        <button class="menu-btn" data-action="practice-ai">Practice vs AI</button>
         <button class="menu-btn" data-action="lab">Glyph Laboratory</button>
-        <button class="menu-btn" data-action="duel">Bot Duel</button>
         <button class="menu-btn" data-action="online">Online Duel</button>
         <button class="menu-btn" data-action="loadout">Loadout builder</button>
         <button class="menu-btn" data-action="settings">Settings</button>
       </div>
-      <p class="offline-note">Tutorial &amp; Glyph Laboratory are fully offline. Online duels connect to the authoritative server.</p>
+      <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
       <p class="links">
         <a href="/MASTERPLAN.md">Master plan</a> ·
         <a href="/design/spells.csv">Spell roster</a>
       </p>
     </div>
 
-    <div class="panel hidden" id="panel-duel">
-      <h2>Bot Duel — Best of Three</h2>
-      <p>Face the bot in a best-of-three series. Win two rounds to take the match. Your loadout is preserved between rounds; the arena resets.</p>
-      <label class="field">Difficulty
-        <select id="duel-diff">
-          <option value="apprentice" selected>Apprentice</option>
-          <option value="adept">Adept</option>
-          <option value="magus">Magus</option>
-          <option value="archmage">Archmage</option>
-        </select>
-      </label>
-      <label class="field">Opponent archetype
-        <select id="duel-opp"></select>
-      </label>
-      <p id="duel-loadout-summary" class="loadout-summary"></p>
+    <div class="panel hidden" id="panel-practice">
+      <h2>Practice vs AI</h2>
+      <p class="offline-note">Fully offline &amp; single-player. One round against a fair AI. The AI uses the same rules, resources, cooldowns, loadout limits, and drawn-glyph execution as you — it only differs in reaction speed, planning, and knowledge.</p>
+      <div class="practice-grid">
+        <label class="field">Difficulty
+          <select id="prac-diff">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <label class="field">Your loadout
+          <select id="prac-player"></select>
+        </label>
+        <label class="field">Opponent
+          <select id="prac-opp"></select>
+        </label>
+        <label class="field">Round
+          <select id="prac-timed">
+            <option value="timed" selected>Standard · 105s + Arcane Pressure</option>
+            <option value="untimed">Untimed</option>
+          </select>
+        </label>
+        <label class="field">Coaching
+          <select id="prac-coaching">
+            <option value="summary">Summary</option>
+            <option value="detailed" selected>Detailed</option>
+          </select>
+        </label>
+        <label class="field">Seed
+          <span class="seed-row">
+            <label class="mini-toggle"><input type="checkbox" id="prac-fixseed" /> fixed</label>
+            <input type="number" id="prac-seed" class="seed-input" min="0" step="1" placeholder="auto" disabled />
+          </span>
+        </label>
+      </div>
+      <label class="toggle"><input type="checkbox" id="prac-templates" /> Show spell templates (assisted — this round is not counted in difficulty stats)</label>
+      <div id="prac-opp-preview" class="opp-preview"></div>
+      <p id="prac-player-summary" class="loadout-summary"></p>
       <div class="menu-list">
-        <button class="menu-btn" data-action="start-duel">Begin series</button>
+        <button class="menu-btn" data-action="start-practice">Begin practice</button>
         <button class="menu-btn ghost" data-action="loadout">Edit my loadout</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
@@ -253,9 +276,23 @@
       </div>
     </div>
 
+    <div class="panel hidden" id="panel-calibrate">
+      <h2>Quick calibration</h2>
+      <p class="offline-note">One-time comfort setup. Draw each shape naturally at a comfortable size — this only tunes guide sizing and your comfortable pace. It never changes how glyphs are recognized.</p>
+      <p id="calib-step" class="calib-step">Draw a horizontal line, left to right.</p>
+      <div class="calib-pad">
+        <canvas id="calib-canvas"></canvas>
+        <div id="calib-progress" class="calib-progress">1 / 3</div>
+      </div>
+      <div class="menu-list">
+        <button class="menu-btn ghost" data-action="calib-skip">Skip &amp; use defaults</button>
+      </div>
+    </div>
+
     <div class="panel hidden" id="panel-result">
       <h2 id="result-title">Round complete</h2>
       <p id="result-text"></p>
+      <div id="coach-report" class="coach-report-wrap hidden" aria-label="Coaching report"></div>
       <div class="menu-list">
         <button class="menu-btn hidden" id="btn-next-round" data-action="next-round">Next round</button>
         <button class="menu-btn" data-action="rematch">Rematch</button>

@@ -14,14 +14,19 @@
 
 import { effectFor, PROJECTILE } from '../../../shared/src/sim/spellEffects.js';
 
-export const SCRIPT_BEHAVIORS = ['idle', 'periodic', 'focus-loop', 'on-mark-defend', 'wall-focus', 'sequence'];
+export const SCRIPT_BEHAVIORS = ['idle', 'periodic', 'focus-loop', 'on-mark-defend', 'wall-focus', 'sequence', 'wind-drill'];
 
 export class ScriptBot {
   constructor(playerId, config = {}) {
     this.id = playerId;
     this.behavior = config.behavior || 'idle';
     this.config = config;
-    this.mem = { nextAttempt: config.startTick ?? 0, seqDone: new Set() };
+    this.mem = {
+      nextAttempt: config.startTick ?? 0,
+      seqDone: new Set(),
+      lightArmed: true,
+      nextHeavy: config.heavyStartTick ?? 200,
+    };
   }
 
   // A legal cast gate mirroring the sim's own acceptance checks so the bot only
@@ -66,6 +71,7 @@ export class ScriptBot {
       case 'on-mark-defend': return this._onMarkDefend(sim);
       case 'wall-focus': return this._wallFocus(sim);
       case 'sequence': return this._sequence(sim);
+      case 'wind-drill': return this._windDrill(sim);
       default: return { move: 0 };
     }
   }
@@ -130,6 +136,33 @@ export class ScriptBot {
         return { move: 0 };
       }
       this.mem.seqDone.add(i);
+    }
+    return { move: 0 };
+  }
+
+  // Wind Answers drill (Lesson 10). Throws a LIGHT bolt whenever the student
+  // raises a Gust Wall (so they can practise deflecting a light projectile), and
+  // periodically throws a HEAVY Stone Shard the student must dodge (Gust cannot
+  // stop it). Reads only public state (the visible wind wall) — no cheating.
+  _windDrill(sim) {
+    const foe = sim.wizards[1 - this.id];
+    const lightId = this.config.lightId ?? 1;
+    const heavyId = this.config.heavyId ?? 4;
+    const heavyStart = this.config.heavyStartTick ?? 200;
+    const heavyPeriod = this.config.heavyPeriodTicks ?? 150;
+    // Fire one light bolt per fresh deflect window the student opens.
+    if (foe && foe.deflectTicks > 0) {
+      if (this.mem.lightArmed && this.canCast(sim, lightId)) {
+        this.mem.lightArmed = false;
+        return { move: 0, cast: lightId, castQuality: 1 };
+      }
+    } else {
+      this.mem.lightArmed = true;
+    }
+    // Otherwise, periodically throw a heavy Stone Shard for the dodge objective.
+    if (sim.tick >= heavyStart && sim.tick >= this.mem.nextHeavy && this.canCast(sim, heavyId)) {
+      this.mem.nextHeavy = sim.tick + heavyPeriod;
+      return { move: 0, cast: heavyId, castQuality: 1 };
     }
     return { move: 0 };
   }
