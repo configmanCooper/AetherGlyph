@@ -178,5 +178,17 @@ export function run() {
     ok(rl.seriesScore[0] === 0 && rl.seriesScore[1] === 0 && rl.state === STATES.ACTIVE, 'retry restarts the series at 0–0');
   }
 
+  // --- 10. Grandmaster trial awards a persistent medal/title on a win -------
+  {
+    let won = false, medaled = false;
+    for (let s = 0; s < 8 && !won; s++) {
+      const r = new TutorialRunner('EXAM_GM', { seed: 1000 + s, profile: defaultProfile(), storage: memoryStorage() });
+      const out = r.runHeadless({ student: makeStudent(CAMPAIGN_BY_ID.EXAM_GM, 1000 + s), maxTicks: 21000 });
+      if (out.completed) { won = true; medaled = r.profile.medals.grandmaster === true; }
+    }
+    ok(won, 'the Grandmaster trial is winnable by a skilled student');
+    ok(medaled, 'winning the Grandmaster trial awards the persistent Grandmaster medal/title');
+  }
+
   return report('tutorialRunner');
 }

@@ -304,6 +304,13 @@ body.reduced .spinner { animation: none; }
 .tut-lesson.next { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .tut-lesson.done { color: var(--muted); }
 .tut-lesson .tl-badge { color: var(--accent2); font-weight: 700; }
+.tut-lesson.locked {
+  flex-direction: column; align-items: flex-start; gap: 3px;
+  cursor: not-allowed; opacity: 0.6;
+}
+.tut-lesson.locked .tl-lock { font-size: 11px; color: var(--muted); font-weight: 600; }
+.tut-subgroup { margin: 4px 0 10px; }
+.tut-subhead { margin: 8px 0 5px; font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
 
 /* Lesson intro: narration before input becomes active. */
 .lesson-narration { margin: 6px 0 12px; padding-left: 18px; line-height: 1.5; }

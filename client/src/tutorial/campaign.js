@@ -1,8 +1,10 @@
 // campaign.js — declarative solo tutorial campaign (SOLO-MODES-PLAN §6, §9-11).
 //
 // This replaces the three-item tutorial stub with fully data-driven content: a
-// Prologue, twelve core Lessons, four Academy lessons, a final-exam scaffold,
-// public-spell drills, and four secret trials. Every lesson names:
+// Prologue, twelve core Lessons, four Academy lessons, a fully interactive final
+// exam (a no-template gesture gauntlet, five tactical scenarios, a best-of-three
+// Final Duel, and an optional Grandmaster trial), public-spell drills, and four
+// secret trials. Every lesson names:
 //   - the real teaching loadouts (player + instructor),
 //   - the taught / drilled spell ids (machine-checked to cover roster 1-40),
 //   - objective predicates from ../tutorial/objectives.js (all registered),
@@ -38,6 +40,60 @@ function dodgeIntent(sim, K = 1) {
   if (threat && P.sidestepCharges > 0) return { sidestep: P.arcPos >= 0 ? -1 : 1 }; // toward centre
   return IDLE;
 }
+
+// --- final-exam content (SOLO-MODES-PLAN §9) -------------------------------
+// The exam is fully interactive and checkpointed. It is built from separate,
+// data-driven lesson entries rather than a bespoke state machine: a no-template
+// Gesture Gauntlet (draw any 10 of 12 glyphs from memory), five Tactical
+// Scenarios (pass any 4 of 5 with real Sim mechanics), a best-of-three Final
+// Duel vs the fair Medium AI, and an optional Grandmaster best-of-three vs the
+// fair Hard AI. Declarative `group` + `requires` metadata drives hub locking so
+// no bespoke exam controller is needed.
+
+// Group thresholds: complete `need` of `total` to satisfy the group.
+export const EXAM_GROUPS = Object.freeze({
+  'exam-gauntlet': { total: 12, need: 10, title: 'Gesture Gauntlet' },
+  'exam-scenarios': { total: 5, need: 4, title: 'Tactical Scenarios' },
+});
+
+// The twelve gauntlet glyphs — all castable with zero Sigil Charges and visually
+// distinct. Every gauntlet stage scopes the production recognizer to this same
+// pool, so each is a genuine twelve-way discrimination drawn WITHOUT any guide.
+const GAUNTLET_TARGETS = [1, 2, 3, 4, 5, 6, 10, 11, 12, 14, 20, 28];
+const GAUNTLET_GLYPH_LABEL = {
+  1: 'Ember Bolt', 2: 'Frost Lance', 3: 'Spark Dart', 4: 'Stone Shard',
+  5: 'Arcane Missile', 6: 'Flame Wave', 10: 'Ward', 11: 'Barrier Dome',
+  12: 'Reflect', 14: 'Blink', 20: 'Grounding Mantle', 28: 'Concussive Blast',
+};
+
+// Build one gauntlet stage: no taught spell (so the guide is always None), a
+// single "draw this glyph" objective checked by the production recognizer, and a
+// deterministic student that draws exactly the requested glyph once (real input,
+// never a tap substitute — a no-input student can never satisfy it).
+function gauntletLesson(index, spellId) {
+  const n = index + 1;
+  const name = GAUNTLET_GLYPH_LABEL[spellId];
+  return {
+    id: `G${String(n).padStart(2, '0')}`, chapter: 'exam',
+    title: `Gauntlet ${n}: ${name}`, order: 20 + index,
+    optional: true, gauntlet: true, group: 'exam-gauntlet',
+    narration: [
+      'The gauntlet: no guide, no template — draw each glyph from memory.',
+      `Draw ${name} cleanly. Pass any ten of the twelve glyphs to advance.`,
+    ],
+    timerEnabled: false, pressureEnabled: false,
+    playerLoadout: GAUNTLET_TARGETS.slice(), opponentLoadout: [1],
+    taughtSpells: [], drills: [],
+    opponent: { type: 'script', config: { behavior: 'idle' } },
+    objectives: [
+      { id: 'draw', text: `Draw ${name} with no guide`, predicate: `cast-spell:${spellId}`, expectSpell: spellId },
+    ],
+    remediation: ['retry'],
+    maxTicks: 900,
+    solution: (sim, t) => (t.castCount(spellId) < 1 && pc(sim, spellId)) ? { cast: spellId, castQuality: 1 } : IDLE,
+  };
+}
+const GAUNTLET_LESSONS = GAUNTLET_TARGETS.map((id, i) => gauntletLesson(i, id));
 
 // --- the campaign ----------------------------------------------------------
 // order is the linear teaching order. `optional:true` lessons (academies, exam,
@@ -558,13 +614,167 @@ export const CAMPAIGN = [
     maxTicks: 21000,
   },
 
+  // --- final exam: gesture gauntlet (draw any 10 of 12, no templates) -------
+  ...GAUNTLET_LESSONS,
+
+  // --- final exam: five tactical scenarios (pass any 4 of 5) ----------------
   {
-    id: 'EXAM', chapter: 'exam', title: 'Final Examination', order: 17,
-    optional: true, formal: true, bestOfThree: true,
+    id: 'S01', chapter: 'exam', title: 'Scenario: Reflect vs Heavy', order: 40,
+    optional: true, group: 'exam-scenarios', requires: [{ group: 'exam-gauntlet', count: 10 }],
     narration: [
-      'The final examination: prove your mastery in a best-of-three duel.',
-      'Take two rounds against the fair Medium examiner.',
-      'A Grandmaster retry against the Hard AI awaits the confident.',
+      'Tactical trial: reflect what you can, refuse what you cannot.',
+      'Bounce the Arcane Missile, then weather the un-reflectable Fireball behind a Barrier.',
+    ],
+    timerEnabled: false, pressureEnabled: false,
+    playerLoadout: [12, 11, 5], opponentLoadout: [5, 8],
+    taughtSpells: [], drills: [],
+    arena: { botCharges: 1 },
+    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }] } },
+    objectives: [
+      { id: 'reflect', text: 'Reflect the Arcane Missile', predicate: 'reflect' },
+      { id: 'survive', text: 'Survive the Fireball behind a Barrier', predicate: 'block-damage:20' },
+    ],
+    remediation: ['retry'],
+    maxTicks: 3000,
+    solution: (sim, t) => {
+      const p = sim.wizards[0];
+      const bot = sim.wizards[1];
+      if (t.facts.reflectsBySelf < 1) {
+        const missile = enemyProj(sim, (pr) => pr.eff.reflectable);
+        if (missile && p.reflectTicks <= 0 && pc(sim, 12)) return { cast: 12, castQuality: 1 };
+        return IDLE;
+      }
+      if (t.facts.blockedDamage < 20) {
+        const fireballWindup = bot.casting && bot.casting.spellId === 8;
+        const heavyIncoming = enemyProj(sim, (pr) => !pr.eff.reflectable && pr.eff.damage >= 20);
+        if ((fireballWindup || heavyIncoming) && !p.barrier && pc(sim, 11)) return { cast: 11, castQuality: 1 };
+        return IDLE;
+      }
+      return IDLE;
+    },
+  },
+
+  {
+    id: 'S02', chapter: 'exam', title: 'Scenario: Break the Freeze', order: 41,
+    optional: true, group: 'exam-scenarios', requires: [{ group: 'exam-gauntlet', count: 10 }],
+    narration: [
+      'A freeze needs a Chilled target first. Deny the setup.',
+      'Cleanse the Chill with Dispel before Frost Bind can land — never be Frozen.',
+    ],
+    timerEnabled: false, pressureEnabled: false,
+    playerLoadout: [13, 1], opponentLoadout: [2, 27],
+    taughtSpells: [], drills: [],
+    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 60, cast: 2 }, { tick: 300, cast: 27 }] } },
+    objectives: [
+      { id: 'cleanse', text: 'Cleanse the Chill with Dispel', predicate: 'cleanse:Chilled' },
+      { id: 'safe', text: 'Never be Frozen', predicate: 'no-self-status:Frozen' },
+    ],
+    remediation: ['slow-script'],
+    maxTicks: 2400,
+    solution: (sim, t) => {
+      const p = sim.wizards[0];
+      if (t.facts.dispelRemovedBySelf.includes('Chilled')) return IDLE;
+      if (sim.hasStatus(p, 'Chilled') && pc(sim, 13)) return { cast: 13, castQuality: 1 };
+      return IDLE;
+    },
+  },
+
+  {
+    id: 'S03', chapter: 'exam', title: 'Scenario: Ward and Answer', order: 42,
+    optional: true, group: 'exam-scenarios', requires: [{ group: 'exam-gauntlet', count: 10 }],
+    narration: [
+      'Defense earns its cost only when it faces the threat — then you answer.',
+      'Block direct fire with a Ward, then land Flame Wave through the opening.',
+    ],
+    timerEnabled: false, pressureEnabled: false,
+    playerLoadout: [10, 6], opponentLoadout: [1],
+    taughtSpells: [], drills: [],
+    opponent: { type: 'script', config: { behavior: 'periodic', spellId: 1, startTick: 30, periodTicks: 60 } },
+    objectives: [
+      { id: 'block', text: 'Block 20 damage with a Ward', predicate: 'block-damage:20' },
+      { id: 'answer', text: 'Land Flame Wave in the counterattack', predicate: 'land-spell:6' },
+    ],
+    remediation: ['slow-script'],
+    maxTicks: 2400,
+    solution: (sim, t) => {
+      const p = sim.wizards[0];
+      if (t.facts.blockedDamage < 20) {
+        if (!p.shield && pc(sim, 10)) return { cast: 10, castQuality: 1 };
+        return IDLE;
+      }
+      if (t.facts.hitsOnOppBySpell.get(6) >= 1) return IDLE;
+      return pc(sim, 6) ? { cast: 6, castQuality: 1 } : IDLE;
+    },
+  },
+
+  {
+    id: 'S04', chapter: 'exam', title: 'Scenario: Grounding vs Storm', order: 43,
+    optional: true, group: 'exam-scenarios', requires: [{ group: 'exam-gauntlet', count: 10 }],
+    narration: [
+      'Storm punishes the ungrounded. Trade some mobility for protection.',
+      'Take Grounding Mantle against the Storm, then counterattack with Stone Shard.',
+    ],
+    timerEnabled: false, pressureEnabled: false,
+    playerLoadout: [20, 4], opponentLoadout: [3, 7],
+    taughtSpells: [], drills: [],
+    opponent: { type: 'script', config: { behavior: 'periodic', spellId: 3, startTick: 90, periodTicks: 120 } },
+    objectives: [
+      { id: 'ground', text: 'Become Grounded against the Storm', predicate: 'self-status:Grounded' },
+      { id: 'punish', text: 'Counterattack with Stone Shard', predicate: 'damage-opponent:10' },
+    ],
+    remediation: ['slow-script'],
+    maxTicks: 2400,
+    solution: (sim, t) => {
+      if ((t.facts.statusAppliedToSelf.get('Grounded') || 0) < 1) return pc(sim, 20) ? { cast: 20, castQuality: 1 } : IDLE;
+      if (t.facts.damageDealtToOpp < 10) return pc(sim, 4) ? { cast: 4, castQuality: 1 } : IDLE;
+      return IDLE;
+    },
+  },
+
+  {
+    id: 'S05', chapter: 'exam', title: 'Scenario: Fire and Water', order: 44,
+    optional: true, group: 'exam-scenarios', requires: [{ group: 'exam-gauntlet', count: 10 }],
+    narration: [
+      'Command the ground: some fights are won by the field, not the bolt.',
+      'Douse one Oil slick with Rain, then ignite another with an Ember.',
+    ],
+    timerEnabled: false, pressureEnabled: false,
+    playerLoadout: [31, 32, 1], opponentLoadout: [1],
+    taughtSpells: [], drills: [],
+    opponent: { type: 'script', config: { behavior: 'idle' } },
+    objectives: [
+      { id: 'douse', text: 'Wash an Oil slick with Rain', predicate: 'reaction:WashedGround' },
+      { id: 'ignite', text: 'Ignite an Oil slick with Ember', predicate: 'reaction:FlashFire' },
+    ],
+    remediation: ['slow-script'],
+    maxTicks: 3000,
+    solution: (sim, t) => {
+      const washed = t.facts.reactionsSetPlayer.has('WashedGround');
+      const flashed = t.facts.reactionsSetPlayer.has('FlashFire');
+      if (!washed) {
+        if (!playerZone(sim, 'Oil') && pc(sim, 31)) return { cast: 31, castQuality: 1 };
+        if (playerZone(sim, 'Oil') && pc(sim, 32)) return { cast: 32, castQuality: 1 };
+        return IDLE;
+      }
+      if (!flashed) {
+        if (!playerZone(sim, 'Oil') && pc(sim, 31)) return { cast: 31, castQuality: 1 };
+        if (playerZone(sim, 'Oil') && pc(sim, 1)) return { cast: 1, castQuality: 1 };
+        return IDLE;
+      }
+      return IDLE;
+    },
+  },
+
+  // --- final exam: the Final Duel (best-of-three vs the fair Medium AI) ------
+  // Unlocked only after the gauntlet (10/12) and scenario (4/5) thresholds.
+  {
+    id: 'EXAM', chapter: 'exam', title: 'Final Duel', order: 50,
+    optional: true, formal: true, bestOfThree: true, group: 'exam-duel',
+    requires: [{ group: 'exam-gauntlet', count: 10 }, { group: 'exam-scenarios', count: 4 }],
+    narration: [
+      'The Final Duel: a best-of-three against the fair Magus examiner.',
+      'Bring a legal loadout. Timer and Arcane Pressure are live.',
+      'Take two rounds to pass the examination.',
     ],
     timerEnabled: true, pressureEnabled: true,
     loadoutRule: 'legal',
@@ -572,19 +782,37 @@ export const CAMPAIGN = [
     opponentLoadout: PRESETS_BY_KEY['gale-trickster'].ids.slice(),
     taughtSpells: [],
     drills: [],
-    // Scaffolded structure for later expansion (SOLO-MODES-PLAN §9 Final Exam):
-    // the gesture gauntlet and tactical scenarios remain future work; the core
-    // best-of-three duel is fully implemented here.
-    stages: [
-      { id: 'gauntlet', kind: 'gesture-gauntlet', note: 'draw 10 of 12 with no templates' },
-      { id: 'scenarios', kind: 'tactical', note: 'pass 4 of 5 tactical scenarios' },
-      { id: 'duel', kind: 'best-of-three', note: 'best-of-three vs Medium' },
-      { id: 'grandmaster', kind: 'optional', note: 'optional retry vs Hard' },
-    ],
     opponent: { type: 'practice', difficulty: 'medium' },
     objectives: [
       { id: 'win', text: 'Win a best-of-three against the Magus examiner', predicate: 'win-series' },
     ],
+    remediation: ['retry'],
+    solutionBot: 'archmage',
+    maxTicks: 21000,
+  },
+
+  // --- final exam: the optional Grandmaster trial (best-of-three vs Hard) ----
+  // Unlocked only after the Final Duel; a win grants the persistent Grandmaster
+  // medal/title. Never gates ranked readiness.
+  {
+    id: 'EXAM_GM', chapter: 'exam', title: 'Grandmaster Trial', order: 51,
+    optional: true, formal: true, bestOfThree: true, group: 'exam-grandmaster',
+    requires: [{ lesson: 'EXAM' }],
+    narration: [
+      'Optional mastery: a best-of-three against the fair Hard AI.',
+      'Win two rounds to earn the persistent Grandmaster title.',
+    ],
+    timerEnabled: true, pressureEnabled: true,
+    loadoutRule: 'legal',
+    playerLoadout: PRESETS_BY_KEY['ember-rush'].ids.slice(),
+    opponentLoadout: PRESETS_BY_KEY['tide-control'].ids.slice(),
+    taughtSpells: [],
+    drills: [],
+    opponent: { type: 'practice', difficulty: 'hard' },
+    objectives: [
+      { id: 'win', text: 'Win a best-of-three against the Hard AI', predicate: 'win-series' },
+    ],
+    medal: { id: 'grandmaster', text: 'Grandmaster', predicate: 'win-series' },
     remediation: ['retry'],
     solutionBot: 'archmage',
     maxTicks: 21000,
@@ -751,4 +979,70 @@ export function makeStudent(lesson, seed = 12345) {
     return (sim) => bot.act(sim);
   }
   return () => ({});
+}
+
+// --- final-exam gating (SOLO-MODES-PLAN §9) --------------------------------
+// The exam stages carry declarative `group` + `requires` metadata. These pure
+// helpers evaluate a profile against that metadata so the hub can lock stages,
+// the start guard can refuse a locked stage, and tests can assert the exact
+// unlock thresholds — all without a bespoke exam state machine.
+export const GAUNTLET_LESSON_IDS = CAMPAIGN.filter((l) => l.group === 'exam-gauntlet').map((l) => l.id);
+export const SCENARIO_LESSON_IDS = CAMPAIGN.filter((l) => l.group === 'exam-scenarios').map((l) => l.id);
+
+// Completion progress for a declarative group: { done, total, need, met }.
+export function groupProgress(profile, group) {
+  const completed = (profile && profile.completedLessons) || [];
+  const ids = CAMPAIGN.filter((l) => l.group === group).map((l) => l.id);
+  const done = ids.filter((id) => completed.includes(id)).length;
+  const need = EXAM_GROUPS[group] ? EXAM_GROUPS[group].need : ids.length;
+  return { done, total: ids.length, need, met: done >= need };
+}
+
+// True when a lesson has no unmet prerequisites. Lessons without `requires` are
+// always unlocked (the entire non-exam campaign, and the gauntlet stages).
+export function lessonUnlocked(lesson, profile) {
+  if (!lesson || !lesson.requires || !lesson.requires.length) return true;
+  const completed = (profile && profile.completedLessons) || [];
+  for (const req of lesson.requires) {
+    if (req.group != null) {
+      const need = req.count ?? (EXAM_GROUPS[req.group] ? EXAM_GROUPS[req.group].need : 1);
+      if (groupProgress(profile, req.group).done < need) return false;
+    }
+    if (req.lesson != null && !completed.includes(req.lesson)) return false;
+  }
+  return true;
+}
+
+// Accessible, human-readable explanation of what remains before a locked lesson
+// can be started (null when the lesson is already unlocked).
+export function lockReason(lesson, profile) {
+  if (lessonUnlocked(lesson, profile)) return null;
+  const completed = (profile && profile.completedLessons) || [];
+  const parts = [];
+  for (const req of lesson.requires || []) {
+    if (req.group != null) {
+      const gp = groupProgress(profile, req.group);
+      const need = req.count ?? gp.need;
+      if (gp.done < need) {
+        const title = EXAM_GROUPS[req.group] ? EXAM_GROUPS[req.group].title : req.group;
+        parts.push(`${title} ${gp.done}/${need}`);
+      }
+    }
+    if (req.lesson != null && !completed.includes(req.lesson)) {
+      const dep = CAMPAIGN_BY_ID[req.lesson];
+      parts.push(`win ${dep ? dep.title : req.lesson}`);
+    }
+  }
+  return parts.length ? `Locked — need ${parts.join('; ')}` : 'Locked';
+}
+
+// The first not-yet-completed lesson (in campaign order) the player can actually
+// start right now — keeps the Continue button on a playable, unlocked lesson.
+export function firstAvailableLessonId(profile) {
+  const completed = (profile && profile.completedLessons) || [];
+  for (const l of CAMPAIGN) {
+    if (completed.includes(l.id)) continue;
+    if (lessonUnlocked(l, profile)) return l.id;
+  }
+  return null;
 }

@@ -13,7 +13,8 @@ import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
 import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact } from './native.js';
 import { TutorialRunner, STATES, GUIDE_STAGE_NAMES } from '../tutorial/runner.js';
-import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters } from '../tutorial/campaign.js';
+import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters,
+  lessonUnlocked, lockReason, groupProgress, firstAvailableLessonId, EXAM_GROUPS } from '../tutorial/campaign.js';
 import {
   loadProfile, saveProfile, deleteProfile, completionPercent,
   setPractice, recordPracticeResult,
@@ -313,6 +314,7 @@ function renderTutorialHub() {
   const medalCount = Object.keys(p.medals).length;
   const clueCount = Object.keys(p.clues).length;
   const secretCount = Object.values(p.secretsFound).filter(Boolean).length;
+  const grandmaster = p.medals && p.medals.grandmaster === true;
 
   const sum = $('#tut-summary');
   if (sum) {
@@ -324,7 +326,8 @@ function renderTutorialHub() {
       `<div class="tut-stat"><span class="k">Clues</span><span class="v">${clueCount}</span></div>` +
       `<div class="tut-stat"><span class="k">Secrets</span><span class="v">${secretCount}/4</span></div>` +
       `<div class="tut-stat ranked ${p.rankedReady ? 'on' : ''}"><span class="k">Ranked</span>` +
-      `<span class="v">${p.rankedReady ? 'Ready ✓' : 'Locked (win Lesson 12)'}</span></div>`;
+      `<span class="v">${p.rankedReady ? 'Ready ✓' : 'Locked (win Lesson 12)'}</span></div>` +
+      (grandmaster ? '<div class="tut-stat ranked on"><span class="k">Title</span><span class="v">Grandmaster ★</span></div>' : '');
   }
 
   const list = $('#tut-chapters');
@@ -334,23 +337,74 @@ function renderTutorialHub() {
       const sec = document.createElement('section');
       sec.className = 'tut-chapter';
       sec.innerHTML = `<h3>${ch.title}</h3>`;
-      const row = document.createElement('div');
-      row.className = 'tut-lessons';
-      for (const l of ch.lessons) {
-        const done = p.completedLessons.includes(l.id);
-        const isNext = l.id === p.currentLessonId;
-        const btn = document.createElement('button');
-        btn.className = 'tut-lesson' + (done ? ' done' : '') + (isNext ? ' next' : '');
-        const badge = done ? '✓' : (l.optional ? '☆' : '');
-        btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-badge">${badge}</span>`;
-        btn.setAttribute('aria-label', `${l.title}${done ? ' (completed)' : ''}${l.optional ? ' (optional)' : ''}`);
-        btn.addEventListener('click', () => startTutorialLesson(l.id));
-        row.appendChild(btn);
+      if (ch.chapter === 'exam') {
+        renderExamChapter(sec, ch, p);
+      } else {
+        const row = document.createElement('div');
+        row.className = 'tut-lessons';
+        for (const l of ch.lessons) row.appendChild(lessonButton(l, p));
+        sec.appendChild(row);
       }
-      sec.appendChild(row);
       list.appendChild(sec);
     }
   }
+}
+
+// The final exam renders as locked/unlockable sub-groups with progress counters
+// and accessible remaining-requirement text (SOLO-MODES-PLAN §9).
+const EXAM_SUBGROUP_ORDER = ['exam-gauntlet', 'exam-scenarios', 'exam-duel', 'exam-grandmaster'];
+const EXAM_SUBGROUP_TITLES = {
+  'exam-gauntlet': 'Gesture Gauntlet', 'exam-scenarios': 'Tactical Scenarios',
+  'exam-duel': 'Final Duel', 'exam-grandmaster': 'Grandmaster Trial',
+};
+
+function renderExamChapter(sec, ch, p) {
+  const byGroup = {};
+  for (const l of ch.lessons) (byGroup[l.group] ||= []).push(l);
+  for (const g of EXAM_SUBGROUP_ORDER) {
+    const lessons = byGroup[g];
+    if (!lessons) continue;
+    const sub = document.createElement('div');
+    sub.className = 'tut-subgroup';
+    let head = EXAM_SUBGROUP_TITLES[g] || g;
+    if (EXAM_GROUPS[g]) {
+      const gp = groupProgress(p, g);
+      head += ` — ${gp.done}/${gp.total} (need ${gp.need}${gp.met ? ' ✓' : ''})`;
+    }
+    const h = document.createElement('h4');
+    h.className = 'tut-subhead';
+    h.textContent = head;
+    sub.appendChild(h);
+    const row = document.createElement('div');
+    row.className = 'tut-lessons';
+    for (const l of lessons) row.appendChild(lessonButton(l, p));
+    sub.appendChild(row);
+    sec.appendChild(sub);
+  }
+}
+
+// Build a single lesson tile. Locked stages are disabled, carry a visible + ARIA
+// remaining-requirement line, and cannot be started (also guarded on start).
+function lessonButton(l, p) {
+  const done = p.completedLessons.includes(l.id);
+  const isNext = l.id === p.currentLessonId;
+  const unlocked = lessonUnlocked(l, p);
+  const btn = document.createElement('button');
+  btn.className = 'tut-lesson' + (done ? ' done' : '') + (isNext ? ' next' : '') + (unlocked ? '' : ' locked');
+  btn.dataset.lesson = l.id;
+  if (!unlocked) {
+    const reason = lockReason(l, p) || 'Locked';
+    btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-lock">🔒 ${reason}</span>`;
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    btn.setAttribute('aria-label', `${l.title} — ${reason}`);
+    return btn;
+  }
+  const badge = done ? '✓' : (l.optional ? '☆' : '');
+  btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-badge">${badge}</span>`;
+  btn.setAttribute('aria-label', `${l.title}${done ? ' (completed)' : ''}${l.optional ? ' (optional)' : ''}`);
+  btn.addEventListener('click', () => startTutorialLesson(l.id));
+  return btn;
 }
 
 function chapterLabel(chapter) {
@@ -361,10 +415,17 @@ function chapterLabel(chapter) {
 function startTutorialLesson(lessonId) {
   const lesson = CAMPAIGN_BY_ID[lessonId];
   if (!lesson) return;
+  const profile = soloProfile();
+  // Start guard: locked exam stages can never be started, even if reached via a
+  // stale Continue pointer or a direct call — surface why and return to the hub.
+  if (!lessonUnlocked(lesson, profile)) {
+    toast(lockReason(lesson, profile) || 'This exam stage is locked.');
+    openTutorialHub();
+    return;
+  }
   tutorialLesson = lesson;
   mode = 'tutorial';
   series = null;
-  const profile = soloProfile();
   const recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(lesson.playerLoadout));
   gesture.recognizer = recognizer;
 
@@ -1057,7 +1118,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'server-reset') resetServerUrl();
     else if (a === 'privacy') openPrivacy();
     else if (a === 'delete-data') deleteMyData();
-    else if (a === 'tut-continue') startTutorialLesson(soloProfile().currentLessonId);
+    else if (a === 'tut-continue') startTutorialLesson(resolveContinueLesson());
     else if (a === 'tut-begin') beginTutorialLesson();
     else if (a === 'tut-showme') tutorialShowMe();
     else if (a === 'tut-tryagain') tutorialTryAgain();
@@ -1080,9 +1141,24 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
 });
 
 function continueTutorial() {
+  const p = soloProfile();
   const nextId = window.__tutNext;
-  if (nextId) startTutorialLesson(nextId);
+  if (nextId && CAMPAIGN_BY_ID[nextId] && !p.completedLessons.includes(nextId) && lessonUnlocked(CAMPAIGN_BY_ID[nextId], p)) {
+    startTutorialLesson(nextId);
+    return;
+  }
+  const avail = firstAvailableLessonId(p);
+  if (avail) startTutorialLesson(avail);
   else openTutorialHub();
+}
+
+// The Continue button stays on a playable, unlocked lesson: the saved position if
+// still startable, otherwise the first unlocked incomplete lesson in campaign order.
+function resolveContinueLesson() {
+  const p = soloProfile();
+  const cur = CAMPAIGN_BY_ID[p.currentLessonId];
+  if (cur && !p.completedLessons.includes(cur.id) && lessonUnlocked(cur, p)) return cur.id;
+  return firstAvailableLessonId(p) || p.currentLessonId;
 }
 
 $('#btn-menu').addEventListener('click', () => { running = false; if (mode === 'online' && online) online.setActive(false); if (mode === 'tutorial' && tutorial) tutorial.pause(); showPanel('panel-main'); showOverlay(true); });

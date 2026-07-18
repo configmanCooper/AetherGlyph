@@ -127,6 +127,79 @@ try {
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
+  // Final exam hub: locking/unlocking via seeded profile manipulation, then one
+  // real no-guide Gesture Gauntlet draw. The solo profile is DOM-free and reloads
+  // from localStorage on every hub render, so seeding + re-opening re-renders it.
+  const seedCompleted = (completed) => page.evaluate((c) => {
+    const k = 'aeg.solo.v1';
+    let p = {};
+    try { p = JSON.parse(localStorage.getItem(k) || '{}'); } catch {}
+    p.completedLessons = c;                    // preserve calibration/practice
+    localStorage.setItem(k, JSON.stringify(p));
+  }, completed);
+  const lockState = (ids) => page.evaluate((list) => {
+    const out = {};
+    for (const id of list) {
+      const b = document.querySelector(`[data-lesson="${id}"]`);
+      out[id] = b ? { locked: b.classList.contains('locked'), disabled: !!b.disabled } : null;
+    }
+    return out;
+  }, ids);
+  const reopenHub = async () => {
+    await page.click('[data-action="tutorial"]');
+    await page.waitForSelector('#panel-tutorial:not(.hidden)', { timeout: 5000 });
+    await page.waitForSelector('[data-lesson="EXAM"]', { timeout: 5000 });
+  };
+
+  // Phase A: few gauntlet glyphs done -> scenarios/duel/grandmaster all LOCKED.
+  await seedCompleted(['G03', 'G04']);
+  await reopenHub();
+  let lk = await lockState(['G01', 'S01', 'EXAM', 'EXAM_GM']);
+  if (!lk.G01 || lk.G01.locked) fail('gauntlet stage G01 must be unlocked from the start: ' + JSON.stringify(lk.G01));
+  if (!lk.S01 || !lk.S01.locked || !lk.S01.disabled) fail('tactical scenario S01 must be locked+disabled at 2/12 gauntlet: ' + JSON.stringify(lk.S01));
+  if (!lk.EXAM || !lk.EXAM.locked || !lk.EXAM.disabled) fail('Final Duel must be locked+disabled: ' + JSON.stringify(lk.EXAM));
+  if (!lk.EXAM_GM || !lk.EXAM_GM.locked) fail('Grandmaster must be locked: ' + JSON.stringify(lk.EXAM_GM));
+
+  // A locked stage cannot be started: clicking it is a no-op and stays on the hub.
+  await page.click('[data-lesson="S01"]').catch(() => {});
+  if (!(await page.$('#panel-tutorial:not(.hidden)'))) fail('clicking a locked exam stage must not leave the hub');
+
+  // Phase B: 10/12 gauntlet + 4/5 scenarios -> Final Duel UNLOCKS, Grandmaster stays locked.
+  await page.click('#panel-tutorial [data-action="back"]');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+  await seedCompleted(['G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10', 'G11', 'G12', 'S01', 'S02', 'S03', 'S04']);
+  await reopenHub();
+  lk = await lockState(['EXAM', 'EXAM_GM']);
+  if (!lk.EXAM || lk.EXAM.locked || lk.EXAM.disabled) fail('Final Duel must unlock at 10/12 gauntlet + 4/5 scenarios: ' + JSON.stringify(lk.EXAM));
+  if (!lk.EXAM_GM || !lk.EXAM_GM.locked) fail('Grandmaster must stay locked until the Final Duel is won: ' + JSON.stringify(lk.EXAM_GM));
+
+  // Phase C: one real, no-guide Gesture Gauntlet draw (G01 is still incomplete).
+  await page.click('[data-lesson="G01"]');
+  await page.waitForSelector('#panel-lesson-intro:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="tut-begin"]');
+  await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
+  const gGuide = await page.evaluate(() => document.querySelector('#coach-guide')?.textContent || '');
+  if (!/None/.test(gGuide)) fail('a gauntlet stage must show no guide (expected "Guide: None"): ' + gGuide);
+  const gpad = await page.$('#draw-canvas');
+  const gbox = await gpad.boundingBox();
+  const gy = gbox.y + gbox.height / 2;
+  async function gflick() {
+    await page.mouse.move(gbox.x + gbox.width * 0.2, gy);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(gbox.x + gbox.width * 0.2 + (gbox.width * 0.6) * (i / 8), gy);
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  await gflick();
+  await page.waitForSelector('#panel-result:not(.hidden)', { timeout: 6000 });
+  const gDone = await page.evaluate(() => {
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}'); } catch {}
+    return (saved.completedLessons || []).includes('G01');
+  });
+  if (!gDone) fail('a real no-guide gauntlet draw did not complete gauntlet stage G01');
+  await page.click('#panel-result [data-action="menu"]');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
   // Glyph Laboratory: no opponent (a recognizer/drill sandbox).
   await page.click('[data-action="lab"]');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });

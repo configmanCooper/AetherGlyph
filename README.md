@@ -31,21 +31,28 @@ recognizer sandbox; **Online Duel** is unchanged and separate.
 
 **Solo Phase A (offline tutorial/campaign)** teaches the real production rules with
 real drawn gestures: a Prologue, twelve core Lessons, four Academy lessons, a
-final exam, public-spell drills, and four secret trials covering every spell id
-1–40. It runs on the real shared `Sim`, the production recognizer, and real spell
-effects/statuses/reactions — no tap-to-complete shortcuts. A deterministic
-`TutorialRunner` (INTRO → CALIBRATE → ARMING → ACTIVE → ATTEMPT_FAILED → REMEDIATE
-→ SUCCESS → PAUSED) consumes simulation events; first run captures an interactive
-line/circle/V calibration that tunes guide sizing/comfort only (recognition
-thresholds are unchanged); a scripted instructor (`ScriptBot`) creates legal
-teaching moments; Academy 16 and the Final Exam run a real **best-of-three** vs
-the fair Medium AI with between-round checkpoints; and a versioned local profile
+fully interactive final exam, public-spell drills, and four secret trials covering
+every spell id 1–40. It runs on the real shared `Sim`, the production recognizer,
+and real spell effects/statuses/reactions — no tap-to-complete shortcuts. A
+deterministic `TutorialRunner` (INTRO → CALIBRATE → ARMING → ACTIVE → ATTEMPT_FAILED
+→ REMEDIATE → SUCCESS → PAUSED) consumes simulation events; first run captures an
+interactive line/circle/V calibration that tunes guide sizing/comfort only
+(recognition thresholds are unchanged); a scripted instructor (`ScriptBot`) creates
+legal teaching moments; Academy 16, the Final Duel, and the optional Grandmaster
+trial run a real **best-of-three** vs the fair Medium/Hard AI with between-round
+checkpoints. The **final exam** is a no-template **Gesture Gauntlet** (draw any 10
+of 12 glyphs from memory with the production recognizer and no guide), **five
+Tactical Scenarios** using real Sim mechanics (reflect vs heavy, break a freeze
+setup, Ward-and-answer, Grounding vs Storm, ignite/douse) of which any four must
+pass, the best-of-three **Final Duel**, and an optional **Grandmaster** best-of-three
+that grants a persistent Grandmaster title; declarative prerequisite metadata locks
+each exam stage in the hub until its threshold is met. A versioned local profile
 (`aeg.solo.v1`) checkpoints progress, calibration, guide stages, medals, clues,
 secret discoveries, ranked-readiness, Practice settings/results, and coaching
 stats with validation, migration, corruption recovery, and Delete My Data support.
 Gust Wall now actually deflects light projectiles in the Sim (heavy shots punch
 through), so Lesson 10 tests it honestly. Lesson 12 unlocks ranked readiness;
-optional academies, medals, and secrets never gate it.
+optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
@@ -140,8 +147,10 @@ malformed/too-fast rejection, duplicate/stale sequences, authoritative damage/
 resource state, reconnect token rotation + resume, disconnect forfeit, match
 termination). `npm run test:browser` uses `puppeteer-core` with a locally
 installed Edge/Chrome; it boots the client, opens the Online menu and creates a
-private room end-to-end, applies an archetype preset, starts a best-of-three bot
-series, draws real glyphs, and asserts a clean running state.
+private room end-to-end, drives the Prologue tutorial through real drawn glyphs,
+exercises the final-exam hub locking/unlocking (via seeded profile manipulation)
+plus one real no-guide Gesture Gauntlet draw, applies an archetype preset, starts
+a best-of-three bot series, draws real glyphs, and asserts a clean running state.
 
 ### Architecture (Phase 1)
 
@@ -348,10 +357,6 @@ reverse when sides swap. Empirical gesture-miss rates are **Easy ~0.34 ≫ Mediu
 
 - **Single instance only** (unchanged): one process owns each live match in
   memory. Do **not** raise `numInstances` in `render.yaml`.
-- The Final Exam's gesture gauntlet and five tactical scenarios remain a scaffold;
-  its core **best-of-three vs the Medium AI is fully implemented** (as is Academy
-  16's). The optional Grandmaster-vs-Hard retry is narrated but not yet a separate
-  stage.
 
 ## Product decision
 
