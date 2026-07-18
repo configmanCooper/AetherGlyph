@@ -16,10 +16,8 @@ export const LOADOUT = {
   maxPerSchool: 3,      // at most three spells from one school
 };
 
-// gestureKey references a template in ../gesture/templates.js. Only the eight
-// starter gestures currently have hand-authored templates; the rest are wired
-// for the loadout UI + on-screen cast bar and become drawable as the gesture
-// corpus grows (a later milestone). Keys are unique per spell.
+// gestureKey references a hand-authored template in ../gesture/templates.js.
+// All 40 roster spells have templates; keys remain unique per spell.
 export const GESTURE_KEYS = {
   1: 'flickRight', 2: 'lineUp', 3: 'zigzag', 4: 'vShape', 5: 'arcUp',
   6: 'wideArc', 7: 'longZigzag', 8: 'triangleCW', 9: 'spiralIn',
