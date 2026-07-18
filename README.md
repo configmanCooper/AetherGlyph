@@ -4,6 +4,24 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
+**Solo Phase A (offline tutorial/campaign foundation) is implemented** on top of
+the Phase 1–4 slices. The old three-item tutorial stub is replaced by a fully
+offline, single-player campaign that teaches the real production rules with real
+drawn gestures: a Prologue, twelve core Lessons, four Academy lessons, a final-
+exam scaffold, public-spell drills, and four secret trials that together cover
+every spell id 1–40. It runs on the real shared `Sim`, the production recognizer,
+and real spell effects/statuses/reactions — no tap-to-complete shortcuts. A
+deterministic `TutorialRunner` state machine (INTRO → CALIBRATE → ARMING → ACTIVE
+→ ATTEMPT_FAILED → REMEDIATE → SUCCESS → PAUSED) consumes simulation events, a
+scripted instructor (`ScriptBot`) creates legal teaching moments, and a versioned
+local profile (`aeg.solo.v1`) checkpoints progress, calibration, per-spell guide
+stages, medals, clues, secret discoveries, ranked-readiness, and coaching stats
+with validation, migration, corruption recovery, and Delete My Data support. The
+progressive guide fades Full → Dotted → Start → None. Lesson 12 unlocks ranked
+readiness; optional academies, medals, and secrets never gate it. *Practice vs AI
+(Easy/Medium/Hard) and post-match coaching are the next phase and are present only
+as menu naming hooks.*
+
 **Phase 4 (Capacitor Android / Google Play packaging) is implemented on top of
 the Phase 1–3 offline + authoritative-online slices.** The no-build web app is
 staged into a Capacitor `webDir` and built into a signable Android App Bundle
@@ -19,6 +37,7 @@ results. All 40 spell gestures are drawable. Planning artifacts remain
 authoritative for later phases.
 
 - `MASTERPLAN.md` - authoritative product, game, technical, test, deployment, and release plan
+- `design/SOLO-MODES-PLAN.md` - solo tutorial / Practice-vs-AI / Glyph Laboratory plan
 - `docs/DEPLOYMENT.md` - environment variables, Render blueprint, scaling limits
 - `docs/ANDROID.md` - Capacitor packaging, web staging, configurable service URL, scripts
 - `PUBLISHING-ANDROID.md` - build/sign/publish flow, Data Safety, release checklist
@@ -28,6 +47,7 @@ authoritative for later phases.
 - `design/environment-matrix.md` - shared battlefield reactions and counter rules
 - `design/tutorial.md` - complete solo tutorial campaign
 - `reviews/` - independent reference, balance, strategy, and mobile/network reviews
+
 
 ## Phase 1 — offline vertical slice
 

@@ -81,6 +81,15 @@ export class Sim {
     this.pressureLevel = 0;
     this.healingDisabled = false;
     this.events = [];
+    // Optional rule toggles. Defaults preserve the authoritative online/offline
+    // behaviour exactly; the solo tutorial disables the round timer and Arcane
+    // Pressure for early teaching lessons (SOLO-MODES-PLAN §4) without changing
+    // any combat resolution. `timer:false` means the round never ends on the
+    // clock; `pressure:false` means the arc never shrinks.
+    this.rules = {
+      timer: opts.rules?.timer !== false,
+      pressure: opts.rules?.pressure !== false,
+    };
 
     const l0 = opts.loadouts?.[0] || [];
     const l1 = opts.loadouts?.[1] || [];
@@ -931,6 +940,7 @@ export class Sim {
   }
 
   updatePressure() {
+    if (!this.rules.pressure) return;
     if (this.timeS >= MATCH.arcanePressureStartS) {
       const steps = 1 + Math.floor((this.timeS - MATCH.arcanePressureStartS) / MATCH.arcanePressureStepS);
       if (steps !== this.pressureLevel) {
@@ -997,7 +1007,7 @@ export class Sim {
     if (this.ended) return this.events.splice(0);
 
     // 6. Round timer.
-    if (this.timeS >= MATCH.roundLimitS) this.resolveTimer();
+    if (this.rules.timer && this.timeS >= MATCH.roundLimitS) this.resolveTimer();
 
     return this.events.splice(0);
   }

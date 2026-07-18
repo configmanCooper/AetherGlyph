@@ -73,6 +73,48 @@ try {
   await page.click('#panel-online [data-action="back"]');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
+  // Tutorial smoke: open the hub, begin the Prologue, and complete the first
+  // guided objective through REAL pointer drawing. Assert the guide fades and
+  // that solo progress is persisted to local storage (aeg.solo.v1).
+  await page.click('[data-action="tutorial"]');
+  await page.waitForSelector('#panel-tutorial:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="tut-continue"]');
+  await page.waitForSelector('#panel-lesson-intro:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="tut-begin"]');
+  await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
+  const guideBefore = await page.evaluate(() => document.querySelector('#coach-guide')?.textContent || '');
+  const tpad = await page.$('#draw-canvas');
+  const tbox = await tpad.boundingBox();
+  const ty = tbox.y + tbox.height / 2;
+  async function flick() {
+    await page.mouse.move(tbox.x + tbox.width * 0.2, ty);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(tbox.x + tbox.width * 0.2 + (tbox.width * 0.6) * (i / 8), ty);
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 1300)); // let the bolt travel + land
+  }
+  await flick();
+  await flick();
+  const tut = await page.evaluate(() => ({
+    obj1: document.querySelector('#coach-objectives .coach-obj')?.classList.contains('done'),
+    guide: document.querySelector('#coach-guide')?.textContent || '',
+    saved: localStorage.getItem('aeg.solo.v1'),
+  }));
+  if (!tut.obj1) fail('tutorial: first objective not completed by real drawing');
+  if (!tut.guide || tut.guide === guideBefore) fail('tutorial: guide did not fade after an objective (' + guideBefore + ' -> ' + tut.guide + ')');
+  if (!tut.saved || !/PROLOGUE|L01/.test(tut.saved)) fail('tutorial: solo progress not persisted to aeg.solo.v1');
+  await page.click('#btn-menu');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
+  // Glyph Laboratory (renamed from Practice; no opponent).
+  await page.click('[data-action="lab"]');
+  await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
+  const labEnemy = await page.evaluate(() => document.querySelector('#enemy-health')?.style.width);
+  if (labEnemy !== '100%' && labEnemy !== '') { /* lab has no opponent pressure; enemy bar static */ }
+  await page.click('#btn-menu');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
   // Non-starter loadout path: open the builder, apply an archetype preset,
   // save it, then start a best-of-three series against a chosen opponent.
   await page.click('[data-action="loadout"]');

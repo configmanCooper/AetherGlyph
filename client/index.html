@@ -77,6 +77,21 @@
       <div class="pad-hint">draw spell</div>
     </div>
 
+    <!-- Tutorial coach panel (objectives + guide stage + remediation); sits
+         opposite the draw pad and mirrors in left-handed mode. Never overlaps
+         the active draw pad. -->
+    <aside id="coach" class="coach hidden" aria-label="Lesson coach">
+      <h3 id="coach-title" class="coach-title">Lesson</h3>
+      <ul id="coach-objectives" class="coach-objectives"></ul>
+      <p id="coach-guide" class="coach-guide">Guide: Full</p>
+      <p id="coach-fail" class="coach-fail hidden"></p>
+      <div id="coach-remediate" class="coach-remediate hidden">
+        <button class="coach-btn" data-action="tut-showme">Show Me</button>
+        <button class="coach-btn" data-action="tut-tryagain">Try again</button>
+      </div>
+      <p id="coach-offline" class="coach-offline">Offline lesson</p>
+    </aside>
+
     <!-- Center + side action buttons -->
     <div class="action-buttons">
       <button id="btn-focus" class="act-btn">Focus</button>
@@ -97,13 +112,14 @@
       <p class="tagline">Arcane Duels — draw glyphs, cast spells, win the duel.</p>
       <div class="menu-list">
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
-        <button class="menu-btn" data-action="practice">Practice (templates + diagnostics)</button>
+        <button class="menu-btn" data-action="practice-ai" aria-disabled="true">Practice vs AI <span class="soon">soon</span></button>
+        <button class="menu-btn" data-action="lab">Glyph Laboratory</button>
         <button class="menu-btn" data-action="duel">Bot Duel</button>
         <button class="menu-btn" data-action="online">Online Duel</button>
         <button class="menu-btn" data-action="loadout">Loadout builder</button>
         <button class="menu-btn" data-action="settings">Settings</button>
       </div>
-      <p class="offline-note">Tutorial &amp; practice are fully offline. Online duels connect to the authoritative server.</p>
+      <p class="offline-note">Tutorial &amp; Glyph Laboratory are fully offline. Online duels connect to the authoritative server.</p>
       <p class="links">
         <a href="/MASTERPLAN.md">Master plan</a> ·
         <a href="/design/spells.csv">Spell roster</a>
@@ -214,13 +230,26 @@
       </div>
     </div>
 
-    <div class="panel hidden" id="panel-tutorial">
-      <h2 id="tut-title">Tutorial</h2>
-      <p id="tut-text">…</p>
-      <div id="tut-glyph-hint" class="glyph-hint"></div>
+    <div class="panel hidden wide" id="panel-tutorial">
+      <h2>Tutorial</h2>
+      <p class="offline-note">Fully offline &amp; single-player. Draw real glyphs — the same recognizer and rules as online play.</p>
+      <div id="tut-summary" class="tut-summary"></div>
+      <div class="menu-list compact">
+        <button class="menu-btn" data-action="tut-continue">Continue</button>
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+      <div id="tut-chapters" class="tut-chapters"></div>
+    </div>
+
+    <div class="panel hidden" id="panel-lesson-intro">
+      <h2 id="lesson-title">Lesson</h2>
+      <ul id="lesson-narration" class="lesson-narration"></ul>
+      <h3 class="lesson-sub">Objectives</h3>
+      <ul id="lesson-objectives" class="lesson-objectives"></ul>
+      <p id="lesson-offline" class="offline-badge">Offline · single-player · no timer</p>
       <div class="menu-list">
         <button class="menu-btn" data-action="tut-begin">Begin lesson</button>
-        <button class="menu-btn ghost" data-action="back">Back</button>
+        <button class="menu-btn ghost" data-action="tutorial">Back to chapters</button>
       </div>
     </div>
 

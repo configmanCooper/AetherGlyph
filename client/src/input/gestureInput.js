@@ -29,7 +29,18 @@ export class GestureInput {
     this.pointerCount = 0;
     this.rect = null;
     this.startTime = 0;
-    this.guide = null; // optional template guide (array of {x,y} in 0..100 space)
+
+    // Progressive guide system (SOLO-MODES-PLAN §5). `guide` is the canonical
+    // template path in 0..100 pad space; `guideStage` selects how much help to
+    // show: 0 Full (solid path + start dot + arrow + one ghost), 1 Dotted, 2
+    // Start (start dot + short direction mark), 3 None (blank pad). Online play
+    // uses no guide (stage None), so the default keeps online behaviour intact.
+    this.guide = null;
+    this.guideStage = 3;
+    this.onDiag = opts.onDiag || (() => {});
+    this.lastDiag = null;      // fresh trace diagnostics (last recognition result)
+    this._ghost = null;        // { start, durationMs } while a ghost demo animates
+    this._ghostRaf = null;
 
     this._bind();
     this.resize();
@@ -37,8 +48,49 @@ export class GestureInput {
   }
 
   setRecognizer(r) { this.recognizer = r; }
-  setReduced(v) { this.reduced = v; }
-  setGuide(points) { this.guide = points || null; this._redraw(); }
+  setReduced(v) { this.reduced = v; if (v) this._stopGhost(); this._redraw(); }
+
+  // Set (or clear) the guide template. opts.stage 0..3 (default: Full when a path
+  // is given, None when cleared). A Full guide plays one ghost demonstration
+  // unless reduced motion is on. Passing null clears the guide (online default).
+  setGuide(points, opts = {}) {
+    this.guide = points && points.length > 1 ? points.map((p) => ({ x: p.x, y: p.y })) : null;
+    this.guideStage = opts.stage != null ? opts.stage : (this.guide ? 0 : 3);
+    this._stopGhost();
+    if (this.guide && this.guideStage === 0 && opts.showGhost !== false && !this.reduced) this.playGhost();
+    else this._redraw();
+  }
+
+  // Change only the guide stage (used as the guide fades across a lesson).
+  setGuideStage(stage) {
+    this.guideStage = Math.max(0, Math.min(3, stage | 0));
+    this._stopGhost();
+    if (this.guide && this.guideStage === 0 && !this.reduced) this.playGhost();
+    else this._redraw();
+  }
+
+  // One optional ghost demonstration: a marker traces the canonical path once.
+  // Reduced motion shows a static solid path instead (no animation).
+  playGhost(durationMs = 1200) {
+    if (!this.guide || this.reduced || typeof requestAnimationFrame === 'undefined') { this._redraw(); return; }
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this._ghost = { start: now, durationMs };
+    const step = () => {
+      if (!this._ghost) return;
+      const t = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const done = (t - this._ghost.start) >= this._ghost.durationMs;
+      this._redraw();
+      if (done) { this._ghost = null; this._ghostRaf = null; this._redraw(); }
+      else this._ghostRaf = requestAnimationFrame(step);
+    };
+    this._ghostRaf = requestAnimationFrame(step);
+  }
+
+  _stopGhost() {
+    this._ghost = null;
+    if (this._ghostRaf && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this._ghostRaf);
+    this._ghostRaf = null;
+  }
 
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -124,6 +176,8 @@ export class GestureInput {
     const points = boundTrace(this.points);
     const trace = { points, durationMs, pointCount: points.length };
     const diag = this.recognizer.recognize(points);
+    this.lastDiag = diag;
+    this.onDiag(diag, trace);
     if (diag.accepted) {
       const q = 0.9 + Math.min(1, Math.max(0, (diag.best.score - 0.6) / 0.4)) * 0.15; // 0.90..1.05
       this.haptics('accept');
@@ -138,27 +192,7 @@ export class GestureInput {
     const ctx = this.ctx;
     const r = this.canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
-
-    // Faint template guide (practice / tutorial): map 0..100 space into a
-    // centered box within the pad.
-    if (this.guide && this.guide.length > 1) {
-      const pad = 0.16;
-      const sx = (v) => (pad + (v / 100) * (1 - 2 * pad)) * r.width;
-      const sy = (v) => (pad + (v / 100) * (1 - 2 * pad)) * r.height;
-      ctx.save();
-      ctx.setLineDash([6, 6]);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(139,107,255,0.5)';
-      ctx.beginPath();
-      ctx.moveTo(sx(this.guide[0].x), sy(this.guide[0].y));
-      for (let i = 1; i < this.guide.length; i++) ctx.lineTo(sx(this.guide[i].x), sy(this.guide[i].y));
-      ctx.stroke();
-      // start dot
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(79,214,201,0.9)';
-      ctx.beginPath(); ctx.arc(sx(this.guide[0].x), sy(this.guide[0].y), 6, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
+    this._drawGuide(ctx, r);
 
     if (this.points.length < 2) return;
     ctx.lineWidth = 5;
@@ -171,6 +205,85 @@ export class GestureInput {
     ctx.moveTo(this.points[0].x, this.points[0].y);
     for (let i = 1; i < this.points.length; i++) ctx.lineTo(this.points[i].x, this.points[i].y);
     ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Map 0..100 pad space into a centred box within the pad. The canonical guide
+  // geometry is NEVER mirrored (left-handed mode moves the pad, not the glyph
+  // direction — SOLO-MODES-PLAN §5).
+  _guideXY(r) {
+    const pad = 0.16;
+    return {
+      sx: (v) => (pad + (v / 100) * (1 - 2 * pad)) * r.width,
+      sy: (v) => (pad + (v / 100) * (1 - 2 * pad)) * r.height,
+    };
+  }
+
+  _drawGuide(ctx, r) {
+    const g = this.guide;
+    if (!g || g.length < 2 || this.guideStage >= 3) return; // None => blank pad
+    const { sx, sy } = this._guideXY(r);
+    const stage = this.guideStage;
+    ctx.save();
+
+    // Path: solid for Full, dotted for Dotted. Start-only draws no path.
+    if (stage === 0 || stage === 1) {
+      ctx.setLineDash(stage === 1 ? [6, 6] : []);
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = stage === 0 ? 'rgba(139,107,255,0.75)' : 'rgba(139,107,255,0.5)';
+      ctx.beginPath();
+      ctx.moveTo(sx(g[0].x), sy(g[0].y));
+      for (let i = 1; i < g.length; i++) ctx.lineTo(sx(g[i].x), sy(g[i].y));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Direction cue: an arrowhead at the start pointing along the first segment
+    // (Full, Start). Dotted keeps the path itself as the direction hint.
+    if (stage === 0 || stage === 2) this._drawStartArrow(ctx, sx, sy, g);
+
+    // Start dot (all visible stages).
+    ctx.fillStyle = 'rgba(79,214,201,0.95)';
+    ctx.beginPath();
+    ctx.arc(sx(g[0].x), sy(g[0].y), 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // One ghost demonstration (Full stage only): a marker traces the path once.
+    if (stage === 0 && this._ghost) this._drawGhostMarker(ctx, sx, sy, g);
+    ctx.restore();
+  }
+
+  _drawStartArrow(ctx, sx, sy, g) {
+    const x0 = sx(g[0].x), y0 = sy(g[0].y);
+    const x1 = sx(g[1].x), y1 = sy(g[1].y);
+    const ang = Math.atan2(y1 - y0, x1 - x0);
+    const len = 18;
+    const tipX = x0 + Math.cos(ang) * len, tipY = y0 + Math.sin(ang) * len;
+    ctx.strokeStyle = 'rgba(79,214,201,0.95)';
+    ctx.fillStyle = 'rgba(79,214,201,0.95)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(tipX, tipY); ctx.stroke();
+    const a = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - Math.cos(ang - a) * 8, tipY - Math.sin(ang - a) * 8);
+    ctx.lineTo(tipX - Math.cos(ang + a) * 8, tipY - Math.sin(ang + a) * 8);
+    ctx.closePath(); ctx.fill();
+  }
+
+  _drawGhostMarker(ctx, sx, sy, g) {
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const p = Math.max(0, Math.min(1, (now - this._ghost.start) / this._ghost.durationMs));
+    const fpos = p * (g.length - 1);
+    const i = Math.min(g.length - 2, Math.floor(fpos));
+    const f = fpos - i;
+    const x = sx(g[i].x + (g[i + 1].x - g[i].x) * f);
+    const y = sy(g[i].y + (g[i + 1].y - g[i].y) * f);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowColor = 'rgba(139,107,255,0.9)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
   }
 }

@@ -17,6 +17,10 @@ import { run as templates } from './templates.test.js';
 import { run as net } from './net.test.js';
 import { run as onlineMatch } from './onlineMatch.test.js';
 import { run as serverConfig } from './serverConfig.test.js';
+import { run as tutorialProgress } from './tutorialProgress.test.js';
+import { run as tutorialCampaign } from './tutorialCampaign.test.js';
+import { run as tutorialRunner } from './tutorialRunner.test.js';
+import { run as scriptBot } from './scriptBot.test.js';
 
 console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
@@ -38,6 +42,10 @@ const modules = [
   ['serverConfig', serverConfig],
   ['bot', bot],
   ['gesture', gesture],
+  ['tutorialProgress', tutorialProgress],
+  ['tutorialCampaign', tutorialCampaign],
+  ['tutorialRunner', tutorialRunner],
+  ['scriptBot', scriptBot],
 ];
 
 let pass = 0, fail = 0;

@@ -46,6 +46,14 @@ const requiredStaged = [
   'client/src/app/main.js',
   'client/src/app/native.js',
   'client/src/net/serverConfig.js',
+  'client/src/input/gestureInput.js',
+  'client/src/tutorial/campaign.js',
+  'client/src/tutorial/runner.js',
+  'client/src/tutorial/objectives.js',
+  'client/src/tutorial/progress.js',
+  'client/src/tutorial/scriptBot.js',
+  'client/src/tutorial/medals.js',
+  'client/src/tutorial/secrets.js',
   'client/styles/style.css',
   'client/manifest.webmanifest',
   'client/sw.js',
@@ -170,6 +178,24 @@ const main = read('client/src/app/main.js');
 ok(main.includes("navigator.serviceWorker.register('./sw.js')"), 'main.js registers ./sw.js (scope /client/)');
 ok(main.includes('isNativeApp') && /loc\.protocol\s*!==\s*'https:'/.test(main),
   'SW registration is gated to production web (never native / never non-https dev)');
+
+// --- 7. solo progress + Delete My Data disclosure --------------------------
+// The tutorial ships as a real, offline, single-player campaign and its local
+// progress must be named in the deletion disclosure + cleared in-app.
+const deletion = read('client/account-deletion.html');
+ok(deletion.includes('aeg.solo.v1'), 'account-deletion.html names the solo progress key aeg.solo.v1');
+ok(/solo progress/i.test(deletion) && /calibration/i.test(deletion) && /medals/i.test(deletion),
+  'account-deletion.html discloses solo progress, calibration, and medals');
+ok(/secret/i.test(deletion) && /coaching/i.test(deletion),
+  'account-deletion.html discloses secret discoveries and coaching statistics');
+ok(main.includes('deleteProfile(localStorage)'),
+  'in-app Delete My Data clears the solo profile from local storage');
+ok(/solo progress/i.test(main) && /calibration/i.test(main),
+  'in-app deletion confirmation names solo progress + calibration');
+
+// The solo tutorial is offline-only: it must not reference the network/server.
+const runnerSrc = read('client/src/tutorial/runner.js');
+ok(!/socket\.io|OnlineMatch|serverConfig|fetch\(/.test(runnerSrc), 'the tutorial runner has no network dependency (offline-only)');
 
 const r = report('packaging');
 console.log(`\npackaging: ${r.pass} passed, ${r.fail} failed`);

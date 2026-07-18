@@ -11,7 +11,6 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 }
-
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; height: 100%; width: 100%;
@@ -279,3 +278,73 @@ body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
   border: 3px solid rgba(255,255,255,0.15); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 body.reduced .spinner { animation: none; }
+
+/* ===================== Solo tutorial UI ===================== */
+/* Main-menu "coming soon" hook for Practice vs AI (Phase B). */
+.menu-btn[aria-disabled="true"] { opacity: 0.55; }
+.menu-btn .soon {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-left: 8px;
+  padding: 1px 6px; border-radius: 8px; background: rgba(139,107,255,0.25); color: var(--accent2);
+}
+
+/* Tutorial hub: progress summary + chapter list. */
+.tut-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.tut-stat { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 6px 10px; }
+.tut-stat .k { display: block; font-size: 11px; color: var(--muted); }
+.tut-stat .v { display: block; font-weight: 600; }
+.tut-stat.ranked.on .v { color: var(--accent2); }
+.tut-chapters { margin-top: 8px; }
+.tut-chapter h3 { margin: 12px 0 6px; font-size: 15px; color: var(--accent); }
+.tut-lessons { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.tut-lesson {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  text-align: left; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--ink); font-size: 13px;
+}
+.tut-lesson.next { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.tut-lesson.done { color: var(--muted); }
+.tut-lesson .tl-badge { color: var(--accent2); font-weight: 700; }
+
+/* Lesson intro: narration before input becomes active. */
+.lesson-narration { margin: 6px 0 12px; padding-left: 18px; line-height: 1.5; }
+.lesson-sub { margin: 8px 0 4px; font-size: 14px; color: var(--accent); }
+.lesson-objectives { margin: 0 0 12px; padding-left: 18px; color: var(--muted); }
+.offline-badge, .coach-offline {
+  display: inline-block; font-size: 11px; color: var(--accent2);
+  border: 1px solid rgba(79,214,201,0.35); border-radius: 8px; padding: 2px 8px; margin-top: 4px;
+}
+
+/* In-lesson coach panel: objectives, guide stage, remediation. Opposite the
+   draw pad (top-left), mirrored to the right in left-handed mode. */
+.coach {
+  position: absolute; top: calc(64px + var(--safe-top)); left: calc(12px + var(--safe-left));
+  width: 40vw; max-width: 300px; z-index: 12;
+  background: var(--panel); border: 1px solid rgba(139,107,255,0.35); border-radius: 14px;
+  padding: 10px 12px; backdrop-filter: blur(6px);
+}
+.coach.hidden { display: none; }
+body.lefthand .coach { left: auto; right: calc(12px + var(--safe-left)); }
+.coach-title { margin: 0 0 6px; font-size: 15px; color: var(--accent); }
+.coach-objectives { list-style: none; margin: 0 0 8px; padding: 0; }
+.coach-obj { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; padding: 3px 0; color: var(--ink); }
+.coach-obj .co-mark { color: var(--muted); font-weight: 700; }
+.coach-obj.done { color: var(--muted); }
+.coach-obj.done .co-mark { color: var(--accent2); }
+.coach-guide { margin: 4px 0; font-size: 12px; color: var(--accent2); }
+.coach-fail { margin: 4px 0; font-size: 12px; color: var(--danger); }
+.coach-fail.hidden { display: none; }
+.coach-remediate { display: flex; gap: 8px; margin: 6px 0; }
+.coach-remediate.hidden { display: none; }
+.coach-btn {
+  flex: 1; padding: 8px 6px; border-radius: 9px; font-size: 12px; cursor: pointer;
+  background: rgba(139,107,255,0.25); border: 1px solid var(--accent); color: var(--ink);
+}
+.coach-btn:active { transform: translateY(1px); }
+
+/* Hide the round timer during no-timer lessons. */
+body.mode-tutorial #round-timer { display: none; }
+
+/* Keep the coach panel clear of a small landscape phone's draw pad. */
+@media (max-height: 460px) {
+  .coach { max-width: 240px; font-size: 12px; top: calc(56px + var(--safe-top)); }
+}

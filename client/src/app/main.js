@@ -12,13 +12,18 @@ import { OnlineMatch } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
 import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact } from './native.js';
-import { LESSONS, guideFor } from '../tutorial/tutorial.js';
+import { TutorialRunner, STATES, GUIDE_STAGE_NAMES } from '../tutorial/runner.js';
+import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters } from '../tutorial/campaign.js';
+import {
+  loadProfile, saveProfile, deleteProfile, completionPercent,
+} from '../tutorial/progress.js';
+import { SECRETS } from '../tutorial/secrets.js';
 
 import { Recognizer } from '@shared/gesture/recognizer.js';
-import { buildTemplates } from '@shared/gesture/templates.js';
+import { buildTemplates, GESTURE_TEMPLATES } from '@shared/gesture/templates.js';
 import {
   starterLoadout, makeLoadout, presetLoadout, validateLoadout,
-  PRESETS, PRESETS_BY_KEY, STARTER_SPELL_IDS,
+  PRESETS, PRESETS_BY_KEY, STARTER_SPELL_IDS, GESTURE_KEYS,
 } from '@shared/balance/loadouts.js';
 import { SPELL_CATALOG, SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
 import { versionTag } from '@shared/protocol/version.js';
@@ -42,8 +47,15 @@ let match = null;
 let running = false;
 let pausedForVisibility = false;
 let mode = null;
-let tutorialIndex = 0;
-let lastGuideKey = null;
+let tutorial = null;        // active TutorialRunner (mode === 'tutorial')
+let tutorialLesson = null;  // its lesson definition
+
+// A guide template path (0..100 space) for a spell id, for the tutorial/lab pad.
+function guideTemplateFor(spellId) {
+  const key = GESTURE_KEYS[spellId];
+  const variants = key ? GESTURE_TEMPLATES[key] : null;
+  return variants ? variants[0] : null;
+}
 
 // Best-of-three series.
 let series = null; // { score:[0,0], round:0, difficulty, botKey, baseSeed }
@@ -83,10 +95,16 @@ const gesture = new GestureInput($('#draw-canvas'), {
       if (online && trace) online.sendCastTrace(trace); // server reclassifies + is authoritative
       return;
     }
+    if (mode === 'tutorial' && tutorial) {
+      tutorial.notePlayerCast(spellId, quality, diag);
+      return;
+    }
     castSpell(spellId, quality);
-    if (mode === 'tutorial') checkLesson(spellId);
   },
-  onReject: (diag) => { audio.unlock(); audio.reject(); hud.setDiag(diag); },
+  onReject: (diag) => {
+    audio.unlock(); audio.reject(); hud.setDiag(diag);
+    if (mode === 'tutorial' && tutorial) tutorial.noteReject(diag);
+  },
 });
 
 function rebuildForLoadout() {
@@ -167,17 +185,19 @@ function startMatch(newMode, opts = {}) {
     onEnd: (sim) => onRoundEnd(sim),
   });
   running = true;
-  hud.showDiag = (newMode === 'practice' || newMode === 'tutorial');
+  hud.showDiag = (newMode === 'practice');
   hud.setDiag(null);
   hud.setSeries(newMode === 'duel' && series ? series.score : null, series ? series.round : 0);
   arena.reset();
   showOverlay(false);
   $('#hud').classList.remove('hidden');
-  $('#spellbar').classList.toggle('hidden', newMode === 'tutorial');
+  $('#coach').classList.add('hidden');
+  document.body.classList.remove('mode-tutorial');
+  $('#spellbar').classList.remove('hidden');
   $('#devcast').classList.toggle('hidden', !settings.devcast);
-  if (newMode === 'tutorial') { tutorialIndex = 0; showLesson(); }
-  else gesture.setGuide(newMode === 'practice' ? guideFor(playerLoadout[0].gestureKey) : null);
-  toast(newMode === 'duel' ? 'Duel! Draw or tap a spell.' : newMode === 'practice' ? 'Practice — draw freely.' : '');
+  gesture.recognizer = recognizer; // restore the full player-loadout recognizer (tutorials scope it)
+  gesture.setGuide(newMode === 'practice' ? guideTemplateFor(playerLoadout[0].id) : null, { stage: 0 });
+  toast(newMode === 'duel' ? 'Duel! Draw or tap a spell.' : 'Glyph Laboratory — draw freely.');
 }
 
 // Start a best-of-three series against the bot.
@@ -194,14 +214,6 @@ function onRoundEnd(sim) {
   running = false;
   const win = sim.winner === 0;
   audio.roundEnd(win); haptic('round');
-
-  if (mode === 'tutorial') {
-    $('#result-title').textContent = 'Tutorial complete';
-    $('#result-text').textContent = 'You have learned the basics. Try a bot duel!';
-    $('#btn-next-round').classList.add('hidden');
-    showPanel('panel-result'); showOverlay(true);
-    return;
-  }
 
   if (mode === 'duel' && series) {
     if (sim.winner === 0) series.score[0] += 1;
@@ -243,25 +255,253 @@ function onRoundEnd(sim) {
 }
 
 // ------------------------------------------------------------------ tutorial
-function showLesson() {
-  const lesson = LESSONS[tutorialIndex];
-  gesture.setGuide(guideFor(lesson.key));
-  lastGuideKey = lesson.key;
-  toast(lesson.text);
+function soloProfile() { return loadProfile(localStorage); }
+
+// Tutorial hub: progress summary, continue/replay, chapter list, offline label.
+function openTutorialHub() {
+  renderTutorialHub();
+  showPanel('panel-tutorial');
 }
-function checkLesson(spellId) {
-  const lesson = LESSONS[tutorialIndex];
-  if (!lesson) return;
-  if (spellId === lesson.spellId) {
-    haptic('accept');
-    tutorialIndex += 1;
-    if (tutorialIndex >= LESSONS.length) {
-      gesture.setGuide(null);
-      if (match) match.sim.endMatch(0, 'health');
-    } else showLesson();
-  } else {
-    toast('Not quite — follow the dotted guide.');
+
+function renderTutorialHub() {
+  const p = soloProfile();
+  const pct = completionPercent(p, REQUIRED_LESSON_IDS);
+  const cur = CAMPAIGN_BY_ID[p.currentLessonId] || CAMPAIGN[0];
+  const medalCount = Object.keys(p.medals).length;
+  const clueCount = Object.keys(p.clues).length;
+  const secretCount = Object.values(p.secretsFound).filter(Boolean).length;
+
+  const sum = $('#tut-summary');
+  if (sum) {
+    sum.innerHTML =
+      `<div class="tut-stat"><span class="k">Chapter</span><span class="v">${cur ? chapterLabel(cur.chapter) : '—'}</span></div>` +
+      `<div class="tut-stat"><span class="k">Next lesson</span><span class="v">${cur ? cur.title : 'Complete'}</span></div>` +
+      `<div class="tut-stat"><span class="k">Progress</span><span class="v">${pct}%</span></div>` +
+      `<div class="tut-stat"><span class="k">Medals</span><span class="v">${medalCount}</span></div>` +
+      `<div class="tut-stat"><span class="k">Clues</span><span class="v">${clueCount}</span></div>` +
+      `<div class="tut-stat"><span class="k">Secrets</span><span class="v">${secretCount}/4</span></div>` +
+      `<div class="tut-stat ranked ${p.rankedReady ? 'on' : ''}"><span class="k">Ranked</span>` +
+      `<span class="v">${p.rankedReady ? 'Ready ✓' : 'Locked (win Lesson 12)'}</span></div>`;
   }
+
+  const list = $('#tut-chapters');
+  if (list) {
+    list.innerHTML = '';
+    for (const ch of chapters()) {
+      const sec = document.createElement('section');
+      sec.className = 'tut-chapter';
+      sec.innerHTML = `<h3>${ch.title}</h3>`;
+      const row = document.createElement('div');
+      row.className = 'tut-lessons';
+      for (const l of ch.lessons) {
+        const done = p.completedLessons.includes(l.id);
+        const isNext = l.id === p.currentLessonId;
+        const btn = document.createElement('button');
+        btn.className = 'tut-lesson' + (done ? ' done' : '') + (isNext ? ' next' : '');
+        const badge = done ? '✓' : (l.optional ? '☆' : '');
+        btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-badge">${badge}</span>`;
+        btn.setAttribute('aria-label', `${l.title}${done ? ' (completed)' : ''}${l.optional ? ' (optional)' : ''}`);
+        btn.addEventListener('click', () => startTutorialLesson(l.id));
+        row.appendChild(btn);
+      }
+      sec.appendChild(row);
+      list.appendChild(sec);
+    }
+  }
+}
+
+function chapterLabel(chapter) {
+  return { prologue: 'Prologue', core: 'Core Lessons', academy: 'Academy', exam: 'Final Exam', secret: 'Secret Trials' }[chapter] || chapter;
+}
+
+// Build the scoped production recognizer + runner for a lesson and show its intro.
+function startTutorialLesson(lessonId) {
+  const lesson = CAMPAIGN_BY_ID[lessonId];
+  if (!lesson) return;
+  tutorialLesson = lesson;
+  mode = 'tutorial';
+  series = null;
+  const profile = soloProfile();
+  const recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(lesson.playerLoadout));
+  gesture.recognizer = recognizer;
+
+  tutorial = new TutorialRunner(lesson, {
+    recognizer, profile, storage: localStorage,
+    reduced: settings.reduced, seed: (Date.now() & 0x7fffffff) >>> 0,
+    onState: (s) => onTutorialState(s),
+    onObjective: (o) => onTutorialObjective(o),
+    onReject: (r) => onTutorialReject(r),
+    onComplete: (res) => onTutorialComplete(res),
+    onGuide: (g) => onTutorialGuide(g),
+  });
+
+  showLessonIntro(lesson);
+}
+
+// Narration is shown BEFORE input becomes active (never over the draw pad).
+function showLessonIntro(lesson) {
+  $('#lesson-title').textContent = lesson.title;
+  const nar = $('#lesson-narration');
+  nar.innerHTML = '';
+  for (const line of lesson.narration || []) {
+    const li = document.createElement('li'); li.textContent = line; nar.appendChild(li);
+  }
+  const obj = $('#lesson-objectives');
+  obj.innerHTML = '';
+  for (const o of lesson.objectives) {
+    const li = document.createElement('li'); li.textContent = o.text; obj.appendChild(li);
+  }
+  $('#lesson-offline').textContent = lesson.formal
+    ? 'Offline · fair rules · timer on'
+    : 'Offline · single-player · no timer';
+  showPanel('panel-lesson-intro');
+  showOverlay(true);
+}
+
+// Begin the active lesson: (optional) calibration, arm the sim, show HUD + coach.
+function beginTutorialLesson() {
+  if (!tutorial) return;
+  tutorial.begin();
+  if (tutorial.state === STATES.CALIBRATE) {
+    // Lightweight first-run calibration: capture handedness + a comfort default.
+    tutorial.calibrate({ hand: settings.lefthand ? 'left' : 'right' });
+  }
+  match = tutorial;
+  running = true;
+  hud.showDiag = false;
+  hud.setDiag(null);
+  hud.setSeries(null);
+  arena.reset();
+  buildCoachPanel(tutorialLesson);
+  onTutorialGuide({ spellId: tutorial.focusSpell ? tutorial.focusSpell.id : null, stage: tutorial.guideStage });
+  showOverlay(false);
+  $('#hud').classList.remove('hidden');
+  $('#spellbar').classList.add('hidden'); // tutorial casts by drawing only
+  $('#devcast').classList.add('hidden');
+  $('#coach').classList.remove('hidden');
+  document.body.classList.add('mode-tutorial');
+  updateCoachState();
+  toast(tutorialLesson.formal ? 'Formal duel — win the round.' : 'Draw to cast.');
+}
+
+function buildCoachPanel(lesson) {
+  $('#coach-title').textContent = lesson.title;
+  const ul = $('#coach-objectives');
+  ul.innerHTML = '';
+  for (const o of lesson.objectives) {
+    const li = document.createElement('li');
+    li.className = 'coach-obj';
+    li.dataset.obj = o.id;
+    li.innerHTML = `<span class="co-mark" aria-hidden="true">○</span><span class="co-text">${o.text}</span>`;
+    ul.appendChild(li);
+  }
+  $('#coach-offline').textContent = lesson.formal ? 'Offline duel' : 'Offline lesson';
+}
+
+function updateCoachObjectives() {
+  if (!tutorial) return;
+  document.querySelectorAll('#coach-objectives .coach-obj').forEach((li) => {
+    const done = tutorial.objectiveStatus[li.dataset.obj];
+    li.classList.toggle('done', !!done);
+    const mark = li.querySelector('.co-mark');
+    if (mark) mark.textContent = done ? '✓' : '○';
+  });
+}
+
+function updateCoachState() {
+  if (!tutorial) return;
+  const gi = $('#coach-guide');
+  if (gi) gi.textContent = `Guide: ${GUIDE_STAGE_NAMES[tutorial.guideStage] || 'None'}`;
+  const failed = tutorial.state === STATES.ATTEMPT_FAILED;
+  $('#coach-remediate').classList.toggle('hidden', !failed);
+  const fr = $('#coach-fail');
+  if (failed && tutorial.failReason) {
+    fr.textContent = ({
+      'too-few-points': 'Draw a longer stroke across the pad.',
+      'below-threshold': 'Follow the shape from the start dot in the shown direction.',
+      ambiguous: 'Make the defining corner or direction more distinct.',
+      'wrong-spell': 'Valid glyph — but this objective needs the highlighted spell.',
+      'round-lost': 'The round ended first. Try again.',
+    })[tutorial.failReason] || tutorial.failReason;
+    fr.classList.remove('hidden');
+  } else {
+    fr.classList.add('hidden');
+  }
+}
+
+function onTutorialState(s) {
+  updateCoachState();
+  // A lost round (formal duel, or a rare teaching-lesson death) is not a mere
+  // recognition failure — surface the result panel with a clean replay path so
+  // the player is never stuck on an ended simulation.
+  if (s === STATES.ATTEMPT_FAILED && tutorial && tutorial.failReason === 'round-lost') {
+    running = false;
+    $('#result-title').textContent = `${tutorialLesson.title} — round lost`;
+    $('#result-text').textContent = 'The round ended before you met the objectives. Replay the lesson to try again.';
+    $('#btn-next-round').classList.add('hidden');
+    const rb = document.querySelector('#panel-result [data-action="rematch"]');
+    if (rb) rb.textContent = 'Replay lesson';
+    showPanel('panel-result'); showOverlay(true);
+  }
+}
+
+function onTutorialObjective() {
+  audio.unlock(); haptic('accept');
+  updateCoachObjectives();
+}
+
+function onTutorialReject(r) {
+  audio.reject();
+  updateCoachState();
+  if (r && r.message) toast(r.message);
+}
+
+function onTutorialGuide(g) {
+  if (!g || g.spellId == null || g.stage >= 3) { gesture.setGuide(null); }
+  else gesture.setGuide(guideTemplateFor(g.spellId), { stage: g.stage, showGhost: g.stage === 0 });
+  updateCoachState();
+}
+
+function onTutorialComplete(res) {
+  running = false;
+  audio.roundEnd(true); haptic('round');
+  const lesson = tutorialLesson;
+  const bits = [];
+  if (res.medal) bits.push(`Medal earned: ${res.medal.text || res.medal.id}.`);
+  if (res.clues && res.clues.length) bits.push('A secret clue was revealed.');
+  if (res.secretFound) bits.push(`Secret discovered: ${SECRETS.find((s) => s.spellId === res.secretFound)?.name || 'a hidden glyph'}!`);
+  if (lesson.reward && lesson.reward.rankedReady) bits.push('Ranked play unlocked — all public spells available.');
+
+  $('#result-title').textContent = `${lesson.title} complete`;
+  $('#result-text').textContent = bits.join(' ') || 'Objective complete. Well drawn.';
+  const nextId = nextRequiredLesson(lesson.id);
+  const nextBtn = $('#btn-next-round');
+  if (nextId) { nextBtn.textContent = 'Continue'; nextBtn.classList.remove('hidden'); }
+  else nextBtn.classList.add('hidden');
+  const rematchBtn = document.querySelector('#panel-result [data-action="rematch"]');
+  if (rematchBtn) rematchBtn.textContent = 'Replay lesson';
+  showPanel('panel-result'); showOverlay(true);
+  // remember next lesson for the Continue button
+  window.__tutNext = nextId;
+}
+
+function nextRequiredLesson(lessonId) {
+  const idx = CAMPAIGN.findIndex((l) => l.id === lessonId);
+  for (let i = idx + 1; i < CAMPAIGN.length; i++) return CAMPAIGN[i].id;
+  return null;
+}
+
+// Remediation controls (Show Me / Try again) from the coach panel.
+function tutorialShowMe() {
+  if (!tutorial) return;
+  tutorial.remediate();               // regress a guide stage (never auto-casts)
+  gesture.playGhost();                // replay the canonical trace
+  updateCoachState();
+}
+function tutorialTryAgain() {
+  if (!tutorial) return;
+  tutorial.retry();
+  updateCoachState();
 }
 
 // ------------------------------------------------------------------ main loop
@@ -618,8 +858,9 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
   btn.addEventListener('click', () => {
     audio.unlock();
     const a = btn.dataset.action;
-    if (a === 'tutorial') { showPanel('panel-tutorial'); $('#tut-title').textContent = 'Tutorial'; $('#tut-text').textContent = 'A short introduction to drawing, casting, and defending. Follow the dotted guides.'; }
-    else if (a === 'practice') { series = null; startMatch('practice'); }
+    if (a === 'tutorial') openTutorialHub();
+    else if (a === 'lab') { series = null; startMatch('practice'); }
+    else if (a === 'practice-ai') toast('Practice vs AI (Easy/Medium/Hard) arrives in the next phase.');
     else if (a === 'duel') { updateDuelSummary(); showPanel('panel-duel'); }
     else if (a === 'online') openOnline();
     else if (a === 'online-quick') startOnlineAction('quick');
@@ -634,23 +875,33 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'privacy') openPrivacy();
     else if (a === 'delete-data') deleteMyData();
     else if (a === 'start-duel') startSeries($('#duel-diff').value);
-    else if (a === 'tut-begin') { series = null; startMatch('tutorial'); }
+    else if (a === 'tut-continue') startTutorialLesson(soloProfile().currentLessonId);
+    else if (a === 'tut-begin') beginTutorialLesson();
+    else if (a === 'tut-showme') tutorialShowMe();
+    else if (a === 'tut-tryagain') tutorialTryAgain();
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
-    else if (a === 'next-round') startSeriesRound();
+    else if (a === 'next-round') { if (mode === 'tutorial') continueTutorial(); else startSeriesRound(); }
     else if (a === 'back' || a === 'menu') returnToMainMenu();
     else if (a === 'rematch') {
-      if (mode === 'online') {
+      if (mode === 'tutorial') { if (tutorialLesson) startTutorialLesson(tutorialLesson.id); }
+      else if (mode === 'online') {
         running = false; match = null; mode = null; setNetStatus(null);
         hud.setSeries(null); $('#hud').classList.add('hidden');
         openOnline(); showOverlay(true);
       } else if (mode === 'duel') startSeries($('#duel-diff').value);
-      else startMatch(mode === 'tutorial' ? 'duel' : mode);
+      else startMatch(mode);
     }
   });
 });
 
-$('#btn-menu').addEventListener('click', () => { running = false; if (mode === 'online' && online) online.setActive(false); showPanel('panel-main'); showOverlay(true); });
+function continueTutorial() {
+  const nextId = window.__tutNext;
+  if (nextId) startTutorialLesson(nextId);
+  else openTutorialHub();
+}
+
+$('#btn-menu').addEventListener('click', () => { running = false; if (mode === 'online' && online) online.setActive(false); if (mode === 'tutorial' && tutorial) tutorial.pause(); showPanel('panel-main'); showOverlay(true); });
 
 // ------------------------------------------------------------------ settings
 function applySettings() {
@@ -700,24 +951,28 @@ function openPrivacy() {
   window.location.href = './privacy.html';
 }
 function deleteMyData() {
-  if (!window.confirm('Delete all local data (identity, name, settings, saved duel)? This cannot be undone.')) return;
+  if (!window.confirm('Delete all local data? This erases your device identity, name, settings, saved duel, and your solo progress — tutorial completion, calibration, medals, secret-clue and secret-spell discoveries, and local coaching statistics. This cannot be undone.')) return;
   if (online) { try { online.leave(); } catch { /* ignore */ } disposeOnline(); }
   try {
     ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-server-url'].forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
+  try { deleteProfile(localStorage); } catch { /* ignore */ } // solo progress / calibration / medals / clues / secrets / coaching stats
+  tutorial = null; tutorialLesson = null;
   const su = $('#set-server-url'); if (su) su.value = '';
   const on = $('#online-name'); if (on) on.value = '';
-  setServerStatus('Local data deleted. A fresh anonymous id is created on next online play.', 'ok');
+  setServerStatus('Local data deleted, including solo progress, calibration, medals, clues, secret discoveries, and coaching stats.', 'ok');
   toast('Your local data was deleted.');
 }
 
 // Full teardown back to the main menu (shared by the Back/Menu buttons and the
 // Android hardware back button).
 function returnToMainMenu() {
-  running = false; match = null; series = null;
+  running = false; match = null; series = null; tutorial = null; tutorialLesson = null;
   if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
   mode = null; setNetStatus(null); hud.setSeries(null);
-  $('#hud').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
+  gesture.setGuide(null);
+  document.body.classList.remove('mode-tutorial');
+  $('#hud').classList.add('hidden'); $('#coach').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
 }
 
 // Android hardware/gesture back: close subpanels first, confirm before
@@ -768,10 +1023,14 @@ function onBackgroundChange(hidden) {
     if (!pausedForVisibility) pausedForVisibility = running;
     running = false;
     if (mode === 'online' && online) online.setActive(false); // stop issuing inputs while backgrounded
+    if (mode === 'tutorial' && tutorial) tutorial.pause();
   } else {
     if (mode === 'online' && online) {
       online.setActive(true);
       if (online.inMatch) { running = true; setNetStatus(online.connected ? 'connected' : 'reconnecting'); }
+    } else if (mode === 'tutorial' && tutorial) {
+      if (tutorial.state === STATES.PAUSED) tutorial.resume();
+      if (tutorial.sim && !tutorial.sim.ended && pausedForVisibility) running = true;
     } else if (pausedForVisibility && match && !match.sim.ended) {
       running = true;
     }
