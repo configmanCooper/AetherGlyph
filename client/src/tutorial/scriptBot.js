@@ -14,7 +14,10 @@
 
 import { effectFor, PROJECTILE } from '../../../shared/src/sim/spellEffects.js';
 
-export const SCRIPT_BEHAVIORS = ['idle', 'periodic', 'focus-loop', 'on-mark-defend', 'wall-focus', 'sequence', 'wind-drill'];
+export const SCRIPT_BEHAVIORS = [
+  'idle', 'periodic', 'focus-loop', 'on-mark-defend', 'wall-focus',
+  'sequence', 'wind-drill', 'return-lightning',
+];
 
 export class ScriptBot {
   constructor(playerId, config = {}) {
@@ -26,6 +29,7 @@ export class ScriptBot {
       seqDone: new Set(),
       lightArmed: true,
       nextHeavy: config.heavyStartTick ?? 200,
+      returnArmed: false,
     };
   }
 
@@ -72,6 +76,7 @@ export class ScriptBot {
       case 'wall-focus': return this._wallFocus(sim);
       case 'sequence': return this._sequence(sim);
       case 'wind-drill': return this._windDrill(sim);
+      case 'return-lightning': return this._returnLightning(sim);
       default: return { move: 0 };
     }
   }
@@ -136,6 +141,25 @@ export class ScriptBot {
         return { move: 0 };
       }
       this.mem.seqDone.add(i);
+    }
+    return { move: 0 };
+  }
+
+  // Rain Conducts drill. Once the instructor becomes Soaked by the player's
+  // Wet+Storm reaction, wait for a clear teaching beat, then release repeated
+  // Spark Darts so the player has multiple chances to tap Dodge after release.
+  _returnLightning(sim) {
+    const w = sim.wizards[this.id];
+    const spellId = this.config.spellId ?? 3;
+    const delay = this.config.delayTicks ?? 90;
+    const period = this.config.periodTicks ?? 180;
+    if (!this.mem.returnArmed && sim.hasStatus(w, 'Soaked')) {
+      this.mem.returnArmed = true;
+      this.mem.nextAttempt = sim.tick + delay;
+    }
+    if (this.mem.returnArmed && sim.tick >= this.mem.nextAttempt && this.canCast(sim, spellId)) {
+      this.mem.nextAttempt = sim.tick + period;
+      return { move: 0, cast: spellId, castQuality: 1 };
     }
     return { move: 0 };
   }

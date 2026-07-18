@@ -4,7 +4,7 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.0.0 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.0.1 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
 service, and the deterministic shared simulation.
 
@@ -56,8 +56,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10000 /
-versionName 1.0.0). Online play connects to a configurable authoritative service
+`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10001 /
+versionName 1.0.1). Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
 
@@ -307,7 +307,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10000` / `versionName 1.0.0`, no cleartext production traffic,
+  `versionCode 10001` / `versionName 1.0.1`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume + haptics via `@capacitor/app` and
   `@capacitor/haptics`.
@@ -367,4 +367,3 @@ reverse when sides swap. Empirical gesture-miss rates are **Easy ~0.34 ≫ Mediu
 - Online unranked and ranked 1v1
 - Google Play package via Capacitor, targeting Android API 36
 - Authoritative multiplayer service hosted on Render
-

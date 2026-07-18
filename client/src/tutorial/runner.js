@@ -48,6 +48,7 @@ export const REJECT_MESSAGES = {
   'wrong-spell': 'That was a valid glyph, but this objective needs the highlighted spell.',
   'no-templates': 'Internal content error; this lesson is unavailable.',
   'round-lost': 'The round ended before you met the objectives. Try again.',
+  'wasted-dispel': 'Dispel only works when a harmful status is active. The lesson has restarted.',
   'series-lost': 'The best-of-three ended in the AI\'s favour. Replay to try again.',
 };
 
@@ -184,7 +185,11 @@ export class TutorialRunner {
     this.sim = new Sim({
       seed: this.seed,
       loadouts,
-      rules: { timer: !!lesson.timerEnabled, pressure: !!lesson.pressureEnabled },
+      rules: {
+        timer: !!lesson.timerEnabled,
+        pressure: !!lesson.pressureEnabled,
+        projectileTravelScale: lesson.projectileTravelScale || 1,
+      },
     });
     this._applyArena(lesson.arena);
     this.bot = this._buildOpponent(lesson.opponent);
@@ -414,7 +419,11 @@ export class TutorialRunner {
     this.sim = new Sim({
       seed: this.seed,
       loadouts: [makeLoadout(lesson.playerLoadout), makeLoadout(lesson.opponentLoadout)],
-      rules: { timer: !!lesson.timerEnabled, pressure: !!lesson.pressureEnabled },
+      rules: {
+        timer: !!lesson.timerEnabled,
+        pressure: !!lesson.pressureEnabled,
+        projectileTravelScale: lesson.projectileTravelScale || 1,
+      },
     });
     this._applyArena(lesson.arena);
     this.bot = this._buildOpponent(lesson.opponent);
@@ -435,6 +444,16 @@ export class TutorialRunner {
         // Reflect the current rule state (never latched): a violation sticks
         // because these facts are monotonic (min Aether, wasted-Dispel count…).
         this.objectiveStatus[o.id] = val;
+        if (!val && o.restartOnViolation) {
+          const reason = typeof o.restartOnViolation === 'string'
+            ? o.restartOnViolation
+            : 'constraint-violated';
+          if (this.onReject) {
+            this.onReject({ reason, message: REJECT_MESSAGES[reason] || reason });
+          }
+          this.restart();
+          return;
+        }
       } else if (val) {
         this.objectiveStatus[o.id] = true;
         if (this.onObjective) this.onObjective(o, this);

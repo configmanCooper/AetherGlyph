@@ -232,7 +232,10 @@ export class GestureInput {
 
   _drawGuide(ctx, r) {
     const g = this.guide;
-    if (!g || g.length < 2 || this.guideStage >= 3) return; // None => blank pad
+    if (!g || g.length < 2 || this.guideStage >= 3) {
+      this.canvas.dataset.guideArrows = '0';
+      return; // None => blank pad
+    }
     const { sx, sy } = this._guideXY(r);
     const stage = this.guideStage;
     ctx.save();
@@ -250,9 +253,15 @@ export class GestureInput {
       ctx.setLineDash([]);
     }
 
-    // Direction cue: an arrowhead at the start pointing along the first segment
-    // (Full, Start). Dotted keeps the path itself as the direction hint.
-    if (stage === 0 || stage === 2) this._drawStartArrow(ctx, sx, sy, g);
+    // Direction cues: Full/Start use a prominent first arrow. Dotted templates
+    // add occasional arrowheads along the path so loops and figure-eights clearly
+    // communicate which way to travel.
+    if (stage === 0 || stage === 2) {
+      this._drawStartArrow(ctx, sx, sy, g);
+      this.canvas.dataset.guideArrows = '1';
+    } else if (stage === 1) {
+      this.canvas.dataset.guideArrows = String(this._drawPathArrows(ctx, sx, sy, g));
+    }
 
     // Start dot (all visible stages).
     ctx.fillStyle = 'rgba(79,214,201,0.95)';
@@ -281,6 +290,45 @@ export class GestureInput {
     ctx.lineTo(tipX - Math.cos(ang - a) * 8, tipY - Math.sin(ang - a) * 8);
     ctx.lineTo(tipX - Math.cos(ang + a) * 8, tipY - Math.sin(ang + a) * 8);
     ctx.closePath(); ctx.fill();
+  }
+
+  _drawPathArrows(ctx, sx, sy, g) {
+    const points = g.map((p) => ({ x: sx(p.x), y: sy(p.y) }));
+    const lengths = [];
+    let total = 0;
+    for (let i = 1; i < points.length; i++) {
+      const len = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      lengths.push(len);
+      total += len;
+    }
+    if (total <= 0) return 0;
+    const fractions = total >= 180 ? [0.08, 0.4, 0.72] : total >= 100 ? [0.12, 0.6] : [0.18];
+    ctx.fillStyle = 'rgba(79,214,201,0.95)';
+    let count = 0;
+    for (const fraction of fractions) {
+      const target = total * fraction;
+      let walked = 0;
+      for (let i = 0; i < lengths.length; i++) {
+        const len = lengths[i];
+        if (walked + len < target || len <= 0) { walked += len; continue; }
+        const t = Math.max(0, Math.min(1, (target - walked) / len));
+        const a = points[i], b = points[i + 1];
+        const x = a.x + (b.x - a.x) * t;
+        const y = a.y + (b.y - a.y) * t;
+        const angle = Math.atan2(b.y - a.y, b.x - a.x);
+        const size = 9;
+        const spread = 0.55;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
+        ctx.lineTo(x - Math.cos(angle - spread) * size, y - Math.sin(angle - spread) * size);
+        ctx.lineTo(x - Math.cos(angle + spread) * size, y - Math.sin(angle + spread) * size);
+        ctx.closePath();
+        ctx.fill();
+        count += 1;
+        break;
+      }
+    }
+    return count;
   }
 
   _drawGhostMarker(ctx, sx, sy, g) {

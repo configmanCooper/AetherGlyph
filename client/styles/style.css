@@ -92,7 +92,11 @@ body.lefthand .move-pad { left: auto; right: calc(14px + var(--safe-right)); }
 body.lefthand .draw-pad { right: auto; left: calc(14px + var(--safe-left)); }
 body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right)); }
 
-.action-buttons { position: absolute; bottom: calc(14px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; flex-direction: column; }
+.action-buttons {
+  position: absolute; bottom: calc(min(42vh, 340px) + 24px + var(--safe-bottom));
+  left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; flex-direction: row; align-items: center;
+}
 .act-btn {
   background: var(--panel); color: var(--ink); border: 1px solid rgba(255,255,255,0.18);
   border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600; min-width: 78px;
@@ -181,7 +185,7 @@ body.reduced * { animation: none !important; transition: none !important; }
 .spellbar {
   position: absolute; bottom: calc(8px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
   display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; max-width: 62%;
-  pointer-events: auto;
+  pointer-events: auto; z-index: 6;
 }
 .spell-btn {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -194,6 +198,8 @@ body.reduced * { animation: none !important; transition: none !important; }
 .spell-btn .sb-cost { font-size: 10px; color: var(--muted); }
 .spell-btn.disabled { opacity: 0.4; }
 .spell-btn.cooldown { border-color: rgba(255,93,115,0.6); }
+.spell-btn.selected { border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(79,214,201,0.24); }
+.spell-btn.spell-next { border-style: dashed; background: rgba(30,22,52,0.96); }
 .spell-btn:active { transform: translateY(1px); }
 
 /* Loadout builder */

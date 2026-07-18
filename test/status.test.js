@@ -13,6 +13,13 @@ export function run() {
   const { ok, eq, near, report } = createHarness();
   let sim, a, b;
 
+  eq(STATUSES.Chilled.durationS, 4.5, 'Chilled setup window lasts 4.5s');
+  eq(STATUSES.Soaked.durationS, 6, 'Soaked setup window lasts 6s');
+  eq(STATUSES.Static.durationS, 4.5, 'Static stacks last 4.5s');
+  eq(STATUSES.Sundered.durationS, 5.5, 'Sundered payoff window lasts 5.5s');
+  eq(STATUSES.Marked.durationS, 6, 'Marked payoff window lasts 6s');
+  eq(STATUSES.Sloth.durationS, 5.5, 'Sloth lasts 5.5s');
+
   // Burning DoT: ~2 dmg/sec for 3 sec.
   sim = freshSim(); b = sim.wizards[1];
   sim.applyStatus(b, 'Burning', 1);

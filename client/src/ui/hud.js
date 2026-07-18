@@ -74,7 +74,7 @@ export class HUD {
 
   // Build the on-screen cast bar for the equipped loadout (primary Phase 2
   // input alongside drawing). onCast(spellId) fires when a button is pressed.
-  buildSpellbar(loadout, onCast) {
+  buildSpellbar(loadout, onCast, opts = {}) {
     if (!this.el.spellbar) return;
     this.el.spellbar.innerHTML = '';
     this.spellButtons.clear();
@@ -82,18 +82,39 @@ export class HUD {
       const btn = document.createElement('button');
       btn.className = 'spell-btn';
       btn.dataset.spell = s.id;
-      btn.innerHTML = `<span class="sb-key">${i + 1}</span><span class="sb-name">${s.name}</span>` +
+      if (opts.guideMode) btn.dataset.guideOnly = 'true';
+      btn.innerHTML = `<span class="sb-key">${opts.guideMode ? 'Guide' : i + 1}</span><span class="sb-name">${s.name}</span>` +
         `<span class="sb-cost">${s.aether}${s.charges ? ' ' + '#'.repeat(s.charges) : ''}</span>`;
       btn.title = `${s.school} - ${s.category}\n${s.effect}`;
-      btn.addEventListener('pointerdown', (e) => { e.preventDefault(); onCast(s.id); });
+      if (s.id === opts.selectedId) {
+        btn.classList.add('selected');
+        btn.setAttribute('aria-pressed', 'true');
+      }
+      btn.addEventListener('click', (e) => { e.preventDefault(); onCast(s.id); });
       this.el.spellbar.appendChild(btn);
       this.spellButtons.set(s.id, btn);
     });
+    if (typeof opts.onNext === 'function') {
+      const next = document.createElement('button');
+      next.className = 'spell-btn spell-next';
+      next.type = 'button';
+      next.innerHTML = `<span class="sb-key">→</span><span class="sb-name">Next</span>` +
+        `<span class="sb-cost">${opts.pageLabel || ''}</span>`;
+      next.title = 'Show more public spells';
+      next.addEventListener('click', (e) => { e.preventDefault(); opts.onNext(); });
+      this.el.spellbar.appendChild(next);
+    }
   }
 
   _updateSpellbar(w) {
     for (const [id, btn] of this.spellButtons) {
       const sp = SPELLS_BY_ID[id];
+      if (btn.dataset.guideOnly === 'true') {
+        btn.classList.remove('cooldown', 'disabled');
+        const cost = btn.querySelector('.sb-cost');
+        if (cost) cost.textContent = `${sp.aether}${sp.charges ? ' ' + '#'.repeat(sp.charges) : ''}`;
+        continue;
+      }
       const cd = (w.cooldowns[id] || 0) > 0;
       const poor = w.aether < sp.aether;
       const noCharge = (sp.charges || 0) > w.charges;

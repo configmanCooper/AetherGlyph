@@ -227,7 +227,12 @@ export const CAMPAIGN = [
     objectives: [
       { id: 'chill', text: 'Chill the instructor', predicate: 'apply-status:Chilled', expectSpell: 2 },
       { id: 'cleanse', text: 'Cleanse your Burning', predicate: 'cleanse:Burning', expectSpell: 13 },
-      { id: 'clean', text: 'Never waste Dispel on plain damage', predicate: 'no-wasted-dispel' },
+      {
+        id: 'clean',
+        text: 'Never waste Dispel on plain damage',
+        predicate: 'no-wasted-dispel',
+        restartOnViolation: 'wasted-dispel',
+      },
     ],
     remediation: ['slow-script'],
     maxTicks: 2000,
@@ -298,17 +303,21 @@ export const CAMPAIGN = [
     narration: [
       'Weather is shared. Rain creates a Wet zone either wizard can exploit.',
       'Lightning conducts through Wet ground — and the instructor can answer.',
-      'Make it rain, shock them in the Wet, then escape the return lightning.',
+      'After the return lightning is released, tap Dodge once. Do not Dodge during the windup — the spell aims when it leaves their hand.',
     ],
     timerEnabled: false, pressureEnabled: false,
+    projectileTravelScale: 2.5,
     playerLoadout: [32, 3], opponentLoadout: [3],
     taughtSpells: [{ id: 32, enterStage: 0, exitStage: 2 }, { id: 3, enterStage: 0, exitStage: 2 }],
     drills: [7, 30],
-    opponent: { type: 'script', config: { behavior: 'periodic', spellId: 3, startTick: 240, periodTicks: 90 } },
+    opponent: {
+      type: 'script',
+      config: { behavior: 'return-lightning', spellId: 3, delayTicks: 90, periodTicks: 180 },
+    },
     objectives: [
       { id: 'wet', text: 'Create a Wet zone', predicate: 'create-zone:Wet', expectSpell: 32 },
       { id: 'conduct', text: 'Trigger Conductive Arc', predicate: 'reaction:ConductiveArc', expectSpell: 3 },
-      { id: 'escape', text: 'Evade the return lightning', predicate: 'evade:1' },
+      { id: 'escape', text: 'When lightning is released, tap Dodge to evade it', predicate: 'evade:1' },
     ],
     medal: { id: 'L07-dry', text: 'Conduct without being Soaked', predicate: 'no-self-status:Soaked' },
     remediation: ['slow-script'],

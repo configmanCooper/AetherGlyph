@@ -47,6 +47,15 @@ const settings = { lefthand: false, reduced: false, audio: true, haptics: true, 
 let playerIds = STARTER_SPELL_IDS.slice();       // the equipped 8 spells (ids)
 let playerLoadout = makeLoadout(playerIds);
 let recognizer = null;
+const LAB_PAGE_SIZE = 8;
+const LAB_PUBLIC_IDS = [
+  ...STARTER_SPELL_IDS,
+  ...SPELL_CATALOG.filter((s) => !s.secret && !STARTER_SPELL_IDS.includes(s.id)).map((s) => s.id),
+];
+let labPage = 0;
+let labSelectedId = LAB_PUBLIC_IDS[0];
+let activeGuideLoadout = [];
+let selectedGuideId = null;
 
 let match = null;
 let running = false;
@@ -71,6 +80,21 @@ function guideTemplateFor(spellId) {
 function setDrawHint(text) {
   const hint = document.querySelector('#draw-pad .pad-hint');
   if (hint) hint.textContent = text || 'draw spell';
+}
+
+function selectEquippedGuide(id) {
+  selectedGuideId = id;
+  gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
+  setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
+  if (mode === 'practice' && match) match.assisted = true;
+  renderEquippedGuideBar();
+}
+
+function renderEquippedGuideBar() {
+  hud.buildSpellbar(activeGuideLoadout, (id) => selectEquippedGuide(id), {
+    selectedId: selectedGuideId,
+    guideMode: true,
+  });
 }
 
 // Best-of-three series (online only; the local bot-duel series was replaced by
@@ -128,7 +152,9 @@ function rebuildForLoadout() {
   playerLoadout = makeLoadout(playerIds);
   recognizer = new Recognizer(buildTemplates()).forLoadout(playerLoadout);
   gesture.recognizer = recognizer;
-  hud.buildSpellbar(playerLoadout, (id) => castSpell(id, 1));
+  activeGuideLoadout = playerLoadout;
+  selectedGuideId = null;
+  renderEquippedGuideBar();
   buildDevcast();
   updatePracticeSummaries();
 }
@@ -159,6 +185,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'a') kbMove = -1;
   else if (e.key === 'd') kbMove = 1;
   else if (e.key === 'f') match.input.focus = true;
+  else if (e.key === 'b') match.input.brace = true;
   else if (e.key === ' ') { match.input.sidestep = dummyInput.__lastDir || 1; e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
@@ -166,6 +193,7 @@ window.addEventListener('keyup', (e) => {
   if (e.key === 'a' && kbMove === -1) kbMove = 0;
   else if (e.key === 'd' && kbMove === 1) kbMove = 0;
   else if (e.key === 'f') match.input.focus = false;
+  else if (e.key === 'b') match.input.brace = false;
 });
 
 // Dev quick-cast buttons (mirror of the equipped loadout).
@@ -190,13 +218,50 @@ function applyInputBridge() {
 }
 
 // Glyph Laboratory: no opponent, no combat pressure (untimed sandbox).
+function labPageIds() {
+  const start = labPage * LAB_PAGE_SIZE;
+  return LAB_PUBLIC_IDS.slice(start, start + LAB_PAGE_SIZE);
+}
+
+function selectLabSpell(id) {
+  labSelectedId = id;
+  const selected = makeLoadout([id]);
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(selected);
+  gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
+  setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
+  const canvas = $('#draw-canvas');
+  if (canvas) {
+    canvas.dataset.guideSpell = String(id);
+    canvas.dataset.guideStage = 'dotted';
+  }
+  renderLabSpellbar();
+}
+
+function renderLabSpellbar() {
+  const pageIds = labPageIds();
+  const pages = Math.ceil(LAB_PUBLIC_IDS.length / LAB_PAGE_SIZE);
+  hud.buildSpellbar(makeLoadout(pageIds), (id) => selectLabSpell(id), {
+    selectedId: labSelectedId,
+    guideMode: true,
+    onNext: () => {
+      labPage = (labPage + 1) % pages;
+      labSelectedId = labPageIds()[0];
+      selectLabSpell(labSelectedId);
+    },
+    pageLabel: `${labPage + 1}/${pages}`,
+  });
+}
+
 function startLab() {
   mode = 'lab';
   series = null;
+  labPage = 0;
+  labSelectedId = LAB_PUBLIC_IDS[0];
+  const labLoadout = makeLoadout(LAB_PUBLIC_IDS);
   match = new LocalMatch({
     mode: 'lab',
     botActive: false,
-    playerLoadout,
+    playerLoadout: labLoadout,
     timed: false,
     seed: (Date.now() & 0x7fffffff) >>> 0,
     onEnd: null,
@@ -212,9 +277,8 @@ function startLab() {
   document.body.classList.remove('mode-tutorial');
   $('#spellbar').classList.remove('hidden');
   $('#devcast').classList.toggle('hidden', !settings.devcast);
-  gesture.recognizer = recognizer;
-  gesture.setGuide(guideTemplateFor(playerLoadout[0].id), { stage: 0 });
-  setDrawHint('draw spell');
+  renderLabSpellbar();
+  selectLabSpell(labSelectedId);
   toast('Glyph Laboratory — draw freely. No opponent.');
 }
 
@@ -250,6 +314,9 @@ function startPractice() {
   const bLoadout = makeLoadout(oppIds);
   // Scope the recognizer to the loadout actually used this round.
   gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(pLoadout);
+  activeGuideLoadout = pLoadout;
+  selectedGuideId = practice.templates ? pLoadout[0].id : null;
+  renderEquippedGuideBar();
 
   match = new LocalMatch({
     mode: 'practice',
@@ -274,7 +341,10 @@ function startPractice() {
   $('#spellbar').classList.remove('hidden');
   $('#devcast').classList.toggle('hidden', !settings.devcast);
   // Templates on = per-spell assistance (a guide) and an assisted coaching flag.
-  gesture.setGuide(practice.templates ? guideTemplateFor(pLoadout[0].id) : null, { stage: 0 });
+  gesture.setGuide(practice.templates ? guideTemplateFor(pLoadout[0].id) : null, {
+    stage: practice.templates ? 1 : 3,
+    showGhost: false,
+  });
   setDrawHint('draw spell');
   toast(`Practice vs ${PRACTICE_PROFILES[practice.difficulty].label} AI — draw to cast.`);
 }
@@ -290,7 +360,7 @@ function onPracticeEnd(sim) {
 
   // Record the difficulty-comparison stat (assisted rounds are excluded).
   const profile = soloProfile();
-  recordPracticeResult(profile, practice.difficulty, win, practice.templates);
+  recordPracticeResult(profile, practice.difficulty, win, !!match.assisted);
   saveProfile(profile, localStorage);
 
   const title = sim.winner === 'draw' ? 'Draw' : win ? 'Victory' : 'Defeat';
@@ -715,6 +785,10 @@ function handleEvents(events) {
     } else if (e.type === 'cast') {
       const sp = SPELLS_BY_ID[e.spellId];
       if (sp) audio.cast(sp.school);
+      if (mode === 'tutorial' && tutorialLesson?.id === 'L07'
+          && e.caster === 1 && e.spellId === 3) {
+        toast('Lightning released — tap Dodge now!');
+      }
     } else if (e.type === 'damage') {
       audio.damage(); if (e.target === 0) haptic('damage');
     } else if (e.type === 'reflect') { audio.reflect(); haptic('counter'); }
@@ -1351,7 +1425,17 @@ showPanel('panel-main');
 // gives no gameplay advantage. Never referenced by normal play.
 if (typeof window !== 'undefined') {
   window.__aegTest = {
-    info: () => ({ mode, difficulty: match && match.difficulty, botActive: !!(match && match.botActive), hasBot: !!(match && match.bot) }),
+    info: () => ({
+      mode,
+      difficulty: match && match.difficulty,
+      botActive: !!(match && match.botActive),
+      hasBot: !!(match && match.bot),
+      selectedGuideId,
+      assisted: !!(match && match.assisted),
+      playerCasting: match?.sim?.wizards?.[0]?.casting?.spellId ?? null,
+      playerCastsResolved: match?.sim?.wizards?.[0]?.castsResolved ?? 0,
+      playerBraceTicks: match?.sim?.wizards?.[0]?.braceTicks ?? 0,
+    }),
     forceEnd: (winner = 0) => {
       try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }
     },

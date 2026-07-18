@@ -75,13 +75,13 @@ export const CAST = {
 export const STATUSES = {
   // Debuffs / crowd control ------------------------------------------------
   Burning:  { durationS: 3, maxStacks: 2, dps: 2, kind: 'dot', harmful: true },
-  Chilled:  { durationS: 3, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
-  Sloth:    { durationS: 4, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
-  Soaked:   { durationS: 4, maxStacks: 1, lightningBonus: 0.25, kind: 'flag', harmful: true },
-  Static:   { durationS: 3, maxStacks: 3, kind: 'flag', harmful: true },
-  Sundered: { durationS: 4, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
-  Weakened: { durationS: 4, maxStacks: 1, damageDealt: 0.22, kind: 'amp', harmful: true },
-  Marked:   { durationS: 5, maxStacks: 1, markBonus: 0.35, kind: 'flag', harmful: true },
+  Chilled:  { durationS: 4.5, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Sloth:    { durationS: 5.5, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Soaked:   { durationS: 6, maxStacks: 1, lightningBonus: 0.25, kind: 'flag', harmful: true },
+  Static:   { durationS: 4.5, maxStacks: 3, kind: 'flag', harmful: true },
+  Sundered: { durationS: 5.5, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
+  Weakened: { durationS: 5, maxStacks: 1, damageDealt: 0.22, kind: 'amp', harmful: true },
+  Marked:   { durationS: 6, maxStacks: 1, markBonus: 0.35, kind: 'flag', harmful: true },
   Blinded:  { durationS: 2, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
   Veiled:   { durationS: 2, maxStacks: 1, kind: 'flag', harmful: true },   // Veil Hex (visual)
   Rooted:   { durationS: 1.5, maxStacks: 1, canCast: true, kind: 'control', harmful: true },

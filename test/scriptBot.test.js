@@ -72,5 +72,34 @@ export function run() {
   eq(canWizardCast(sim, 0, 18), true, 'Amplify becomes castable once a charge is available');
   eq(canWizardCast(sim, 0, 99), false, 'an unequipped spell id is never castable');
 
+  // --- 6. Rain Conducts gives repeated, slowed return-lightning attempts ---
+  {
+    const rainSim = new Sim({
+      seed: 7,
+      loadouts: [makeLoadout([32, 3]), makeLoadout([3])],
+      rules: { timer: false, pressure: false, projectileTravelScale: 2.5 },
+    });
+    rainSim.applyStatus(rainSim.wizards[1], 'Soaked', 1);
+    const returnBot = makeScriptBot(1, {
+      behavior: 'return-lightning', spellId: 3, delayTicks: 90, periodTicks: 180,
+    });
+    let starts = 0, firstStart = null, travelTicks = null;
+    for (let i = 0; i < 500 && !rainSim.ended; i++) {
+      const evs = rainSim.step({ 0: {}, 1: returnBot.act(rainSim) });
+      for (const e of evs) {
+        if (e.type === 'castStart' && e.caster === 1 && e.spellId === 3) {
+          starts += 1;
+          if (firstStart == null) firstStart = e.tick;
+        }
+        if (e.type === 'cast' && e.caster === 1 && e.spellId === 3 && travelTicks == null) {
+          travelTicks = rainSim.projectiles.find((p) => p.owner === 1 && p.spellId === 3)?.totalTicks;
+        }
+      }
+    }
+    ok(starts >= 2, 'return-lightning gives the player repeated evade attempts');
+    ok(firstStart >= 90, 'return lightning waits for the teaching delay');
+    eq(travelTicks, Math.round(0.32 * 60 * 2.5), 'Rain Conducts slows Spark travel for an actionable Dodge window');
+  }
+
   return report('scriptBot');
 }

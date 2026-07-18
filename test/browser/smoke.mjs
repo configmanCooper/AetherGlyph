@@ -239,6 +239,86 @@ try {
   await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
   const labInfo = await page.evaluate(() => (window.__aegTest ? window.__aegTest.info() : null));
   if (!labInfo || labInfo.mode !== 'lab' || labInfo.botActive) fail('Glyph Laboratory should have no active opponent: ' + JSON.stringify(labInfo));
+  const labFirst = await page.evaluate(() => ({
+    spells: Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)),
+    lastName: document.querySelector('#spellbar .spell-btn[data-spell]:last-of-type .sb-name')?.textContent,
+    hasNext: !!document.querySelector('#spellbar .spell-next'),
+  }));
+  if (labFirst.spells.join(',') !== '1,2,4,3,28,10,11,12' || !labFirst.hasNext) {
+    fail('Glyph Laboratory first page must end with Reflect and a Next button: ' + JSON.stringify(labFirst));
+  }
+
+  // Selecting a spell updates the active dotted drawing template.
+  await page.click('#spellbar .spell-btn[data-spell="4"]');
+  const labStone = await page.evaluate(() => ({
+    hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+    guide: document.querySelector('#draw-canvas')?.dataset.guideSpell,
+    selected: document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell,
+    hit: (() => {
+      const b = document.querySelector('#spellbar .spell-btn[data-spell="4"]');
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { box: [r.x, r.y, r.width, r.height], hit: hit?.id || hit?.className || hit?.tagName };
+    })(),
+  }));
+  if (!/Stone Shard/i.test(labStone.hint) || labStone.guide !== '4' || labStone.selected !== '4') {
+    fail('Glyph Laboratory selection did not update the Stone Shard guide: ' + JSON.stringify(labStone));
+  }
+
+  // Page through the full public catalog. Weather/environment spells must appear;
+  // secret spells 37-40 must never appear.
+  const labSeen = new Set(labFirst.spells);
+  const labPages = [labFirst.spells];
+  for (let i = 0; i < 4; i++) {
+    await page.click('#spellbar .spell-next');
+    const ids = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)));
+    labPages.push(ids);
+    ids.forEach((id) => labSeen.add(id));
+    if (i === 1) {
+      const surge = await page.$('#spellbar .spell-btn[data-spell="17"]');
+      if (!surge) fail('Aether Surge missing from expected lab page: ' + JSON.stringify(labPages));
+      await surge.click();
+      const surgeGuide = await page.evaluate(() => ({
+        hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+        arrows: Number(document.querySelector('#draw-canvas')?.dataset.guideArrows || 0),
+      }));
+      if (!/Aether Surge/i.test(surgeGuide.hint) || surgeGuide.arrows < 2) {
+        fail('Aether Surge dotted guide must include directional arrows: ' + JSON.stringify(surgeGuide));
+      }
+    }
+    if (i === 2) {
+      const rain = await page.$('#spellbar .spell-btn[data-spell="32"]');
+      if (!rain) fail('Rain Glyph missing from weather lab page: ' + JSON.stringify(labPages));
+      await rain.click();
+      const labRain = await page.evaluate(() => ({
+        hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+        guide: document.querySelector('#draw-canvas')?.dataset.guideSpell,
+      }));
+      if (!/Rain Glyph/i.test(labRain.hint) || labRain.guide !== '32') {
+        fail('Glyph Laboratory weather selection did not update the Rain Glyph guide: ' + JSON.stringify(labRain));
+      }
+    }
+  }
+  const labCatalog = [...labSeen].sort((a, b) => a - b);
+  if (labCatalog.length !== 36 || ![31, 32, 33, 34, 35, 36].every((id) => labSeen.has(id))
+      || [37, 38, 39, 40].some((id) => labSeen.has(id))) {
+    fail('Glyph Laboratory catalog must contain all 36 public spells including weather, excluding secrets: ' + labCatalog.join(','));
+  }
+  const actionLayout = await page.evaluate(() => {
+    const ids = ['btn-focus', 'btn-brace', 'btn-sidestep'];
+    return ids.map((id) => {
+      const el = document.getElementById(id); const r = el.getBoundingClientRect();
+      return { id, text: el.textContent, x: r.x, y: r.y };
+    });
+  });
+  if (!(actionLayout[0].x < actionLayout[1].x && actionLayout[1].x < actionLayout[2].x)
+      || Math.max(...actionLayout.map((x) => x.y)) - Math.min(...actionLayout.map((x) => x.y)) > 3
+      || !/\(F\)/.test(actionLayout[0].text) || !/\(B\)/.test(actionLayout[1].text)
+      || !/\(Space\)/.test(actionLayout[2].text)) {
+    fail('Focus/Brace/Dodge controls are not horizontal with keyboard labels: ' + JSON.stringify(actionLayout));
+  }
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
@@ -265,6 +345,21 @@ try {
     if (!info || info.mode !== 'practice' || !info.botActive || !info.hasBot || info.difficulty !== diff) {
       fail(`Practice AI not active for ${diff}: ` + JSON.stringify(info));
     }
+    const guideButton = await page.$('#spellbar .spell-btn[data-spell]');
+    const guideSpell = await page.evaluate((b) => Number(b.dataset.spell), guideButton);
+    const beforeGuide = await page.evaluate(() => window.__aegTest.info());
+    await guideButton.click();
+    await new Promise((r) => setTimeout(r, 120));
+    const afterGuide = await page.evaluate(() => window.__aegTest.info());
+    if (afterGuide.selectedGuideId !== guideSpell || afterGuide.playerCasting !== null
+        || afterGuide.playerCastsResolved !== beforeGuide.playerCastsResolved || !afterGuide.assisted) {
+      fail(`spellbar button must select a guide without casting (${diff}): ` + JSON.stringify({ beforeGuide, afterGuide, guideSpell }));
+    }
+    await page.keyboard.down('b');
+    await new Promise((r) => setTimeout(r, 120));
+    const braceInfo = await page.evaluate(() => window.__aegTest.info());
+    await page.keyboard.up('b');
+    if (braceInfo.playerBraceTicks <= 0) fail(`Brace (B) keyboard binding did not activate in ${diff}`);
     // Draw a real glyph, then force the round to a finish and read the coaching.
     const pad = await page.$('#draw-canvas');
     const box = await pad.boundingBox();

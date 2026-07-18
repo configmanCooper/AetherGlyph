@@ -90,6 +90,7 @@ export class Sim {
     this.rules = {
       timer: opts.rules?.timer !== false,
       pressure: opts.rules?.pressure !== false,
+      projectileTravelScale: Math.max(0.5, Math.min(4, Number(opts.rules?.projectileTravelScale) || 1)),
     };
 
     const l0 = opts.loadouts?.[0] || [];
@@ -419,7 +420,8 @@ export class Sim {
       case PROJECTILE: {
         this.projectiles.push({
           id: _projId++, owner: w.id, spellId: c.spellId, eff,
-          ticks: sToTicks(eff.travelS), totalTicks: sToTicks(eff.travelS), quality: c.quality,
+          ticks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
+          totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale), quality: c.quality,
           originPos: w.arcPos,
           targetPos: opp.arcPos, // aimed at defender's position at release
         });
@@ -711,7 +713,8 @@ export class Sim {
       this.emit('reflect', { by: defender.id, spellId: p.spellId });
       this.projectiles.push({
         id: _projId++, owner: defender.id, spellId: p.spellId, eff,
-        ticks: sToTicks(eff.travelS), totalTicks: sToTicks(eff.travelS), quality: p.quality,
+        ticks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
+        totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale), quality: p.quality,
         originPos: defender.arcPos,
         targetPos: attacker.arcPos,
       });

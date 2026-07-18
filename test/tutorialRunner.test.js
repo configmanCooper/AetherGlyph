@@ -126,6 +126,26 @@ export function run() {
   rCon._stepOnce({});
   eq(rCon.objectiveStatus.reserve, false, 'aether-min constraint fails once violated (not latched at start)');
 
+  // Clean Hands restarts immediately when Dispel is cast with no harmful status,
+  // rather than leaving an unwinnable false constraint behind.
+  {
+    let rejection = null;
+    const rClean = new TutorialRunner('L04', {
+      seed: 22,
+      onReject: (r) => { rejection = r; },
+    });
+    rClean.arm();
+    const firstSim = rClean.sim;
+    for (let i = 0; i < 90 && rClean.sim === firstSim; i++) {
+      rClean._stepOnce(i === 0 ? { cast: 13, castQuality: 1 } : {});
+    }
+    ok(rClean.sim !== firstSim, 'a wasted Dispel rebuilds the Clean Hands simulation');
+    eq(rClean.state, STATES.ACTIVE, 'Clean Hands is immediately active after the restart');
+    ok(rClean.lesson.objectives.every((o) => rClean.objectiveStatus[o.id] === false),
+      'Clean Hands objectives reset after the wasted Dispel');
+    eq(rejection?.reason, 'wasted-dispel', 'the restart explains why Dispel was wasted');
+  }
+
   // --- 7. a lost formal round re-arms on retry (no soft lock) ------------
   const rLoss = new TutorialRunner('L12', { seed: 4 });
   rLoss.arm();
