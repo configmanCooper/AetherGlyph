@@ -123,7 +123,7 @@ ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.inclu
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 10002'), 'gradle versionCode 10002');
+ok(appGradle.includes('versionCode 10003'), 'gradle versionCode 10003');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');

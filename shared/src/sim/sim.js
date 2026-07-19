@@ -91,6 +91,7 @@ export class Sim {
       timer: opts.rules?.timer !== false,
       pressure: opts.rules?.pressure !== false,
       projectileTravelScale: Math.max(0.5, Math.min(4, Number(opts.rules?.projectileTravelScale) || 1)),
+      sandbox: opts.rules?.sandbox === true,
     };
 
     const l0 = opts.loadouts?.[0] || [];
@@ -1001,9 +1002,22 @@ export class Sim {
   }
 
   // -------------------------------------------------------------------- step
+  refreshSandbox() {
+    if (!this.rules.sandbox) return;
+    for (const w of this.wizards) {
+      w.health = MATCH.startHealth;
+      w.aether = AETHER.max;
+      w.charges = SIGIL.max;
+      w.sidestepCharges = SIDESTEP.charges;
+      for (const id of Object.keys(w.cooldowns)) w.cooldowns[id] = 0;
+      if (!w.casting && !w.channel) w.recoveryTicks = 0;
+    }
+  }
+
   step(intents = {}) {
     if (this.ended) return this.events.splice(0);
     this.events = [];
+    this.refreshSandbox();
     this.tick += 1;
     this.timeS = this.tick * DT;
 

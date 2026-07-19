@@ -77,7 +77,7 @@ imports, so every call is a safe no-op in a plain browser:
 ## Android project (`android/`, checked in)
 
 - `variables.gradle`: `minSdk 24`, `compileSdk 36`, `targetSdk 36`.
-- `app/build.gradle`: `versionCode 10002`, `versionName "1.0.2"`; release signing
+- `app/build.gradle`: `versionCode 10003`, `versionName "1.0.3"`; release signing
   read from an ignored `keystore.properties` (unsigned when absent).
 - `AndroidManifest.xml`: `singleTask`, `screenOrientation="landscape"`,
   `usesCleartextTraffic="false"` + `@xml/network_security_config`, `INTERNET` +

@@ -24,6 +24,7 @@ import { run as scriptBot } from './scriptBot.test.js';
 import { run as practiceBot } from './practiceBot.test.js';
 import { run as coaching } from './coaching.test.js';
 import { run as gust } from './gust.test.js';
+import { run as lab } from './lab.test.js';
 
 console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
@@ -52,6 +53,7 @@ const modules = [
   ['practiceBot', practiceBot],
   ['coaching', coaching],
   ['gust', gust],
+  ['lab', lab],
 ];
 
 let pass = 0, fail = 0;

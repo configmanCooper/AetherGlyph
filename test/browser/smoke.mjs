@@ -361,8 +361,25 @@ try {
   const blankBefore = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
   await gflick();
   await new Promise((r) => setTimeout(r, 800));
-  const blankAfter = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
-  if (blankAfter <= blankBefore) fail('Blank guide mode did not recognize and cast a public spell drawn from memory');
+  const blankAfter = await page.evaluate(() => {
+    const info = window.__aegTest.info();
+    const label = document.querySelector('#last-cast');
+    const draw = document.querySelector('#draw-pad');
+    const lr = label?.getBoundingClientRect();
+    const dr = draw?.getBoundingClientRect();
+    return {
+      casts: info.playerCastsResolved,
+      text: label?.textContent || '',
+      hidden: label?.classList.contains('hidden'),
+      labelBottom: lr?.bottom,
+      drawTop: dr?.top,
+    };
+  });
+  if (blankAfter.casts <= blankBefore) fail('Blank guide mode did not recognize and cast a public spell drawn from memory');
+  if (blankAfter.hidden || !/Last cast: Ember Bolt/.test(blankAfter.text)
+      || blankAfter.labelBottom > blankAfter.drawTop + 1) {
+    fail('Last-cast label is missing or not directly above the draw area: ' + JSON.stringify(blankAfter));
+  }
 
   const actionLayout = await page.evaluate(() => {
     const ids = ['btn-focus', 'btn-brace', 'btn-sidestep'];

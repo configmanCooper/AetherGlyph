@@ -82,6 +82,21 @@ function setDrawHint(text) {
   if (hint) hint.textContent = text || 'draw spell';
 }
 
+function resetLastCast() {
+  const el = $('#last-cast');
+  if (!el) return;
+  el.textContent = '';
+  el.classList.add('hidden');
+}
+
+function showLastCast(spellId) {
+  const spell = SPELLS_BY_ID[spellId];
+  const el = $('#last-cast');
+  if (!spell || !el) return;
+  el.textContent = `Last cast: ${spell.name}`;
+  el.classList.remove('hidden');
+}
+
 function selectEquippedGuide(id) {
   selectedGuideId = id;
   gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
@@ -270,6 +285,7 @@ function renderLabSpellbar() {
 function startLab() {
   mode = 'lab';
   series = null;
+  resetLastCast();
   labPage = 0;
   labSelectedId = LAB_PUBLIC_IDS[0];
   const labLoadout = makeLoadout(LAB_PUBLIC_IDS);
@@ -322,6 +338,7 @@ function resolveOpponentPracticeIds(playerPracticeIds, seed) {
 function startPractice() {
   mode = 'practice';
   series = null;
+  resetLastCast();
   const seed = practiceSeed != null ? practiceSeed : resolvePracticeSeed();
   const playerPracticeIds = resolvePlayerPracticeIds();
   const oppIds = resolveOpponentPracticeIds(playerPracticeIds, seed);
@@ -626,6 +643,7 @@ function applyCalibration(cal) {
 // Arm the sim + show HUD/coach for the current tutorial lesson (post-calibration).
 function armTutorialLesson() {
   if (!tutorial) return;
+  resetLastCast();
   match = tutorial;
   running = true;
   hud.showDiag = false;
@@ -800,6 +818,7 @@ function handleEvents(events) {
     } else if (e.type === 'cast') {
       const sp = SPELLS_BY_ID[e.spellId];
       if (sp) audio.cast(sp.school);
+      if (e.caster === 0) showLastCast(e.spellId);
       if (mode === 'tutorial' && tutorialLesson?.id === 'L07'
           && e.caster === 1 && e.spellId === 3) {
         toast('Lightning released — wait until it gets close, then tap Dodge!');
@@ -1120,6 +1139,7 @@ function cancelOnline() {
 
 function onOnlineMatchStart() {
   mode = 'online';
+  resetLastCast();
   match = online;
   series = null;
   onlineRoundIndex = 0;
