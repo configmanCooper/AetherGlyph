@@ -334,6 +334,36 @@ try {
       || [37, 38, 39, 40].some((id) => labSeen.has(id))) {
     fail('Glyph Laboratory catalog must contain all 36 public spells including weather, excluding secrets: ' + labCatalog.join(','));
   }
+
+  // Blank guide mode clears the template but keeps all public spells recognizable.
+  await page.click('#spellbar .spell-blank');
+  await new Promise((r) => setTimeout(r, 120));
+  const blankLab = await page.evaluate(() => {
+    const canvas = document.querySelector('#draw-canvas');
+    const ctx = canvas?.getContext('2d');
+    let painted = 0;
+    if (canvas && ctx) {
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) painted++;
+    }
+    return {
+      hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+      stage: canvas?.dataset.guideStage,
+      guide: canvas?.dataset.guideSpell,
+      selected: document.querySelector('#spellbar .spell-blank')?.classList.contains('selected'),
+      painted,
+    };
+  });
+  if (!/any public spell/i.test(blankLab.hint) || blankLab.stage !== 'blank'
+      || blankLab.guide != null || !blankLab.selected || blankLab.painted !== 0) {
+    fail('Glyph Laboratory Blank mode did not clear the guide: ' + JSON.stringify(blankLab));
+  }
+  const blankBefore = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
+  await gflick();
+  await new Promise((r) => setTimeout(r, 800));
+  const blankAfter = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
+  if (blankAfter <= blankBefore) fail('Blank guide mode did not recognize and cast a public spell drawn from memory');
+
   const actionLayout = await page.evaluate(() => {
     const ids = ['btn-focus', 'btn-brace', 'btn-sidestep'];
     return ids.map((id) => {

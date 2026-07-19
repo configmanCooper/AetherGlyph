@@ -115,8 +115,8 @@ export const ZONE = {
   coverReduction: 0.5,    // Stone Wall cover reduces incoming projectile dmg
   coverHp: 26,
   durations: {
-    Oil: 7, Wet: 7, Fog: 6, Frozen: 3, Snare: 8, Cover: 8,
-    Hourglass: 6, Fire: 4, Gust: 0.6, Grounded: 1,
+    Oil: 21, Wet: 21, Fog: 18, Frozen: 9, Snare: 24, Cover: 24,
+    Hourglass: 18, Fire: 12, Gust: 1.8, Grounded: 3,
   },
 };
 
@@ -125,8 +125,8 @@ export const REACTION = {
   cooldownS: 1.0,          // same reaction cannot trigger more than once/sec
   maxLinks: 2,             // chains stop after two reaction links
   flashFireDamage: 10,     // Oil + Ember -> Flash Fire area damage
-  quakeSlowS: 1.0,         // Wall + Quake rubble slow
-  frozenGroundSlowS: 3,    // Wet + Frost -> Frozen Ground slow surface
+  quakeSlowS: 3.0,         // Wall + Quake rubble slow
+  frozenGroundSlowS: 9,    // Wet + Frost -> Frozen Ground slow surface
 };
 
 // Deterministic reaction priority (environment-matrix.md). Lower = earlier

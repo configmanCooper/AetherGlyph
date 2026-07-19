@@ -5,7 +5,7 @@ import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { REACTIONS, sortByPriority, priorityOf, prismaticUtility } from '../shared/src/sim/reactions.js';
-import { REACTION_PRIORITY, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
+import { REACTION, REACTION_PRIORITY, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
 
 function mk(ids0, ids1 = [1]) {
   const sim = new Sim({ seed: 5, loadouts: [ids0.map(spellWithGesture), ids1.map(spellWithGesture)] });
@@ -28,6 +28,17 @@ function reactionNames(evs) { return evs.filter((e) => e.type === 'reaction').ma
 
 export function run() {
   const { ok, eq, report } = createHarness();
+
+  eq(ZONE.durations.Oil, 21, 'Oil lasts three times the original duration');
+  eq(ZONE.durations.Wet, 21, 'Wet lasts three times the original duration');
+  eq(ZONE.durations.Fog, 18, 'Fog lasts three times the original duration');
+  eq(ZONE.durations.Snare, 24, 'Snare lasts three times the original duration');
+  eq(ZONE.durations.Cover, 24, 'Cover lasts three times the original duration');
+  eq(ZONE.durations.Hourglass, 18, 'Hourglass lasts three times the original duration');
+  eq(ZONE.durations.Fire, 12, 'Fire lasts three times the original duration');
+  eq(ZONE.durations.Gust, 1.8, 'Gust lasts three times the original duration');
+  eq(ZONE.durations.Grounded, 3, 'Grounded strip lasts three times the original duration');
+  eq(REACTION.frozenGroundSlowS, 9, 'Frozen Ground reaction lasts three times as long');
 
   // Priority table is data-versioned and covers every reaction category.
   eq(REACTION_PRIORITY.join(','), 'douse,ground,freeze,conduct,ignite,spread,cover',

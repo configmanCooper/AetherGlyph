@@ -237,12 +237,27 @@ function selectLabSpell(id) {
   renderLabSpellbar();
 }
 
+function selectLabBlank() {
+  labSelectedId = null;
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(LAB_PUBLIC_IDS));
+  gesture.setGuide(null);
+  setDrawHint('blank guide — draw any public spell from memory');
+  const canvas = $('#draw-canvas');
+  if (canvas) {
+    delete canvas.dataset.guideSpell;
+    canvas.dataset.guideStage = 'blank';
+  }
+  renderLabSpellbar();
+}
+
 function renderLabSpellbar() {
   const pageIds = labPageIds();
   const pages = Math.ceil(LAB_PUBLIC_IDS.length / LAB_PAGE_SIZE);
   hud.buildSpellbar(makeLoadout(pageIds), (id) => selectLabSpell(id), {
     selectedId: labSelectedId,
     guideMode: true,
+    onBlank: () => selectLabBlank(),
+    blankSelected: labSelectedId == null,
     onNext: () => {
       labPage = (labPage + 1) % pages;
       labSelectedId = labPageIds()[0];

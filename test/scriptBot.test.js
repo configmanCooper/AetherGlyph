@@ -113,5 +113,27 @@ export function run() {
     ok(!playerDamaged, 'the correctly dodged tutorial lightning does not damage the player');
   }
 
+  // --- 7. Wards and Angles fires only after the student's Ward is active ---
+  {
+    const wardSim = new Sim({
+      seed: 8,
+      loadouts: [makeLoadout([10, 6]), makeLoadout([1])],
+      rules: { timer: false, pressure: false },
+    });
+    const wardBot = makeScriptBot(1, { behavior: 'ward-drill', spellId: 1 });
+    let castBeforeWard = false, blocked = false;
+    for (let i = 0; i < 180 && !wardSim.ended; i++) {
+      const player = i === 20 ? { cast: 10, castQuality: 1 } : {};
+      const events = wardSim.step({ 0: player, 1: wardBot.act(wardSim) });
+      for (const e of events) {
+        if (e.type === 'castStart' && e.caster === 1 && !wardSim.wizards[0].shield) castBeforeWard = true;
+      }
+      if (wardSim.wizards[0].shield && wardSim.wizards[0].shield.absorb < 30) blocked = true;
+    }
+    ok(!castBeforeWard, 'Ward drill does not attack before the student raises Ward');
+    ok(blocked, 'Ward drill fires a bolt that is absorbed by the active Ward');
+    eq(wardSim.wizards[0].health, 100, 'a correct Ward prevents the teaching bolt from damaging health');
+  }
+
   return report('scriptBot');
 }

@@ -641,7 +641,7 @@ export class Sim {
       }
       case 'SteamVeil':
         this.removeZones((z) => z.kind === 'Frozen', 'melted');
-        this.addZone(ctx.casterId, 'Fog', { durationS: 3 });
+        this.addZone(ctx.casterId, 'Fog', { durationS: 9 });
         break;
       case 'ConductiveArc':
         if (target) this.applyStatus(target, 'Soaked', 1);

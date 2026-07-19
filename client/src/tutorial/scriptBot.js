@@ -16,7 +16,7 @@ import { effectFor, PROJECTILE } from '../../../shared/src/sim/spellEffects.js';
 
 export const SCRIPT_BEHAVIORS = [
   'idle', 'periodic', 'focus-loop', 'on-mark-defend', 'wall-focus',
-  'sequence', 'wind-drill', 'return-lightning',
+  'sequence', 'wind-drill', 'return-lightning', 'ward-drill',
 ];
 
 export class ScriptBot {
@@ -30,6 +30,7 @@ export class ScriptBot {
       lightArmed: true,
       nextHeavy: config.heavyStartTick ?? 200,
       returnArmed: false,
+      wardArmed: true,
     };
   }
 
@@ -77,6 +78,7 @@ export class ScriptBot {
       case 'sequence': return this._sequence(sim);
       case 'wind-drill': return this._windDrill(sim);
       case 'return-lightning': return this._returnLightning(sim);
+      case 'ward-drill': return this._wardDrill(sim);
       default: return { move: 0 };
     }
   }
@@ -160,6 +162,23 @@ export class ScriptBot {
     if (this.mem.returnArmed && sim.tick >= this.mem.nextAttempt && this.canCast(sim, spellId)) {
       this.mem.nextAttempt = sim.tick + period;
       return { move: 0, cast: spellId, castQuality: 1 };
+    }
+    return { move: 0 };
+  }
+
+  // Wards and Angles drill. Wait until the student has a live Ward, then fire a
+  // single Ember Bolt into it. Re-arm only after the Ward drops, so one correctly
+  // timed shield always creates a clear, successful teaching moment.
+  _wardDrill(sim) {
+    const foe = sim.wizards[1 - this.id];
+    const spellId = this.config.spellId ?? 1;
+    if (foe && foe.shield && foe.shield.ticks > 0) {
+      if (this.mem.wardArmed && this.canCast(sim, spellId)) {
+        this.mem.wardArmed = false;
+        return { move: 0, cast: spellId, castQuality: 1 };
+      }
+    } else {
+      this.mem.wardArmed = true;
     }
     return { move: 0 };
   }

@@ -78,6 +78,17 @@ export class HUD {
     if (!this.el.spellbar) return;
     this.el.spellbar.innerHTML = '';
     this.spellButtons.clear();
+    if (typeof opts.onBlank === 'function') {
+      const blank = document.createElement('button');
+      blank.className = 'spell-btn spell-blank' + (opts.blankSelected ? ' selected' : '');
+      blank.type = 'button';
+      blank.innerHTML = '<span class="sb-key">○</span><span class="sb-name">Blank</span>' +
+        '<span class="sb-cost">Any spell</span>';
+      blank.title = 'Clear the guide and draw any public spell from memory';
+      blank.setAttribute('aria-pressed', opts.blankSelected ? 'true' : 'false');
+      blank.addEventListener('click', (e) => { e.preventDefault(); opts.onBlank(); });
+      this.el.spellbar.appendChild(blank);
+    }
     loadout.forEach((s, i) => {
       const btn = document.createElement('button');
       btn.className = 'spell-btn';
