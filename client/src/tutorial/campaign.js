@@ -303,7 +303,7 @@ export const CAMPAIGN = [
     narration: [
       'Weather is shared. Rain creates a Wet zone either wizard can exploit.',
       'Lightning conducts through Wet ground — and the instructor can answer.',
-      'After the return lightning is released, tap Dodge once. Do not Dodge during the windup — the spell aims when it leaves their hand.',
+      'After the return lightning is released, let it get close, then tap Dodge. Spark homes slightly, so dodging too early lets it follow you.',
     ],
     timerEnabled: false, pressureEnabled: false,
     projectileTravelScale: 2.5,
@@ -317,7 +317,7 @@ export const CAMPAIGN = [
     objectives: [
       { id: 'wet', text: 'Create a Wet zone', predicate: 'create-zone:Wet', expectSpell: 32 },
       { id: 'conduct', text: 'Trigger Conductive Arc', predicate: 'reaction:ConductiveArc', expectSpell: 3 },
-      { id: 'escape', text: 'When lightning is released, tap Dodge to evade it', predicate: 'evade:1' },
+      { id: 'escape', text: 'Let the return lightning get close, then tap Dodge', predicate: 'evade:1' },
     ],
     medal: { id: 'L07-dry', text: 'Conduct without being Soaked', predicate: 'no-self-status:Soaked' },
     remediation: ['slow-script'],

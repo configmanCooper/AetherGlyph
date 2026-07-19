@@ -254,6 +254,15 @@ try {
     hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
     guide: document.querySelector('#draw-canvas')?.dataset.guideSpell,
     selected: document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell,
+    painted: (() => {
+      const canvas = document.querySelector('#draw-canvas');
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return 0;
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let count = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
+      return count;
+    })(),
     hit: (() => {
       const b = document.querySelector('#spellbar .spell-btn[data-spell="4"]');
       if (!b) return null;
@@ -262,7 +271,8 @@ try {
       return { box: [r.x, r.y, r.width, r.height], hit: hit?.id || hit?.className || hit?.tagName };
     })(),
   }));
-  if (!/Stone Shard/i.test(labStone.hint) || labStone.guide !== '4' || labStone.selected !== '4') {
+  if (!/Stone Shard/i.test(labStone.hint) || labStone.guide !== '4'
+      || labStone.selected !== '4' || labStone.painted < 20) {
     fail('Glyph Laboratory selection did not update the Stone Shard guide: ' + JSON.stringify(labStone));
   }
 
@@ -283,8 +293,17 @@ try {
       const surgeGuide = await page.evaluate(() => ({
         hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
         arrows: Number(document.querySelector('#draw-canvas')?.dataset.guideArrows || 0),
+        painted: (() => {
+          const canvas = document.querySelector('#draw-canvas');
+          const ctx = canvas?.getContext('2d');
+          if (!canvas || !ctx) return 0;
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
+          return count;
+        })(),
       }));
-      if (!/Aether Surge/i.test(surgeGuide.hint) || surgeGuide.arrows < 2) {
+      if (!/Aether Surge/i.test(surgeGuide.hint) || surgeGuide.arrows < 2 || surgeGuide.painted < 20) {
         fail('Aether Surge dotted guide must include directional arrows: ' + JSON.stringify(surgeGuide));
       }
     }
@@ -295,8 +314,17 @@ try {
       const labRain = await page.evaluate(() => ({
         hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
         guide: document.querySelector('#draw-canvas')?.dataset.guideSpell,
+        painted: (() => {
+          const canvas = document.querySelector('#draw-canvas');
+          const ctx = canvas?.getContext('2d');
+          if (!canvas || !ctx) return 0;
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          for (let i = 3; i < data.length; i += 4) if (data[i] > 0) count++;
+          return count;
+        })(),
       }));
-      if (!/Rain Glyph/i.test(labRain.hint) || labRain.guide !== '32') {
+      if (!/Rain Glyph/i.test(labRain.hint) || labRain.guide !== '32' || labRain.painted < 20) {
         fail('Glyph Laboratory weather selection did not update the Rain Glyph guide: ' + JSON.stringify(labRain));
       }
     }

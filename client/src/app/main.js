@@ -787,7 +787,7 @@ function handleEvents(events) {
       if (sp) audio.cast(sp.school);
       if (mode === 'tutorial' && tutorialLesson?.id === 'L07'
           && e.caster === 1 && e.spellId === 3) {
-        toast('Lightning released — tap Dodge now!');
+        toast('Lightning released — wait until it gets close, then tap Dodge!');
       }
     } else if (e.type === 'damage') {
       audio.damage(); if (e.target === 0) haptic('damage');

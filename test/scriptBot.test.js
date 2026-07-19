@@ -84,21 +84,33 @@ export function run() {
       behavior: 'return-lightning', spellId: 3, delayTicks: 90, periodTicks: 180,
     });
     let starts = 0, firstStart = null, travelTicks = null;
+    let dodged = false, playerDamaged = false;
+    const dodgedProjectiles = new Set();
     for (let i = 0; i < 500 && !rainSim.ended; i++) {
-      const evs = rainSim.step({ 0: {}, 1: returnBot.act(rainSim) });
+      const incoming = rainSim.projectiles.find((p) => p.owner === 1 && p.spellId === 3);
+      const shouldDodge = incoming && incoming.ticks <= 1 && !dodgedProjectiles.has(incoming.id);
+      if (shouldDodge) dodgedProjectiles.add(incoming.id);
+      const playerIntent = shouldDodge ? { sidestep: 1 } : {};
+      const evs = rainSim.step({ 0: playerIntent, 1: returnBot.act(rainSim) });
       for (const e of evs) {
         if (e.type === 'castStart' && e.caster === 1 && e.spellId === 3) {
           starts += 1;
           if (firstStart == null) firstStart = e.tick;
         }
-        if (e.type === 'cast' && e.caster === 1 && e.spellId === 3 && travelTicks == null) {
-          travelTicks = rainSim.projectiles.find((p) => p.owner === 1 && p.spellId === 3)?.totalTicks;
+        if (e.type === 'cast' && e.caster === 1 && e.spellId === 3) {
+          if (travelTicks == null) {
+            travelTicks = rainSim.projectiles.find((p) => p.owner === 1 && p.spellId === 3)?.totalTicks;
+          }
         }
+        if (e.type === 'miss' && e.target === 0 && e.spellId === 3) dodged = true;
+        if (e.type === 'damage' && e.target === 0 && e.source === 'Spark Dart') playerDamaged = true;
       }
     }
     ok(starts >= 2, 'return-lightning gives the player repeated evade attempts');
     ok(firstStart >= 90, 'return lightning waits for the teaching delay');
     eq(travelTicks, Math.round(0.32 * 60 * 2.5), 'Rain Conducts slows Spark travel for an actionable Dodge window');
+    ok(dodged, 'tapping Dodge after Spark release makes the tutorial lightning miss');
+    ok(!playerDamaged, 'the correctly dodged tutorial lightning does not damage the player');
   }
 
   return report('scriptBot');

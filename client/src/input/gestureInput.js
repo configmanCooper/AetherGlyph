@@ -69,6 +69,7 @@ export class GestureInput {
     this._stopGhost();
     if (this.guide && this.guideStage === 0 && opts.showGhost !== false && !this.reduced) this.playGhost();
     else this._redraw();
+    this._redrawAfterLayout();
   }
 
   // Change only the guide stage (used as the guide fades across a lesson).
@@ -77,6 +78,19 @@ export class GestureInput {
     this._stopGhost();
     if (this.guide && this.guideStage === 0 && !this.reduced) this.playGhost();
     else this._redraw();
+    this._redrawAfterLayout();
+  }
+
+  // Menus hide the entire HUD, which temporarily gives the canvas a 0x0 CSS
+  // box. A guide selected during that transition would otherwise be painted into
+  // a 1x1 backing canvas and appear missing until another resize. Re-check after
+  // layout and repaint whenever a guide changes.
+  _redrawAfterLayout() {
+    if (typeof requestAnimationFrame === 'undefined') return;
+    requestAnimationFrame(() => {
+      const r = this.canvas.getBoundingClientRect();
+      if (r.width > 1 && r.height > 1) this.resize();
+    });
   }
 
   // One optional ghost demonstration: a marker traces the canonical path once.
