@@ -4,9 +4,12 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.2.2 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.3.0 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
-service, and the deterministic shared simulation. 1.2.2 makes **Blink conceal its
+service, and the deterministic shared simulation. In 1.3.0, Practice and online
+duels recognize the **full 40-spell roster**: the selected eight spells are dotted
+guide shortcuts only, and every unselected spell remains castable when its normal
+Aether, Sigil Charge, cooldown, and setup requirements are met. 1.2.2 makes **Blink conceal its
 caster for 3 seconds** while retaining its shorter 1.05s evade window, and raises
 Blink's cooldown to 9 seconds. 1.2.1 adds a **persistent
 Reflect visual** — a standing, angled mirror-plane guard that shows for the whole
@@ -107,8 +110,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10202 /
-versionName 1.2.2). Online play connects to a configurable authoritative service
+`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10300 /
+versionName 1.3.0). Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
 
@@ -166,9 +169,9 @@ Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT
   coaching), **Glyph Laboratory** (free draw + recognizer diagnostics, no
   opponent), **Online Duel** (best-of-three vs another device: Quick Match, Create
   Private Duel, or Join Code).
-- **Loadout builder**: pick from all 40 spells or an archetype preset (Ember Rush,
+- **Guide shortcuts**: pick any eight dotted guides from all 40 spells or use an archetype preset (Ember Rush,
   Tide Control, Storm Tempo, Stone Warden, Gale Trickster, Arcane Combo, Umbra
-  Attrition, Prismatic Hybrid); live 14-point / school / heavy validation.
+  Attrition, Prismatic Hybrid). These shortcuts never limit casting.
 - In an offline duel, cast by drawing or by tapping the on-screen cast bar; the
   arena shows environmental zones and both wizards' statuses. **Online duels are
   draw-only** — the server reclassifies every gesture and is authoritative.
@@ -252,21 +255,21 @@ Phase 1 basic modes (Tutorial, Practice, starter smoke path) intact.
   Rooted, Frozen, Stunned, Sloth, Haste, Aether Surge, Attunement, Grounding,
   Veil, Blinded, Phoenix protection, Hourglass shared slow, and the Mirror decoy
   are all simulated.
-- **Loadout builder.** `validateLoadout` enforces 8 spells / 14-point budget /
-  max two 3-point spells / max three per school, with a soft "no defensive
-  answer" warning. Eight curated archetype presets are provided, and the
-  responsive builder UI exposes all 40 spells (secrets selectable in Phase 2).
+- **Guide shortcut builder.** `validateLoadout` requires eight distinct known
+  spells only. Point, heavy, school, and defensive-coverage restrictions no
+  longer apply because the selection controls visible dotted guides rather than
+  cast eligibility. Eight curated themed presets remain available.
 - **Best-of-three series.** Rounds reset the arena/statuses/resources while
-  preserving both loadouts; a running series score, per-round transitions, and
+  preserving both guide layouts; a running series score, per-round transitions, and
   correct rematch/menu behaviour are wired (`Series` / `runSeries` in
   `shared/src/sim/match.js`).
-- **Bot pilots any loadout.** The `DuelBot` categorises whatever it is dealt and
+- **Bot pilots any strategy set.** The `DuelBot` categorises its preferred spell pool and
   reasons about setup (chill→Frost Bind, static/soak→Thunderclap), resources
   (charges/Focus), zones (place then ignite), defense (Ward/Reflect/Blink/Dispel),
   and counters (Grounding vs lightning). Four internal levels are kept.
 - **Visuals/HUD.** The Three.js arena draws generic zone disks and effects per
   category; the HUD shows statuses (buffs vs debuffs), active zones + durations,
-  the series score, and an on-screen cast bar for the equipped loadout.
+  the series score, and an on-screen bar for the eight selected guide shortcuts.
 
 ### Known Phase 2 limitations
 
@@ -297,12 +300,12 @@ duel while preserving the deterministic shared simulation and all offline modes.
   stable identity, per-socket rate limiting, disconnect routing, and drain.
 - **Draw-to-cast is authoritative.** A cast intent sends a **bounded, quantized
   gesture trace + timing**, never a trusted spell id. The server re-runs the
-  shared `Recognizer` restricted to the player's equipped loadout and rejects
+  shared full-roster `Recognizer` and rejects
   malformed / ambiguous / too-fast / oversized / rate-limited casts, passing only
   the classified id + quality into the sim. Development quick-cast (cast bar,
   keyboard, dev buttons) is unavailable online — online casting uses the gesture
-  pad. **All 40 spell gestures have distinct single-stroke templates**, so any
-  legal online loadout is fully drawable; `test/templates.test.js` proves each
+  pad. **All 40 spell gestures have distinct single-stroke templates**, and every
+  roster spell is drawable regardless of the selected guides; `test/templates.test.js` proves each
   classifies its own trace under legal loadouts with an acceptable margin.
 - **Sequencing & anti-abuse.** Per-player sequence numbers with duplicate/stale
   rejection, an input state machine (movement/focus/brace + one-shot
@@ -358,7 +361,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10202` / `versionName 1.2.2`, no cleartext production traffic,
+  `versionCode 10300` / `versionName 1.3.0`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume + haptics via `@capacitor/app` and
   `@capacitor/haptics`.

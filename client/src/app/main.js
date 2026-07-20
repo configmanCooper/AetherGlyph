@@ -45,8 +45,9 @@ const audio = new Audio();
 
 const settings = { lefthand: false, reduced: false, audio: true, haptics: true, devcast: false };
 
-// Loadout + practice state.
-let playerIds = STARTER_SPELL_IDS.slice();       // the equipped 8 spells (ids)
+// Guide-set + practice state. These eight spells control the visible guide
+// shortcuts only; duel recognition always covers the full 40-spell roster.
+let playerIds = STARTER_SPELL_IDS.slice();
 let playerLoadout = makeLoadout(playerIds);
 let recognizer = null;
 const LAB_PAGE_SIZE = 8;
@@ -168,7 +169,7 @@ const gesture = new GestureInput($('#draw-canvas'), {
 
 function rebuildForLoadout() {
   playerLoadout = makeLoadout(playerIds);
-  recognizer = new Recognizer(buildTemplates()).forLoadout(playerLoadout);
+  recognizer = new Recognizer(buildTemplates());
   gesture.recognizer = recognizer;
   activeGuideLoadout = playerLoadout;
   selectedGuideId = null;
@@ -214,7 +215,7 @@ window.addEventListener('keyup', (e) => {
   else if (e.key === 'b') match.input.brace = false;
 });
 
-// Dev quick-cast buttons (mirror of the equipped loadout).
+// Dev quick-cast buttons (mirror of the selected guide shortcuts).
 function buildDevcast() {
   const wrap = $('#devcast');
   wrap.innerHTML = '';
@@ -361,8 +362,8 @@ function startPractice() {
   const oppIds = resolveOpponentPracticeIds(playerPracticeIds, seed);
   const pLoadout = makeLoadout(playerPracticeIds);
   const bLoadout = makeLoadout(oppIds);
-  // Scope the recognizer to the loadout actually used this round.
-  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(pLoadout);
+  // Practice recognizes the full roster; this set only controls visible guides.
+  gesture.recognizer = new Recognizer(buildTemplates());
   activeGuideLoadout = pLoadout;
   selectedGuideId = practice.templates ? pLoadout[0].id : null;
   renderEquippedGuideBar();
@@ -970,15 +971,14 @@ function updatePracticeSummaries() {
   const playerPracticeIds = resolvePlayerPracticeIds();
   if (pEl) {
     const names = makeLoadout(playerPracticeIds).map((s) => s.name).join(', ');
-    const pts = playerPracticeIds.reduce((a, id) => a + (SPELLS_BY_ID[id]?.loadout_points || 0), 0);
-    pEl.textContent = `Your loadout (${pts} pts): ${names}`;
+    pEl.textContent = `Your guides: ${names}. All 40 spells remain castable.`;
   }
   if (oppEl) {
     const seed = practiceSeed != null ? practiceSeed : resolvePracticeSeed();
     const oppIds = resolveOpponentPracticeIds(playerPracticeIds, seed);
     const names = oppIds.map((id) => SPELLS_BY_ID[id]?.name).join(', ');
     const auto = practice.opponentPreset === 'auto';
-    oppEl.innerHTML = `<strong>Opponent${auto ? ' (auto)' : ''}:</strong> ${names}`;
+    oppEl.innerHTML = `<strong>Opponent style${auto ? ' (auto)' : ''}:</strong> ${names}`;
   }
 }
 
@@ -1018,7 +1018,7 @@ function renderCatalog() {
       const picked = draftIds.includes(s.id);
       chip.className = 'spell-chip' + (picked ? ' picked' : '') + (s.secret ? ' secret' : '');
       chip.innerHTML = `<span class="chip-name">${s.name}</span>` +
-        `<span class="chip-meta">${s.school} · ${s.loadout_points}p${s.charges ? ' · ' + '#'.repeat(s.charges) : ''}</span>`;
+        `<span class="chip-meta">${s.school}${s.charges ? ' · ' + '#'.repeat(s.charges) : ''}</span>`;
       chip.title = s.effect;
       chip.addEventListener('click', () => toggleDraft(s.id));
       row.appendChild(chip);
@@ -1032,7 +1032,7 @@ function toggleDraft(id) {
   const i = draftIds.indexOf(id);
   if (i >= 0) draftIds.splice(i, 1);
   else if (draftIds.length < 8) draftIds.push(id);
-  else toast('Loadout is full (8 spells). Remove one first.');
+  else toast('Guide set is full (8 spells). Remove one first.');
   renderCatalog();
   renderLoadoutState();
 }
@@ -1042,15 +1042,14 @@ function renderLoadoutState() {
   const picked = $('#loadout-picked');
   picked.innerHTML = draftIds.map((id) => {
     const s = SPELLS_BY_ID[id];
-    return `<span class="picked-chip">${s.name} <em>${s.loadout_points}p</em></span>`;
+    return `<span class="picked-chip">${s.name}</span>`;
   }).join('') || '<span class="muted">No spells selected.</span>';
 
   const status = $('#loadout-status');
-  const schools = Object.entries(v.schoolCounts).map(([k, n]) => `${k} ${n}`).join(' · ');
-  let html = `<div class="ls-line">${draftIds.length}/8 spells · ${v.points}/14 points · ${v.heavyCount} heavy · ${schools || 'no schools'}</div>`;
+  let html = `<div class="ls-line">${draftIds.length}/8 guide shortcuts · all 40 spells castable</div>`;
   for (const err of v.errors) html += `<div class="ls-err">✗ ${err}</div>`;
   for (const warn of v.warnings) html += `<div class="ls-warn">! ${warn}</div>`;
-  if (v.valid) html += '<div class="ls-ok">✓ Legal loadout</div>';
+  if (v.valid) html += '<div class="ls-ok">✓ Guide set ready</div>';
   status.innerHTML = html;
   const saveBtn = $('[data-action="save-loadout"]');
   if (saveBtn) saveBtn.disabled = !v.valid;
@@ -1058,10 +1057,10 @@ function renderLoadoutState() {
 
 function saveLoadout() {
   const v = validateLoadout(draftIds);
-  if (!v.valid) { toast('Loadout is not legal yet.'); return; }
+  if (!v.valid) { toast('Choose 8 different spell guides first.'); return; }
   playerIds = draftIds.slice();
   rebuildForLoadout();
-  toast('Loadout saved.');
+  toast('Guide shortcuts saved.');
   openPractice();
 }
 
@@ -1070,8 +1069,7 @@ function updateOnlineSummary() {
   const el = $('#online-loadout-summary');
   if (!el) return;
   const names = playerLoadout.map((s) => s.name).join(', ');
-  const pts = playerLoadout.reduce((a, s) => a + s.loadout_points, 0);
-  el.textContent = `Your loadout (${pts} pts): ${names}`;
+  el.textContent = `Your guides: ${names}. All 40 spells remain castable.`;
 }
 
 function openOnline() {
@@ -1127,7 +1125,7 @@ function wireOnlineCallbacks(o) {
 async function startOnlineAction(kind, code) {
   const nm = $('#online-name').value.trim();
   if (nm) setDisplayName(nm);
-  rebuildForLoadout(); // ensure the recognizer matches the equipped loadout
+  rebuildForLoadout(); // refresh full-roster recognition + selected guide shortcuts
   try { await ensureOnline(); } catch (err) { onOnlineError(err); return; }
   online.setLoadout(playerIds);
   if (nm) online.identity.name = nm;
@@ -1507,6 +1505,10 @@ if (typeof window !== 'undefined') {
       playerBraceTicks: match?.sim?.wizards?.[0]?.braceTicks ?? 0,
       labCooldowns,
     }),
+    recognize: (points) => {
+      try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }
+      catch (e) { return { accepted: false, error: String(e && e.message || e) }; }
+    },
     forceEnd: (winner = 0) => {
       try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }
     },

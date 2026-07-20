@@ -15,12 +15,12 @@ Move on a shallow arc, read your opponent, and trace spells on the glyph pad.
 Bend the shared arena to your will: ignite oil, freeze water, ground lightning,
 raise stone cover, and chain elemental reactions your rival can exploit too.
 
-- **Draw to cast.** A $1-style recognizer reads your traced glyph against your
-  own eight equipped spells for sharp, fair recognition.
-- **40 spells, one deck of 8.** Build a legal 8-spell / 14-point loadout from
-  offense, defense, control, buffs, and environmental zones — or start from a
-  curated archetype (Ember Rush, Tide Control, Storm Tempo, Stone Warden, and
-  more).
+- **Draw to cast.** A $1-style recognizer reads your traced glyph against the
+  full 40-spell roster in Practice and online duels.
+- **40 spells, eight guide shortcuts.** Choose any eight dotted guides for quick
+  reference — or start from a curated theme such as Ember Rush, Tide Control,
+  Storm Tempo, or Stone Warden. Unselected spells remain fully castable whenever
+  you meet their Aether, charge, cooldown, and setup requirements.
 - **A distinct look for every spell.** Flame Wave rolls in as a wall of fire,
   Arcane Missile streaks with arcane rings, Chain Lightning forks between you and
   your foe, and each of the 40 spells has its own silhouette and motion — all

@@ -4,7 +4,7 @@
 import { createHarness } from './tiny.js';
 import { Recognizer, resample, normalize, preprocess } from '../shared/src/gesture/recognizer.js';
 import { GESTURE_TEMPLATES, buildTemplates } from '../shared/src/gesture/templates.js';
-import { starterLoadout, STARTER_GESTURE_KEYS } from '../shared/src/balance/loadouts.js';
+import { starterLoadout, STARTER_GESTURE_KEYS, GESTURE_KEYS } from '../shared/src/balance/loadouts.js';
 
 // Add small deterministic jitter to a path to simulate a human trace.
 function jitter(pts, amp, seed) {
@@ -29,6 +29,17 @@ export function run() {
   ok(templates.length >= 8, 'templates built for starter gestures');
   const loadout = starterLoadout();
   const rec = new Recognizer(templates).forLoadout(loadout);
+  const full = new Recognizer(templates);
+
+  let fullCorrect = 0, fullTotal = 0;
+  for (const [id, key] of Object.entries(GESTURE_KEYS)) {
+    for (const variant of GESTURE_TEMPLATES[key]) {
+      fullTotal++;
+      const result = full.recognize(variant);
+      if (result.accepted && result.spellId === Number(id)) fullCorrect++;
+    }
+  }
+  eq(fullCorrect, fullTotal, `full-roster duel recognition identifies every canonical glyph (${fullCorrect}/${fullTotal})`);
 
   // Each starter gesture's own template classifies to its spell, even jittered.
   const keyToId = {};

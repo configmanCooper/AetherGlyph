@@ -62,7 +62,7 @@
     <!-- Recognition diagnostics (dev / practice) -->
     <div id="diag" class="diag hidden"></div>
 
-    <!-- On-screen cast bar for the equipped loadout (Phase 2 primary input) -->
+    <!-- Eight selected guide shortcuts; all roster spells remain drawable -->
     <div id="spellbar" class="spellbar"></div>
 
     <!-- Left movement control -->
@@ -100,7 +100,7 @@
       <button id="btn-sidestep" class="act-btn">Dodge (Space)</button>
     </div>
 
-    <!-- Dev accessibility fallback: quick-cast the loadout with buttons/keys -->
+    <!-- Dev accessibility fallback: quick-cast the selected guide shortcuts -->
     <div id="devcast" class="devcast hidden"></div>
 
     <button id="btn-menu" class="corner-btn" title="Menu">☰</button>
@@ -116,7 +116,7 @@
         <button class="menu-btn" data-action="practice-ai">Practice vs AI</button>
         <button class="menu-btn" data-action="lab">Glyph Laboratory</button>
         <button class="menu-btn" data-action="online">Online Duel</button>
-        <button class="menu-btn" data-action="loadout">Loadout builder</button>
+        <button class="menu-btn" data-action="loadout">Guide shortcuts</button>
         <button class="menu-btn" data-action="settings">Settings</button>
       </div>
       <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
@@ -128,7 +128,7 @@
 
     <div class="panel hidden" id="panel-practice">
       <h2>Practice vs AI</h2>
-      <p class="offline-note">Fully offline &amp; single-player. One round against a fair AI. The AI uses the same rules, resources, cooldowns, loadout limits, and drawn-glyph execution as you — it only differs in reaction speed, planning, and knowledge.</p>
+      <p class="offline-note">Fully offline &amp; single-player. One round against a fair AI. Both sides use the same spell requirements, resources, cooldowns, and drawn-glyph execution; your selected eight spells are guide shortcuts, not casting limits.</p>
       <div class="practice-grid">
         <label class="field">Difficulty
           <select id="prac-diff">
@@ -137,10 +137,10 @@
             <option value="hard">Hard</option>
           </select>
         </label>
-        <label class="field">Your loadout
+        <label class="field">Your guide set
           <select id="prac-player"></select>
         </label>
-        <label class="field">Opponent
+        <label class="field">Opponent style
           <select id="prac-opp"></select>
         </label>
         <label class="field">Round
@@ -167,7 +167,7 @@
       <p id="prac-player-summary" class="loadout-summary"></p>
       <div class="menu-list">
         <button class="menu-btn" data-action="start-practice">Begin practice</button>
-        <button class="menu-btn ghost" data-action="loadout">Edit my loadout</button>
+        <button class="menu-btn ghost" data-action="loadout">Edit my guides</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
     </div>
@@ -186,7 +186,7 @@
           <input type="text" id="online-code" maxlength="5" placeholder="CODE" autocomplete="off" />
           <button class="menu-btn" data-action="online-join">Join Code</button>
         </div>
-        <button class="menu-btn ghost" data-action="loadout">Edit my loadout</button>
+        <button class="menu-btn ghost" data-action="loadout">Edit my guides</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
       <p id="online-error" class="ls-err-line"></p>
@@ -209,14 +209,14 @@
     </div>
 
     <div class="panel hidden wide" id="panel-loadout">
-      <h2>Loadout Builder</h2>
-      <p class="loadout-rules">8 spells · 14 points · max two 3-point spells · max three per school.</p>
+      <h2>Guide Shortcuts</h2>
+      <p class="loadout-rules">Choose any 8 spell guides for quick reference. All 40 spells can still be drawn and cast.</p>
       <div class="loadout-presets" id="loadout-presets"></div>
       <div id="loadout-status" class="loadout-status"></div>
       <div id="loadout-picked" class="loadout-picked"></div>
       <div id="loadout-catalog" class="loadout-catalog"></div>
       <div class="menu-list">
-        <button class="menu-btn" data-action="save-loadout">Save loadout</button>
+        <button class="menu-btn" data-action="save-loadout">Save guides</button>
         <button class="menu-btn ghost" data-action="clear-loadout">Clear</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>

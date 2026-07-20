@@ -106,7 +106,7 @@ async function main() {
     ok(typeof hostStart.token === 'string' && hostStart.token.length > 10, 'host receives a resume token');
     eq(hostStart.ranked, false, 'private match is unranked (does not affect rating)');
 
-    // --- 4. Valid trace classified + forged spell id ignored -------------
+    // --- 4. Full-roster trace classification + forged spell id ignored ----
     // Collect host snapshots to observe authoritative state.
     const snaps = [];
     host.on(EVENTS.SNAPSHOT, (m) => snaps.push(m));
@@ -136,20 +136,28 @@ async function main() {
     ok(minSelfAether < 60, `caster spent Aether authoritatively (min ${minSelfAether.toFixed(1)})`);
     ok(sawSelf100, 'still caster took no damage (state is server-owned, not client-set)');
 
+    // Frost Lance is not one of the host's eight submitted guide shortcuts, but
+    // the authoritative recognizer still accepts its real glyph.
+    await sleep(360);
+    const lineUp = boundTrace(GESTURE_TEMPLATES.lineUp[0]);
+    const outsideGuides = await emitAck(host, EVENTS.CAST, { seq: 3, points: lineUp, durationMs: 360 });
+    ok(outsideGuides.ok && outsideGuides.accepted, 'server accepts a spell outside the submitted guide set');
+    eq(outsideGuides.spellId, 2, 'server classifies the outside-guide trace as Frost Lance');
+
     // --- 6. Oversized / malformed / too-fast rejection (spaced for rate) --
     const bigTrace = Array.from({ length: 60 }, (_, i) => ({ x: i, y: (i * 7) % 90 }));
-    const over = await emitAck(host, EVENTS.CAST, { seq: 3, points: bigTrace, durationMs: 400 });
+    const over = await emitAck(host, EVENTS.CAST, { seq: 4, points: bigTrace, durationMs: 400 });
     eq(over.code, ERR.OVERSIZE, 'oversized trace rejected (too many points)');
     await sleep(360);
-    const nan = await emitAck(host, EVENTS.CAST, { seq: 4, points: [{ x: 1, y: 2 }, { x: NaN, y: 3 }, { x: 4, y: 5 }, { x: 6, y: 7 }], durationMs: 400 });
+    const nan = await emitAck(host, EVENTS.CAST, { seq: 5, points: [{ x: 1, y: 2 }, { x: NaN, y: 3 }, { x: 4, y: 5 }, { x: 6, y: 7 }], durationMs: 400 });
     eq(nan.code, ERR.MALFORMED, 'malformed (non-finite) trace rejected');
     await sleep(360);
-    const tooFast = await emitAck(host, EVENTS.CAST, { seq: 5, points: flick, durationMs: 10 });
+    const tooFast = await emitAck(host, EVENTS.CAST, { seq: 6, points: flick, durationMs: 10 });
     eq(tooFast.code, ERR.TOO_FAST, 'implausibly fast trace rejected');
 
     // --- 7. Duplicate / stale sequence rejection -------------------------
     await sleep(360);
-    const dup = await emitAck(host, EVENTS.CAST, { seq: 5, points: flick, durationMs: 320 }); // seq already used
+    const dup = await emitAck(host, EVENTS.CAST, { seq: 6, points: flick, durationMs: 320 }); // seq already used
     eq(dup.code, ERR.STALE, 'duplicate/stale sequence rejected');
     await sleep(360);
     const stale = await emitAck(host, EVENTS.CAST, { seq: 2, points: flick, durationMs: 320 }); // older than lastCastSeq

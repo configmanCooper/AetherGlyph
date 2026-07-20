@@ -3,8 +3,9 @@
 // DOM-free so the SAME recognizer runs on the client and (Phase 2) the
 // authoritative server. Pipeline (MASTERPLAN §5): resample -> translate ->
 // uniform scale (aspect + direction preserved, rotation NOT normalized) ->
-// compare only against the equipped loadout templates -> accept only when the
-// best score clears the spell threshold AND beats the runner-up by a margin.
+// compare against the caller-selected template pool -> accept only when the best
+// score clears the spell threshold AND beats the runner-up by a margin. Duels use
+// the full roster; tutorials/laboratory may intentionally scope the pool.
 
 const DEFAULT_N = 24;
 
@@ -101,7 +102,7 @@ export class Recognizer {
     }));
   }
 
-  // Restrict classification to the equipped spells for a given loadout.
+  // Restrict classification to a selected template subset (tutorial/lab use).
   forLoadout(loadout) {
     const keys = new Set(loadout.map((s) => s.gestureKey || s.id));
     const ids = new Set(loadout.map((s) => s.id));

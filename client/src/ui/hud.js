@@ -77,8 +77,8 @@ export class HUD {
     container.innerHTML = chips.join('');
   }
 
-  // Build the on-screen cast bar for the equipped loadout (primary Phase 2
-  // input alongside drawing). onCast(spellId) fires when a button is pressed.
+  // Build the eight selected guide shortcuts. In normal play buttons select a
+  // dotted guide; all roster spells remain drawable whether listed here or not.
   buildSpellbar(loadout, onCast, opts = {}) {
     if (!this.el.spellbar) return;
     this.el.spellbar.innerHTML = '';

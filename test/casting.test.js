@@ -84,10 +84,21 @@ export function run() {
   ok(!sim.wizards[1].focusing || sim.wizards[1].charges === 0, 'Concussive interrupts Focus');
   ok(sim.wizards[0].countersLanded >= 1, 'interrupt counts as a counter landed');
 
+  // Guide selection does not restrict casting. With normal resource/charge
+  // requirements met, every roster spell can begin from the starter guide set.
+  let unrestricted = 0;
+  for (let id = 1; id <= 40; id++) {
+    sim = freshSim(id);
+    sim.wizards[0].aether = 100;
+    sim.wizards[0].charges = 3;
+    if (sim.beginCast(sim.wizards[0], id, 1)) unrestricted++;
+  }
+  eq(unrestricted, 40, 'all 40 spells can begin regardless of selected guides');
+
   // A rejected deliberate trace incurs recovery but no Aether cost.
   sim = freshSim();
   const aBefore = sim.wizards[0].aether;
-  sim.step({ 0: { cast: 99, castWasGesture: true }, 1: {} }); // id 99 not in loadout
+  sim.step({ 0: { cast: 99, castWasGesture: true }, 1: {} }); // unknown spell id
   ok(sim.wizards[0].recoveryTicks > 0, 'rejected trace triggers recovery');
   ok(sim.wizards[0].aether >= aBefore - 0.5, 'rejected trace costs no Aether');
 

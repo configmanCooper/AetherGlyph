@@ -2,7 +2,7 @@
 //
 // The server OWNS the simulation. It runs the exact same deterministic shared
 // Sim at its fixed tick, validates sequenced intents, reclassifies cast traces
-// with the shared Recognizer restricted to each player's equipped loadout, and
+// with the shared Recognizer across the full spell roster, and
 // broadcasts personalized authoritative snapshots + domain events at a bounded
 // rate. Clients never set health, resources, spell ids, or results.
 //
@@ -25,8 +25,8 @@ const TICK_MS = 1000 / NET.TICK_HZ;
 const MAX_CATCHUP = 6;
 const INTERMISSION_MS = 2800;
 
-// A single template set is shared by every match; each seat scopes it to its
-// own loadout. Building it once keeps classification deterministic + cheap.
+// A single full-roster template set is shared by every match. Building it once
+// keeps authoritative classification deterministic + cheap.
 const BASE_RECOGNIZER = new Recognizer(buildTemplates());
 
 // Map a recognition quality score to potency via the shared single-source
@@ -66,7 +66,7 @@ export class MatchRoom {
         name: s.name || `Wizard ${slot + 1}`,
         loadoutIds: s.loadoutIds.slice(),
         loadout,
-        recognizer: BASE_RECOGNIZER.forLoadout(loadout),
+        recognizer: BASE_RECOGNIZER,
         socket: s.socket,
         connected: true,
         epoch: 1,
@@ -312,7 +312,8 @@ export class MatchRoom {
     const shape = validateTraceEnvelope(env);
     if (!shape.ok) return { ok: false, code: shape.code };
 
-    // Authoritative reclassification, restricted to THIS player's loadout.
+    // Authoritative full-roster reclassification. The submitted eight-spell set
+    // is a guide shortcut layout, not a cast eligibility list.
     const diag = seat.recognizer.recognize(env.points);
     if (!diag.accepted) {
       seat.pendingReject = true; // sim applies the 0.25s reject recovery
@@ -320,8 +321,6 @@ export class MatchRoom {
         : diag.reason === 'below-threshold' ? ERR.BELOW : ERR.MALFORMED;
       return { ok: false, code, spellId: null };
     }
-    if (!seat.loadoutIds.includes(diag.spellId)) return { ok: false, code: ERR.NOT_IN_LOADOUT };
-
     seat.pendingCast = { spellId: diag.spellId, quality: qualityFromScore(diag.best.score) };
     return { ok: true, accepted: true, spellId: diag.spellId };
   }
@@ -436,7 +435,7 @@ export class MatchRoom {
   }
 }
 
-// Validate a proposed loadout id list independent of the client (§8 rules).
+// Validate a proposed eight-guide shortcut list independent of the client.
 export function validateSeatLoadout(ids) {
   if (!Array.isArray(ids)) return { valid: false, errors: ['Loadout must be a list of spell ids.'] };
   return validateLoadout(ids);

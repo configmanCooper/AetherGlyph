@@ -1,8 +1,8 @@
 // gestureInput.js — hold-to-draw glyph pad with live trace + recognition.
 //
 // Captures pointer samples inside the draw pad only, renders the live trace,
-// and on release classifies against the equipped loadout via the shared
-// Recognizer. Touch + mouse via Pointer Events. A two-finger tap breaks the
+// and on release classifies through the shared Recognizer (full roster in duels,
+// lesson-scoped in tutorials). Touch + mouse via Pointer Events. A two-finger tap breaks the
 // trace with no cost (MASTERPLAN §4).
 //
 // For online play the pad also hands the onCast callback a BOUNDED, quantized

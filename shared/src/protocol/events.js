@@ -36,7 +36,6 @@ export const ERR = Object.freeze({
   TOO_FAST: 'too-fast',         // trace drawn implausibly fast
   AMBIGUOUS: 'ambiguous',       // recognizer could not separate two spells
   BELOW: 'below-threshold',     // recognizer best score below accept threshold
-  NOT_IN_LOADOUT: 'not-in-loadout', // classified/forged id not equipped
   NO_ROOM: 'no-room',           // room code not found
   ROOM_FULL: 'room-full',       // room already has two players
   BAD_CODE: 'bad-code',         // malformed join code

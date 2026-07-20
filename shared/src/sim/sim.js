@@ -351,7 +351,6 @@ export class Sim {
   beginCast(w, spellId, quality) {
     if (!this.canAct(w)) return false;
     if (w.casting || w.focusing || w.recoveryTicks > 0) return false;
-    if (!w.loadoutIds.includes(spellId)) return false;
     const spell = this.spellData(spellId);
     const eff = effectFor(spellId);
     if (!spell || !eff) return false;

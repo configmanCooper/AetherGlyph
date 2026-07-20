@@ -5,6 +5,11 @@ Scope: Final implementation phase
 Modes: Single-player Tutorial, Practice vs AI, Glyph Laboratory  
 AI difficulties: Easy, Medium, Hard
 
+> **Version 1.3 override:** Practice and online players may draw and cast any
+> roster spell when its normal requirements are met. Eight-spell selections are
+> guide shortcuts only. Tutorial lessons may still scope recognition to their
+> curriculum, and AI spell lists remain strategy preferences rather than rules.
+
 ## 1. Outcome
 
 The final solo phase replaces the current three-step tutorial and passive practice screen with:
@@ -407,9 +412,8 @@ Drills: Fireball, Rune Snare.
 
 Teach:
 
-- loadout construction,
-- 14-point budget,
-- school/heavy limits,
+- guide shortcut construction,
+- full-roster casting outside the selected guides,
 - timer,
 - Arcane Pressure,
 - post-match coaching.
@@ -699,7 +703,8 @@ The quality mapping is extracted into a shared module used by player and AI.
 
 ### Hard
 
-- Builds a legal 8-spell, 14-point loadout through the same validator.
+- Builds a balanced eight-spell strategy preference set while remaining subject
+  to the same full-roster casting rules as the player.
 - Plans setup, payoff, and retained defense.
 - Uses all documented counters and reactions.
 - Adapts to observed spell timing and school frequency.
@@ -719,7 +724,7 @@ Score existing presets against the player's visible school distribution and sele
 
 ### Hard
 
-Construct a legal loadout that:
+Construct a coherent preferred strategy set that:
 
 - has eight unique spells,
 - stays at or below 14 points,

@@ -123,13 +123,13 @@ ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.inclu
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 10202'), 'gradle versionCode 10202');
+ok(appGradle.includes('versionCode 10300'), 'gradle versionCode 10300');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');
 eq(readJson('package-lock.json').version, version, 'package-lock version matches package.json');
 const publishingGuide = read('PUBLISHING-ANDROID.md');
-ok(publishingGuide.includes('| Version code | `10202` |'), 'publishing guide versionCode 10202');
+ok(publishingGuide.includes('| Version code | `10300` |'), 'publishing guide versionCode 10300');
 ok(publishingGuide.includes(`| Version name | \`${version}\` |`), `publishing guide versionName ${version}`);
 
 const vars = read('android/variables.gradle');

@@ -1,19 +1,19 @@
 // loadouts.js — loadout construction, validation, and curated archetype presets.
 //
 // The canonical spell NUMBERS come from spellData.generated.js (generated from
-// design/spells.csv); this file only chooses which to equip, validates a build
-// against the §8 rules, and pairs each spell with a gesture template key.
+// design/spells.csv); this file chooses eight visible guide shortcuts and pairs
+// each spell with a gesture template key. Every spell remains castable in duels.
 // Combat behaviour for every spell is authored in ../sim/spellEffects.js.
 
 import { SPELLS_BY_ID, SPELL_CATALOG } from './spellData.generated.js';
 import { effectFor, categoryOf } from '../sim/spellEffects.js';
 
-// --- §8 loadout-construction rules ---------------------------------------
+// --- guide-set construction ------------------------------------------------
 export const LOADOUT = {
   size: 8,
-  pointBudget: 14,
-  maxHeavy: 2,          // at most two 3-point spells
-  maxPerSchool: 3,      // at most three spells from one school
+  pointBudget: 14,      // retained for curated AI strategy construction only
+  maxHeavy: 2,
+  maxPerSchool: 3,
 };
 
 // gestureKey references a hand-authored template in ../gesture/templates.js.
@@ -43,8 +43,7 @@ export function spellWithGesture(id) {
   return { ...spell, gestureKey: GESTURE_KEYS[id] || `spell${id}` };
 }
 
-// Turn a list of spell ids into equipped spell objects (no validation — used by
-// presets, the bot, and after the UI has validated a build).
+// Turn a list of spell ids into guide/strategy spell objects.
 export function makeLoadout(ids) {
   return ids.map(spellWithGesture);
 }
@@ -68,7 +67,9 @@ export function hasDefensiveAnswer(ids) {
   });
 }
 
-// Validate a set of spell ids against the §8 construction rules. Returns
+// Validate an eight-slot guide set. Point/school/heavy totals remain available
+// as informational metadata and for AI strategy builders, but never block a
+// human guide selection because all spells are castable. Returns
 // { valid, errors, warnings, points, schoolCounts, heavyCount }.
 export function validateLoadout(ids) {
   const errors = [];
@@ -90,36 +91,22 @@ export function validateLoadout(ids) {
   // Size.
   if (list.length !== LOADOUT.size) errors.push(`Loadout must have exactly ${LOADOUT.size} spells (has ${list.length}).`);
 
-  // Point budget.
+  // Informational legacy strategy metrics.
   const points = list.reduce((s, id) => s + (SPELLS_BY_ID[id]?.loadout_points || 0), 0);
-  if (points > LOADOUT.pointBudget) errors.push(`Over budget: ${points}/${LOADOUT.pointBudget} points.`);
 
-  // At most two 3-point spells.
   const heavyCount = list.filter((id) => (SPELLS_BY_ID[id]?.loadout_points || 0) >= 3).length;
-  if (heavyCount > LOADOUT.maxHeavy) errors.push(`At most ${LOADOUT.maxHeavy} three-point spells (has ${heavyCount}).`);
 
-  // At most three spells from the same school.
   const schoolCounts = {};
   for (const id of list) {
     const sc = SPELLS_BY_ID[id]?.school;
     if (sc) schoolCounts[sc] = (schoolCounts[sc] || 0) + 1;
   }
-  for (const [sc, n] of Object.entries(schoolCounts)) {
-    if (n > LOADOUT.maxPerSchool) errors.push(`At most ${LOADOUT.maxPerSchool} ${sc} spells (has ${n}).`);
-  }
-
-  // Defensive-coverage warning (does not block).
-  if (list.length && !hasDefensiveAnswer(list)) {
-    warnings.push('No equipped spell answers projectiles, zones, or statuses. Add a Ward, Dispel, Reflect, Blink, Gust, or Grounding.');
-  }
-
   return { valid: errors.length === 0, errors, warnings, points, schoolCounts, heavyCount };
 }
 
 // --- Curated archetype presets (§8) --------------------------------------
-// Each preset is a legal 8-spell / 14-point build. Secret spells are included
-// in some presets and are selectable for Phase 2 development; final unlock
-// progression arrives in the solo/ranked phase.
+// Curated eight-guide shortcut sets. They also remain useful as AI strategy
+// pools, but do not limit what a human can draw and cast.
 export const PRESETS = [
   { key: 'ember-rush',      name: 'Ember Rush',      ids: [1, 6, 31, 28, 22, 10, 13, 16],
     blurb: 'Cheap pressure, interrupt Focus, finish with Flame Wave.' },

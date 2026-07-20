@@ -9,6 +9,8 @@
 import puppeteer from 'puppeteer-core';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { GESTURE_TEMPLATES } from '../../shared/src/gesture/templates.js';
+import { GESTURE_KEYS } from '../../shared/src/balance/loadouts.js';
 
 const PORT = process.env.PORT || 8132;
 const URL = `http://localhost:${PORT}/client/index.html`;
@@ -476,6 +478,16 @@ try {
     const info = await page.evaluate(() => (window.__aegTest ? window.__aegTest.info() : null));
     if (!info || info.mode !== 'practice' || !info.botActive || !info.hasBot || info.difficulty !== diff) {
       fail(`Practice AI not active for ${diff}: ` + JSON.stringify(info));
+    }
+    if (diff === 'easy') {
+      const visibleGuideIds = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)));
+      const outsideId = Number(Object.keys(GESTURE_KEYS).find((id) => !visibleGuideIds.includes(Number(id))));
+      const outsidePoints = GESTURE_TEMPLATES[GESTURE_KEYS[outsideId]][0];
+      const outsideDiag = await page.evaluate((points) => window.__aegTest.recognize(points), outsidePoints);
+      if (!outsideDiag.accepted || outsideDiag.spellId !== outsideId) {
+        fail('practice recognizer cannot cast outside selected guides: ' + JSON.stringify({ visibleGuideIds, outsideId, outsideDiag }));
+      }
     }
     const guideButton = await page.$('#spellbar .spell-btn[data-spell]');
     const guideSpell = await page.evaluate((b) => Number(b.dataset.spell), guideButton);

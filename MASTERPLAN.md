@@ -140,7 +140,7 @@ The client and server use the same pure recognizer:
 
 ### Forgiveness rules
 
-- Recognition uses only the player's eight equipped spells, sharply reducing ambiguity.
+- Practice and online duels recognize the full 40-spell roster. The player's eight selected spells are visual guide shortcuts only; tutorials may still scope recognition to the current lesson.
 - Each spell has multiple hand-authored and recorded templates.
 - Potency from drawing quality ranges only from 0.90 to 1.05. Recognition matters more than artistic precision.
 - Fast drawing never shortens a spell below its minimum windup.
