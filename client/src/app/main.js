@@ -56,6 +56,7 @@ const LAB_PUBLIC_IDS = [
 ];
 let labPage = 0;
 let labSelectedId = LAB_PUBLIC_IDS[0];
+let labCooldowns = false;
 let activeGuideLoadout = [];
 let selectedGuideId = null;
 
@@ -267,6 +268,13 @@ function selectLabBlank() {
   renderLabSpellbar();
 }
 
+function toggleLabCooldowns() {
+  labCooldowns = !labCooldowns;
+  if (match?.sim?.setSandboxCooldowns) match.sim.setSandboxCooldowns(labCooldowns);
+  toast(`Glyph Laboratory cooldowns ${labCooldowns ? 'on' : 'off'}.`);
+  renderLabSpellbar();
+}
+
 function renderLabSpellbar() {
   const pageIds = labPageIds();
   const pages = Math.ceil(LAB_PUBLIC_IDS.length / LAB_PAGE_SIZE);
@@ -275,6 +283,8 @@ function renderLabSpellbar() {
     guideMode: true,
     onBlank: () => selectLabBlank(),
     blankSelected: labSelectedId == null,
+    onCooldownToggle: () => toggleLabCooldowns(),
+    cooldownsEnabled: labCooldowns,
     onNext: () => {
       labPage = (labPage + 1) % pages;
       labSelectedId = labPageIds()[0];
@@ -290,6 +300,7 @@ function startLab() {
   resetLastCast();
   labPage = 0;
   labSelectedId = LAB_PUBLIC_IDS[0];
+  labCooldowns = false;
   const labLoadout = makeLoadout(LAB_PUBLIC_IDS);
   match = new LocalMatch({
     mode: 'lab',
@@ -838,9 +849,11 @@ function handleEvents(events) {
 }
 
 let lastT = performance.now();
+let idleRenderAcc = 0;
 function frame(now) {
   const dt = Math.min(64, now - lastT); lastT = now;
   if (match && running) {
+    idleRenderAcc = 0;
     applyInputBridge();
     match.update(dt);
     const evs = match.drainEvents();
@@ -848,9 +861,17 @@ function frame(now) {
     hud.update(match.sim);
     arena.update(match.sim, match.alpha, dt);
   } else if (match) {
+    idleRenderAcc = 0;
     arena.update(match.sim, match.alpha, dt);
   } else {
-    arena.renderIdle(dt);
+    // The detailed academy is decorative while menus are open. Rendering it at
+    // 20 FPS keeps menu/touch input responsive on low-end phones and software GL
+    // without affecting live-duel frame rate.
+    idleRenderAcc += dt;
+    if (idleRenderAcc >= 50) {
+      arena.renderIdle(idleRenderAcc);
+      idleRenderAcc = 0;
+    }
   }
   requestAnimationFrame(frame);
 }
@@ -1472,6 +1493,7 @@ if (typeof window !== 'undefined') {
       playerCasting: match?.sim?.wizards?.[0]?.casting?.spellId ?? null,
       playerCastsResolved: match?.sim?.wizards?.[0]?.castsResolved ?? 0,
       playerBraceTicks: match?.sim?.wizards?.[0]?.braceTicks ?? 0,
+      labCooldowns,
     }),
     forceEnd: (winner = 0) => {
       try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }

@@ -207,6 +207,7 @@ body.reduced * { animation: none !important; transition: none !important; }
 .spell-btn.selected { border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(79,214,201,0.24); }
 .spell-btn.spell-next { border-style: dashed; background: rgba(30,22,52,0.96); }
 .spell-btn.spell-blank { border-style: dotted; background: rgba(12,10,22,0.96); }
+.spell-btn.spell-cooldown-toggle { background: rgba(38,24,55,0.96); }
 .spell-btn:active { transform: translateY(1px); }
 
 /* Loadout builder */

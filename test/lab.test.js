@@ -34,5 +34,17 @@ export function run() {
   ok(player.castsResolved >= 1, 'charged public spell resolves normally in the lab sandbox');
   ok(!sim.ended, 'lab target remains available after taking damage');
 
+  // Live-cooldown toggle: resources remain full, but a resolved spell cannot be
+  // immediately recast until its cooldown expires.
+  sim.setSandboxCooldowns(true);
+  const before = player.castsResolved;
+  sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
+  for (let i = 0; i < 120 && player.castsResolved === before; i++) sim.step({ 0: {}, 1: {} });
+  ok(player.cooldowns[1] > 0, 'lab cooldown toggle preserves the live Ember Bolt cooldown');
+  const rejectedBefore = player.castsRejected;
+  sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
+  eq(player.castsRejected, rejectedBefore + 1, 'lab rejects an immediate recast while cooldowns are on');
+  eq(player.aether, AETHER.max, 'lab still refills Aether while cooldowns are on');
+
   return report('lab');
 }

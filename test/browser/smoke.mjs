@@ -28,6 +28,10 @@ process.on('SIGINT', () => cleanup(1));
 
 function cleanup(code) { if (server) try { server.kill(); } catch {} process.exit(code); }
 function fail(msg) { console.error('SMOKE FAIL:', msg); cleanup(1); }
+async function activate(page, selector) {
+  await page.waitForSelector(selector, { timeout: 15000 });
+  await page.evaluate((s) => document.querySelector(s)?.click(), selector);
+}
 
 const browser = await puppeteer.launch({
   executablePath: edge,
@@ -61,16 +65,16 @@ try {
 
   // Online menu smoke: open it, create a private room end-to-end (real socket
   // to the authoritative server), confirm a share code appears, then cancel.
-  await page.click('[data-action="online"]');
+  await activate(page, '[data-action="online"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
-  await page.click('[data-action="online-create"]');
+  await activate(page, '[data-action="online-create"]');
   await page.waitForSelector('#panel-online-wait:not(.hidden)', { timeout: 15000 });
   await page.waitForFunction(() => /^[A-Z0-9]{5}$/.test(document.querySelector('#wait-code-value')?.textContent || ''), { timeout: 15000 });
   const roomCode = await page.evaluate(() => document.querySelector('#wait-code-value')?.textContent);
   if (!/^[A-Z0-9]{5}$/.test(roomCode || '')) fail('online create did not yield a room code: ' + roomCode);
-  await page.click('[data-action="online-cancel"]');
+  await activate(page, '[data-action="online-cancel"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
-  await page.click('#panel-online [data-action="back"]');
+  await activate(page, '#panel-online [data-action="back"]');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
   // Tutorial smoke: open the hub, begin the Prologue, complete the first-run
@@ -358,6 +362,23 @@ try {
       || blankLab.guide != null || !blankLab.selected || blankLab.painted !== 0) {
     fail('Glyph Laboratory Blank mode did not clear the guide: ' + JSON.stringify(blankLab));
   }
+  const cooldownToggle = await page.$('#spellbar .spell-cooldown-toggle');
+  if (!cooldownToggle) fail('Glyph Laboratory is missing the Cooldowns toggle');
+  const cooldownOff = await page.evaluate(() => ({
+    text: document.querySelector('#spellbar .spell-cooldown-toggle .sb-cost')?.textContent,
+    state: window.__aegTest.info().labCooldowns,
+  }));
+  if (cooldownOff.text !== 'Off' || cooldownOff.state !== false) {
+    fail('Glyph Laboratory cooldown toggle should default Off: ' + JSON.stringify(cooldownOff));
+  }
+  await cooldownToggle.click();
+  const cooldownOn = await page.evaluate(() => ({
+    text: document.querySelector('#spellbar .spell-cooldown-toggle .sb-cost')?.textContent,
+    state: window.__aegTest.info().labCooldowns,
+  }));
+  if (cooldownOn.text !== 'On' || cooldownOn.state !== true) {
+    fail('Glyph Laboratory cooldown toggle did not turn On: ' + JSON.stringify(cooldownOn));
+  }
   const blankBefore = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
   await gflick();
   await new Promise((r) => setTimeout(r, 800));
@@ -394,6 +415,11 @@ try {
       || !/\(Space\)/.test(actionLayout[2].text)) {
     fail('Focus/Brace/Dodge controls are not horizontal with keyboard labels: ' + JSON.stringify(actionLayout));
   }
+  await page.keyboard.down('b');
+  await new Promise((r) => setTimeout(r, 120));
+  const labBraceInfo = await page.evaluate(() => window.__aegTest.info());
+  await page.keyboard.up('b');
+  if (labBraceInfo.playerBraceTicks <= 0) fail('Brace (B) keyboard binding did not activate in Glyph Laboratory');
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
@@ -430,11 +456,6 @@ try {
         || afterGuide.playerCastsResolved !== beforeGuide.playerCastsResolved || !afterGuide.assisted) {
       fail(`spellbar button must select a guide without casting (${diff}): ` + JSON.stringify({ beforeGuide, afterGuide, guideSpell }));
     }
-    await page.keyboard.down('b');
-    await new Promise((r) => setTimeout(r, 120));
-    const braceInfo = await page.evaluate(() => window.__aegTest.info());
-    await page.keyboard.up('b');
-    if (braceInfo.playerBraceTicks <= 0) fail(`Brace (B) keyboard binding did not activate in ${diff}`);
     // Draw a real glyph, then force the round to a finish and read the coaching.
     const pad = await page.$('#draw-canvas');
     const box = await pad.boundingBox();

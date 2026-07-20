@@ -37,7 +37,12 @@ export class LocalMatch {
     this.sim = new Sim({
       seed,
       loadouts: [this.playerLoadout, this.botLoadout],
-      rules: { timer: this.timed, pressure: this.timed, sandbox: this.mode === 'lab' },
+      rules: {
+        timer: this.timed,
+        pressure: this.timed,
+        sandbox: this.mode === 'lab',
+        sandboxCooldowns: !!opts.sandboxCooldowns,
+      },
     });
     // Player is wizard 0; the bot controls wizard 1. Practice difficulties route
     // to the fair PracticeBot; the legacy internal names use the old DuelBot.

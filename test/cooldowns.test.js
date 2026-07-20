@@ -8,6 +8,9 @@ import { dirname, join } from 'node:path';
 import { createHarness } from './tiny.js';
 import { parseCsv, rowsToSpells } from '../scripts/generate-spells.js';
 import { SPELL_CATALOG, SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
+import { Sim } from '../shared/src/sim/sim.js';
+import { spellWithGesture } from '../shared/src/balance/loadouts.js';
+import { TICK_HZ } from '../shared/src/sim/constants.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CSV_PATH = join(__dirname, '..', 'design', 'spells.csv');
@@ -77,6 +80,29 @@ export function run() {
   ok(cd(30) > cd(28), 'Thunderclap (hard stun) out-cools Concussive Blast (light interrupt)');
   // Protective utility scaled up with its new, longer active windows.
   ok(cd(11) > cd(10) && cd(15) > cd(14), 'Barrier Dome > Ward and Stone Wall > Blink (stronger protection, longer cooldown)');
+
+  // ---- 5. shared simulation enforces cooldowns for every adapter ------------
+  // Practice vs AI's LocalMatch and the authoritative online MatchRoom both call
+  // this same Sim.step/beginCast path.
+  const sim = new Sim({
+    seed: 99,
+    loadouts: [[spellWithGesture(1)], [spellWithGesture(1)]],
+    rules: { timer: false, pressure: false },
+  });
+  const player = sim.wizards[0];
+  player.aether = 100;
+  sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
+  for (let i = 0; i < 120 && player.castsResolved < 1; i++) sim.step({ 0: {}, 1: {} });
+  ok(player.cooldowns[1] > 0, 'resolved Ember Bolt starts its shared simulation cooldown');
+  const resolved = player.castsResolved;
+  const rejected = player.castsRejected;
+  sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
+  eq(player.castsResolved, resolved, 'an immediate recast does not resolve during cooldown');
+  eq(player.castsRejected, rejected + 1, 'an immediate gesture recast is rejected during cooldown');
+  while (player.cooldowns[1] > 0) sim.step({ 0: {}, 1: {} });
+  player.aether = 100;
+  sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
+  ok(player.casting && player.casting.spellId === 1, `recast is allowed after ${cd(1) * TICK_HZ} cooldown ticks expire`);
 
   return report('cooldowns');
 }

@@ -89,6 +89,17 @@ export class HUD {
       blank.addEventListener('click', (e) => { e.preventDefault(); opts.onBlank(); });
       this.el.spellbar.appendChild(blank);
     }
+    if (typeof opts.onCooldownToggle === 'function') {
+      const cooldown = document.createElement('button');
+      cooldown.className = 'spell-btn spell-cooldown-toggle' + (opts.cooldownsEnabled ? ' selected' : '');
+      cooldown.type = 'button';
+      cooldown.innerHTML = `<span class="sb-key">CD</span><span class="sb-name">Cooldowns</span>` +
+        `<span class="sb-cost">${opts.cooldownsEnabled ? 'On' : 'Off'}</span>`;
+      cooldown.title = 'Toggle live-game spell cooldowns in Glyph Laboratory';
+      cooldown.setAttribute('aria-pressed', opts.cooldownsEnabled ? 'true' : 'false');
+      cooldown.addEventListener('click', (e) => { e.preventDefault(); opts.onCooldownToggle(); });
+      this.el.spellbar.appendChild(cooldown);
+    }
     loadout.forEach((s, i) => {
       const btn = document.createElement('button');
       btn.className = 'spell-btn';

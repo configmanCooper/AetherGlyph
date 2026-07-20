@@ -92,6 +92,7 @@ export class Sim {
       pressure: opts.rules?.pressure !== false,
       projectileTravelScale: Math.max(0.5, Math.min(4, Number(opts.rules?.projectileTravelScale) || 1)),
       sandbox: opts.rules?.sandbox === true,
+      sandboxCooldowns: opts.rules?.sandboxCooldowns === true,
     };
 
     const l0 = opts.loadouts?.[0] || [];
@@ -1009,6 +1010,19 @@ export class Sim {
       w.aether = AETHER.max;
       w.charges = SIGIL.max;
       w.sidestepCharges = SIDESTEP.charges;
+      if (!this.rules.sandboxCooldowns) {
+        for (const id of Object.keys(w.cooldowns)) w.cooldowns[id] = 0;
+        if (!w.casting && !w.channel) w.recoveryTicks = 0;
+      }
+    }
+  }
+
+  setSandboxCooldowns(enabled) {
+    if (!this.rules.sandbox) return;
+    this.rules.sandboxCooldowns = !!enabled;
+    // Switching the lab mode starts a fresh cooldown exercise rather than
+    // carrying a hidden recovery/cooldown from the previous setting.
+    for (const w of this.wizards) {
       for (const id of Object.keys(w.cooldowns)) w.cooldowns[id] = 0;
       if (!w.casting && !w.channel) w.recoveryTicks = 0;
     }
