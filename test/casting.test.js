@@ -41,7 +41,7 @@ export function run() {
 
   // Ward absorbs a bolt; caster takes no damage.
   sim = freshSim();
-  sim.wizards[1].shield = { absorb: 30, ticks: Math.round(1.4 * TICK_HZ), frontal: true };
+  sim.wizards[1].shield = { absorb: 30, ticks: Math.round(4.2 * TICK_HZ), frontal: true };
   const hp3 = sim.wizards[1].health;
   sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
   idleFor(sim, 60);
@@ -49,7 +49,7 @@ export function run() {
 
   // Piercing (Stone Shard) partially bypasses a Ward.
   sim = freshSim();
-  sim.wizards[1].shield = { absorb: 30, ticks: Math.round(1.4 * TICK_HZ), frontal: true };
+  sim.wizards[1].shield = { absorb: 30, ticks: Math.round(4.2 * TICK_HZ), frontal: true };
   const hp4 = sim.wizards[1].health;
   sim.step({ 0: { cast: 4, castQuality: 1 }, 1: {} }); // Stone Shard 14 piercing
   idleFor(sim, 80);
@@ -57,7 +57,7 @@ export function run() {
 
   // Reflect bounces a reflectable projectile back at the caster (white-box).
   sim = freshSim();
-  sim.wizards[1].reflectTicks = Math.round(0.4 * TICK_HZ);
+  sim.wizards[1].reflectTicks = Math.round(1.2 * TICK_HZ);
   sim.projectiles.push({
     id: 999, owner: 0, spellId: 1, eff: effectFor(1),
     ticks: 1, quality: 1, targetPos: sim.wizards[1].arcPos,
@@ -72,7 +72,7 @@ export function run() {
 
   // Barrier prevents offensive casting while active.
   sim = freshSim();
-  sim.wizards[0].barrier = { absorb: 60, ticks: Math.round(1.5 * TICK_HZ) };
+  sim.wizards[0].barrier = { absorb: 60, ticks: Math.round(4.5 * TICK_HZ) };
   sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
   ok(!sim.wizards[0].casting, 'Barrier blocks offensive cast');
 

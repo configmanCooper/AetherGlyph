@@ -88,11 +88,11 @@ export const SPELL_EFFECTS = {
   },
 
   // === Defensive (6) =======================================================
-  10: { type: SHIELD, absorb: 30, durationS: 1.4, frontal: true, school: 'Arcane' }, // Ward
-  11: { type: BARRIER, absorb: 60, durationS: 1.5, blocksOffense: true, school: 'Arcane' }, // Barrier Dome
-  12: { type: REFLECT, windowS: 0.4, school: 'Gale' }, // Reflect
+  10: { type: SHIELD, absorb: 30, durationS: 4.2, frontal: true, school: 'Arcane' }, // Ward
+  11: { type: BARRIER, absorb: 60, durationS: 4.5, blocksOffense: true, school: 'Arcane' }, // Barrier Dome
+  12: { type: REFLECT, windowS: 1.2, school: 'Gale' }, // Reflect
   13: { type: DISPEL, statuses: 2, orZone: true, school: 'Arcane' }, // Dispel
-  14: { type: BLINK, arcDelta: 0.5, evadeS: 0.35, escapesRoot: true, school: 'Arcane' }, // Blink
+  14: { type: BLINK, arcDelta: 0.5, evadeS: 1.05, escapesRoot: true, school: 'Arcane' }, // Blink
   15: { type: ZONE, zoneKind: 'Cover', school: 'Stone' }, // Stone Wall
 
   // === Buffs (5) ===========================================================
@@ -139,9 +139,9 @@ export const SPELL_EFFECTS = {
   36: { type: ZONE, zoneKind: 'Snare', school: 'Arcane' }, // Rune Snare
 
   // === Secret (4) ==========================================================
-  37: { type: MIRROR, durationS: 4, charges: 2, school: 'Arcane' }, // Mirror Twin
+  37: { type: MIRROR, durationS: 12, charges: 2, school: 'Arcane' }, // Mirror Twin
   38: { type: ZONE, zoneKind: 'Hourglass', charges: 2, school: 'Arcane' }, // Hourglass Field
-  39: { type: PHOENIX, durationS: 5, charges: 3, school: 'Ember' }, // Phoenix Covenant
+  39: { type: PHOENIX, durationS: 15, charges: 3, school: 'Ember' }, // Phoenix Covenant
   40: { // Prismatic Beam — immobile channel; mixed-resonance utility
     type: CHANNEL, totalDamage: 28, durationS: 2, charges: 2, school: 'Prismatic',
   },

@@ -1,41 +1,41 @@
 id,name,school,category,gesture,aether,charges,cooldown_s,min_cast_s,loadout_points,effect,setup_or_payoff,counters,secret
-1,Ember Bolt,Ember,Offensive,right flick,12,0,0.7,0.25,1,"8 damage; apply Burning 1","Build Ember resonance; ignites Oil","Ward; Gust; Reflect",false
-2,Frost Lance,Tide,Offensive,straight up line,16,0,1.1,0.38,1,"10 damage; apply Chilled","Primes Frost Bind and Shatter","Ward; Blink; Dispel",false
-3,Spark Dart,Storm,Offensive,short zigzag,10,0,0.8,0.30,1,"6 damage; apply Static 1","Primes Thunderclap; gains on Wet target","Gust; Ward; Grounding Mantle",false
-4,Stone Shard,Stone,Offensive,V shape,18,0,1.5,0.48,1,"14 piercing damage","Extra cover damage","Blink; Stone Wall; Brace",false
-5,Arcane Missile,Arcane,Offensive,upward arc,20,0,1.8,0.55,2,"12 damage; mild homing","Consumes Mark for bonus damage","Blink; Barrier; Reflect",false
-6,Flame Wave,Ember,Offensive,wide rising arc,28,0,4.0,0.70,2,"16 cone damage; apply Burning","Ignites Oil and disperses light Fog","Sidestep backward; Barrier; Rain",false
-7,Chain Lightning,Storm,Offensive,long zigzag,34,1,6.0,0.85,3,"18 damage; jumps through Wet zones","Stuns only when target is Soaked or has Static 3","Dispel setup; Grounding Mantle; Blink",false
-8,Fireball,Ember,Offensive,clockwise triangle,45,1,8.0,1.05,3,"30 slow area damage; destroys cover","Oil causes a capped secondary burst","Sidestep; Barrier; interrupt windup",false
-9,Ice Comet,Tide,Offensive,inward spiral,40,1,8.0,1.10,3,"26 area damage; apply Chilled 2","Freezes Wet ground briefly","Blink; Barrier; interrupt windup",false
-10,Ward,Arcane,Defensive,open right bracket,15,0,1.0,0.32,1,"30 health frontal shield for 1.4 sec","Efficient only when facing threat","Flank angle; Quake; sustained pressure",false
-11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,7.0,0.72,2,"360 degree barrier for 1.5 sec","Caster cannot use offense while active","Wait; Sunder; Quake",false
-12,Reflect,Gale,Defensive,check mark,20,0,4.0,0.30,2,"Reflect projectile during 0.4 sec window","Perfect timing grants half Sigil Charge","Area spell; feint; delayed projectile",false
-13,Dispel,Arcane,Defensive,counterclockwise circle,22,0,3.5,0.55,1,"Remove two harmful statuses or one zone edge","Destroys Mark and setup investment","Bait it; reapply later; direct damage",false
-14,Blink,Arcane,Defensive,double short directional strokes,18,0,2.5,0.30,2,"Short movement burst with brief evade","Escapes Root but not already resolved damage","Track landing; area zone; delay release",false
-15,Stone Wall,Stone,Defensive,low square,26,0,6.0,0.78,2,"Create destructible line-of-sight cover","Can channel Focus behind it","Quake; Fireball; reposition",false
-16,Haste,Gale,Buff,upward spiral,25,0,8.0,0.72,2,"15 percent movement and recovery speed for 6 sec","Counters Chilled and supports rushdown","Dispel; Weaken; force defense",false
-17,Aether Surge,Arcane,Buff,figure eight,30,0,10.0,1.10,2,"Gain 5 extra Aether/sec for 6 sec after channel","Economy setup with interrupt risk","Concussive Blast; Static; Quake",false
-18,Amplify,Arcane,Buff,small clockwise loop,20,1,7.0,0.58,2,"Apply Mark; next direct hit gains 35 percent","Heavy combo setup","Dispel; Brace; force a weak consumption",false
-19,Ember Attunement,Ember,Buff,flame outline,18,0,9.0,0.68,2,"Ember costs 15 percent less for 6 sec","Broadcasts Ember commitment","Rain; Tide pressure; Dispel",false
-20,Grounding Mantle,Stone,Buff,closed diamond,24,0,8.0,0.72,2,"Reduce direct damage 15 percent and become Grounded for 5 sec; slower movement","Cancels lightning bonus and new Static while active","Sunder; Aether Leech; zones",false
-21,Weaken,Umbra,Debuff,downward arc,18,0,3.0,0.48,1,"Target deals 22 percent less damage for 4 sec","Wins an expected damage exchange","Dispel; wait; utility casts",false
-22,Sunder,Stone,Debuff,jagged X,22,0,4.5,0.62,2,"Target takes 20 percent more direct damage for 4 sec","Burst setup","Dispel; Barrier; evade follow-up",false
-23,Sloth Hex,Umbra,Debuff,slow outward spiral,24,0,6.0,0.88,2,"Slow movement and recovery 18 percent for 4 sec","Enables zones and heavy spells","Dispel; Haste; interrupt",false
-24,Aether Leech,Umbra,Debuff,downward hook,20,0,5.0,0.58,2,"Drain up to 18 Aether; gain half","Cannot drain protected final 12 Aether","Ward line; Dispel; spend before hit",false
-25,Veil Hex,Umbra,Debuff,knot,30,1,8.0,0.95,3,"Distort visible trace ink and hide confidence for 2 sec","Does not alter actual input mapping","Dispel; preplanned simple glyph; interrupt",false
-26,Entangle,Stone,Control,U with root ticks,24,0,5.0,0.70,2,"Root for 1.5 sec; target may cast","Sets up area pressure","Blink; Dispel; Barrier",false
-27,Frost Bind,Tide,Control,two linked loops,28,0,6.0,0.82,2,"Freeze for 1 sec only if target is Chilled","Consumes Chilled","Preemptive Dispel; Tenacity; Blink before resolve",false
-28,Concussive Blast,Gale,Control,pushing arc,20,0,3.5,0.45,1,"6 damage; knockback; interrupt channel","Punishes Focus and Aether Surge","Ward; spacing; bait",false
-29,Eclipse Glare,Umbra,Control,five point burst,26,0,7.0,0.68,2,"Reduce central clarity for 2 sec; preserve threat outlines","Supports feints and zones","Dispel; Barrier; audio and outlines",false
-30,Thunderclap,Storm,Control,two inward lines,30,1,7.0,0.78,3,"8 damage; stun 0.8 sec only on Soaked or Static 3","Consumes setup; grants Tenacity afterward","Dispel setup; Grounding Mantle; distance",false
-31,Oil Script,Ember,Environmental,wavy horizontal line,16,0,4.5,0.58,1,"Place slippery Oil zone for 7 sec","Ember ignites it for capped burst","Rain; Gust; avoid",false
-32,Rain Glyph,Tide,Environmental,cloud arc then down stroke,20,0,5.0,0.72,1,"Create Wet zone for 7 sec; douse Burning","Enables lightning and frost reactions","Dispel; Gust; leave zone",false
-33,Gust Wall,Gale,Environmental,three fan strokes,22,0,4.0,0.62,1,"Deflect light projectiles; move Fog and Oil edges","Spreads fire but disperses Fog","Stone Shard; heavy projectile; reposition",false
-34,Quake,Stone,Environmental,vertical line then ground slash,34,1,8.0,0.92,3,"10 area damage; interrupt; destroy cover","Punishes channeling and wall defense","Blink; Sidestep at release; interrupt windup",false
-35,Fog Cloud,Gale,Environmental,loose open circle,20,0,5.5,0.68,1,"Shared reduced visibility zone for 6 sec","Conceals setup but affects caster too","Gust; Flame Wave; leave zone",false
-36,Rune Snare,Arcane,Environmental,small triangle then placement tap,24,0,6.0,0.82,2,"Visible trap roots 1 sec when crossed","Controls movement lanes","Dispel; avoid; trigger with shield",false
-37,Mirror Twin,Arcane,Secret,figure eight then tap,40,2,12.0,1.20,3,"Create one decoy matching next windup for 4 sec","Misdirection; no direct damage","Quake; area spell; watch movement shadow",true
-38,Hourglass Field,Arcane,Secret,hourglass outline,45,2,14.0,1.25,3,"Zone slows projectiles and movement 25 percent for both players","Shared timing manipulation","Leave zone; Dispel; instant utility",true
-39,Phoenix Covenant,Ember,Secret,phoenix wing arc,0,3,105.0,1.30,3,"For 5 sec the next lethal hit leaves caster at 1 health; once per round","Visible aura; consumes all charges","Bait with small hit; Dispel; delayed damage",true
-40,Prismatic Beam,Prismatic,Secret,six segment star line,50,2,12.0,1.35,3,"Channel up to 28 damage over 2 sec while immobile","Power depends on prior mixed resonance","Interrupt; Barrier; move behind cover",true
+1,Ember Bolt,Ember,Offensive,right flick,12,0,3,0.25,1,"8 damage; apply Burning 1","Build Ember resonance; ignites Oil","Ward; Gust; Reflect",false
+2,Frost Lance,Tide,Offensive,straight up line,16,0,4,0.38,1,"10 damage; apply Chilled","Primes Frost Bind and Shatter","Ward; Blink; Dispel",false
+3,Spark Dart,Storm,Offensive,short zigzag,10,0,2,0.30,1,"6 damage; apply Static 1","Primes Thunderclap; gains on Wet target","Gust; Ward; Grounding Mantle",false
+4,Stone Shard,Stone,Offensive,V shape,18,0,5,0.48,1,"14 piercing damage","Extra cover damage","Blink; Stone Wall; Brace",false
+5,Arcane Missile,Arcane,Offensive,upward arc,20,0,5,0.55,2,"12 damage; mild homing","Consumes Mark for bonus damage","Blink; Barrier; Reflect",false
+6,Flame Wave,Ember,Offensive,wide rising arc,28,0,9,0.70,2,"16 cone damage; apply Burning","Ignites Oil and disperses light Fog","Sidestep backward; Barrier; Rain",false
+7,Chain Lightning,Storm,Offensive,long zigzag,34,1,18,0.85,3,"18 damage; jumps through Wet zones","Stuns only when target is Soaked or has Static 3","Dispel setup; Grounding Mantle; Blink",false
+8,Fireball,Ember,Offensive,clockwise triangle,45,1,24,1.05,3,"30 slow area damage; destroys cover","Oil causes a capped secondary burst","Sidestep; Barrier; interrupt windup",false
+9,Ice Comet,Tide,Offensive,inward spiral,40,1,24,1.10,3,"26 area damage; apply Chilled 2","Freezes Wet ground briefly","Blink; Barrier; interrupt windup",false
+10,Ward,Arcane,Defensive,open right bracket,15,0,8,0.32,1,"30 health frontal shield for 4.2 sec","Efficient only when facing threat","Flank angle; Quake; sustained pressure",false
+11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,18,0.72,2,"360 degree barrier for 4.5 sec","Caster cannot use offense while active","Wait; Sunder; Quake",false
+12,Reflect,Gale,Defensive,check mark,20,0,7,0.30,2,"Reflect projectile during 1.2 sec window","Perfect timing grants half Sigil Charge","Area spell; feint; delayed projectile",false
+13,Dispel,Arcane,Defensive,counterclockwise circle,22,0,10,0.55,1,"Remove two harmful statuses or one zone edge","Destroys Mark and setup investment","Bait it; reapply later; direct damage",false
+14,Blink,Arcane,Defensive,double short directional strokes,18,0,6,0.30,2,"Short movement burst with brief evade","Escapes Root but not already resolved damage","Track landing; area zone; delay release",false
+15,Stone Wall,Stone,Defensive,low square,26,0,24,0.78,2,"Create destructible line-of-sight cover","Can channel Focus behind it","Quake; Fireball; reposition",false
+16,Haste,Gale,Buff,upward spiral,25,0,14,0.72,2,"15 percent movement and recovery speed for 6 sec","Counters Chilled and supports rushdown","Dispel; Weaken; force defense",false
+17,Aether Surge,Arcane,Buff,figure eight,30,0,20,1.10,2,"Gain 5 extra Aether/sec for 6 sec after channel","Economy setup with interrupt risk","Concussive Blast; Static; Quake",false
+18,Amplify,Arcane,Buff,small clockwise loop,20,1,16,0.58,2,"Apply Mark; next direct hit gains 35 percent","Heavy combo setup","Dispel; Brace; force a weak consumption",false
+19,Ember Attunement,Ember,Buff,flame outline,18,0,16,0.68,2,"Ember costs 15 percent less for 6 sec","Broadcasts Ember commitment","Rain; Tide pressure; Dispel",false
+20,Grounding Mantle,Stone,Buff,closed diamond,24,0,18,0.72,2,"Reduce direct damage 15 percent and become Grounded for 15 sec; slower movement","Cancels lightning bonus and new Static while active","Sunder; Aether Leech; zones",false
+21,Weaken,Umbra,Debuff,downward arc,18,0,9,0.48,1,"Target deals 22 percent less damage for 4 sec","Wins an expected damage exchange","Dispel; wait; utility casts",false
+22,Sunder,Stone,Debuff,jagged X,22,0,12,0.62,2,"Target takes 20 percent more direct damage for 4 sec","Burst setup","Dispel; Barrier; evade follow-up",false
+23,Sloth Hex,Umbra,Debuff,slow outward spiral,24,0,12,0.88,2,"Slow movement and recovery 18 percent for 4 sec","Enables zones and heavy spells","Dispel; Haste; interrupt",false
+24,Aether Leech,Umbra,Debuff,downward hook,20,0,14,0.58,2,"Drain up to 18 Aether; gain half","Cannot drain protected final 12 Aether","Ward line; Dispel; spend before hit",false
+25,Veil Hex,Umbra,Debuff,knot,30,1,20,0.95,3,"Distort visible trace ink and hide confidence for 2 sec","Does not alter actual input mapping","Dispel; preplanned simple glyph; interrupt",false
+26,Entangle,Stone,Control,U with root ticks,24,0,12,0.70,2,"Root for 1.5 sec; target may cast","Sets up area pressure","Blink; Dispel; Barrier",false
+27,Frost Bind,Tide,Control,two linked loops,28,0,14,0.82,2,"Freeze for 1 sec only if target is Chilled","Consumes Chilled","Preemptive Dispel; Tenacity; Blink before resolve",false
+28,Concussive Blast,Gale,Control,pushing arc,20,0,6,0.45,1,"6 damage; knockback; interrupt channel","Punishes Focus and Aether Surge","Ward; spacing; bait",false
+29,Eclipse Glare,Umbra,Control,five point burst,26,0,16,0.68,2,"Reduce central clarity for 2 sec; preserve threat outlines","Supports feints and zones","Dispel; Barrier; audio and outlines",false
+30,Thunderclap,Storm,Control,two inward lines,30,1,20,0.78,3,"8 damage; stun 0.8 sec only on Soaked or Static 3","Consumes setup; grants Tenacity afterward","Dispel setup; Grounding Mantle; distance",false
+31,Oil Script,Ember,Environmental,wavy horizontal line,16,0,10,0.58,1,"Place slippery Oil zone for 7 sec","Ember ignites it for capped burst","Rain; Gust; avoid",false
+32,Rain Glyph,Tide,Environmental,cloud arc then down stroke,20,0,12,0.72,1,"Create Wet zone for 7 sec; douse Burning","Enables lightning and frost reactions","Dispel; Gust; leave zone",false
+33,Gust Wall,Gale,Environmental,three fan strokes,22,0,8,0.62,1,"Deflect light projectiles; move Fog and Oil edges","Spreads fire but disperses Fog","Stone Shard; heavy projectile; reposition",false
+34,Quake,Stone,Environmental,vertical line then ground slash,34,1,24,0.92,3,"10 area damage; interrupt; destroy cover","Punishes channeling and wall defense","Blink; Sidestep at release; interrupt windup",false
+35,Fog Cloud,Gale,Environmental,loose open circle,20,0,14,0.68,1,"Shared reduced visibility zone for 6 sec","Conceals setup but affects caster too","Gust; Flame Wave; leave zone",false
+36,Rune Snare,Arcane,Environmental,small triangle then placement tap,24,0,16,0.82,2,"Visible trap roots 1 sec when crossed","Controls movement lanes","Dispel; avoid; trigger with shield",false
+37,Mirror Twin,Arcane,Secret,figure eight then tap,40,2,32,1.20,3,"Create one decoy matching next windup for 12 sec","Misdirection; no direct damage","Quake; area spell; watch movement shadow",true
+38,Hourglass Field,Arcane,Secret,hourglass outline,45,2,45,1.25,3,"Zone slows projectiles and movement 25 percent for both players","Shared timing manipulation","Leave zone; Dispel; instant utility",true
+39,Phoenix Covenant,Ember,Secret,phoenix wing arc,0,3,60,1.30,3,"For 15 sec the next lethal hit leaves caster at 1 health; once per round","Visible aura; consumes all charges","Bait with small hit; Dispel; delayed damage",true
+40,Prismatic Beam,Prismatic,Secret,six segment star line,50,2,50,1.35,3,"Channel up to 28 damage over 2 sec while immobile","Power depends on prior mixed resonance","Interrupt; Barrier; move behind cover",true

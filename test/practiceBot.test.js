@@ -238,9 +238,11 @@ export function run() {
   }
 
   // --- difficulty ordering across mirrored equal-loadout matches ---------
-  const HvE = mirror('hard', 'easy', 30, 9000);
-  const HvM = mirror('hard', 'medium', 30, 9000);
-  const MvE = mirror('medium', 'easy', 30, 9000);
+  // 60 mirrored seeds per pairing: a robust fixed-seed sample so the closest
+  // gap (Hard vs Medium) separates on BOTH seats without razor-edge noise.
+  const HvE = mirror('hard', 'easy', 60, 9000);
+  const HvM = mirror('hard', 'medium', 60, 9000);
+  const MvE = mirror('medium', 'easy', 60, 9000);
   ok(HvE.rate > 0.70, `Hard beats Easy > 70% (${(HvE.rate * 100).toFixed(0)}%)`);
   ok(HvM.rate > 0.55, `Hard beats Medium > 55% (${(HvM.rate * 100).toFixed(0)}%)`);
   ok(MvE.rate > 0.60, `Medium beats Easy > 60% (${(MvE.rate * 100).toFixed(0)}%)`);

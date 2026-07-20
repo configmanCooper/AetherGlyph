@@ -89,10 +89,10 @@ export const STATUSES = {
   Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   // Self buffs -------------------------------------------------------------
   Haste:       { durationS: 6, maxStacks: 1, haste: 0.15, kind: 'buff' },
-  Grounded:    { durationS: 5, maxStacks: 1, dmgReduction: 0.15, moveSlow: 0.15, kind: 'buff' },
+  Grounded:    { durationS: 15, maxStacks: 1, dmgReduction: 0.15, moveSlow: 0.15, kind: 'buff' },
   AetherSurge: { durationS: 6, maxStacks: 1, aetherPerS: 5, kind: 'buff' },
   Attunement:  { durationS: 6, maxStacks: 1, school: 'Ember', costMul: 0.85, kind: 'buff' },
-  Phoenix:     { durationS: 5, maxStacks: 1, kind: 'buff' },
+  Phoenix:     { durationS: 15, maxStacks: 1, kind: 'buff' },
 };
 
 // Hard control that Tenacity guards against.

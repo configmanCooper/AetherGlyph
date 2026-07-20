@@ -21,6 +21,19 @@ raise stone cover, and chain elemental reactions your rival can exploit too.
   offense, defense, control, buffs, and environmental zones — or start from a
   curated archetype (Ember Rush, Tide Control, Storm Tempo, Stone Warden, and
   more).
+- **A distinct look for every spell.** Flame Wave rolls in as a wall of fire,
+  Arcane Missile streaks with arcane rings, Chain Lightning forks between you and
+  your foe, and each of the 40 spells has its own silhouette and motion — all
+  drawn in real time with no downloaded art. A reduced-motion setting keeps every
+  spell readable without flashes or shake.
+- **Duel in a grand arcane academy.** An original, moonlit hall of arched stone
+  arcades, tall windows lit with abstract sigils, hanging banners, floating
+  lanterns, animated braziers, and distant towers frames every match — with your
+  robed rival rendered in full (hood, hat, belt, mantle, boots, and a
+  crystal-tipped staff) and your own gloved hand and wand in first person.
+  Weather looks like weather: rain falls with splash ripples, fog drifts in a
+  dense bank, wind sweeps as a curved wall, fire visibly burns, and ice frosts
+  the ground — tuned to stay smooth and readable on a phone.
 - **Offline tutorial, Practice vs AI & Glyph Laboratory.** Learn every gesture in
   a checkpointed campaign, then practise a single round against a fair Easy,
   Medium, or Hard AI with a post-round coaching report — all with no connection

@@ -33,6 +33,8 @@ import { chooseOpponentLoadout, PRACTICE_PROFILES } from '@shared/bot/practiceBo
 import { coachReport } from '@shared/analytics/coach.js';
 import { renderCoachReport } from '../ui/coach.js';
 import { versionTag } from '@shared/protocol/version.js';
+import { SPELL_VFX, VFX_IDS } from '../render/spellVfxProfiles.js';
+import { vfxFamilyCoverage } from '../render/spellVfx.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1474,6 +1476,26 @@ if (typeof window !== 'undefined') {
     forceEnd: (winner = 0) => {
       try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }
     },
+  };
+
+  // Dev-only VFX gallery hook. Not wired to any production UI element; it only
+  // asks the renderer to draw a representative object for a given spell so a
+  // headless smoke test (or a developer) can confirm every visual family draws
+  // without WebGL errors and that the produced VFX kinds are distinct. It never
+  // touches the simulation, so it grants no gameplay effect.
+  window.__aegVfx = {
+    profiles: () => VFX_IDS.map((id) => ({ id, kind: SPELL_VFX[id].kind, family: SPELL_VFX[id].family, school: SPELL_VFX[id].school })),
+    spawn: (id) => { try { return arena.debugSpawn(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    spawnZone: (kind) => { try { return arena.debugSpawnZone(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    productionRelease: (id) => { try { return arena.debugProductionRelease(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    productionMotion: () => { try { return arena.debugProductionMotion(); } catch { return null; } },
+    productionCount: () => { try { return arena.debugProductionCount(); } catch { return -1; } },
+    playerHitSafety: (id) => { try { return arena.debugPlayerHitSafety(Number(id)); } catch { return []; } },
+    kinds: () => { try { return arena.debugKinds(); } catch { return []; } },
+    clear: () => { try { arena.debugClear(); } catch { /* ignore */ } },
+    coverage: () => { try { return vfxFamilyCoverage(); } catch { return ['error']; } },
+    academy: () => { try { return arena.academyStats(); } catch (e) { return { error: String(e && e.message || e) }; } },
+    setReduced: (v) => { try { arena.setReduced(!!v); } catch { /* ignore */ } },
   };
 }
 

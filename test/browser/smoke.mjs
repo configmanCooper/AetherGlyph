@@ -464,6 +464,108 @@ try {
     practiceSaved: (() => { try { return JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}').practice; } catch { return null; } })(),
   }));
 
+  // ---- Spell VFX gallery smoke (dev-only hook; never in production UI) ------
+  // Force a representative spell from every major visual family and confirm the
+  // renderer draws distinct VFX objects, animates several frames (so WebGL runs
+  // on each), and disposes cleanly — all with no JS/WebGL errors. Runs on the
+  // idle main-menu arena, so no live match is required.
+  const vfxReps = [6, 5, 7, 8, 9, 10, 11, 17, 26, 27, 32, 33, 34, 35, 37, 39, 40];
+  const vfxResult = await page.evaluate(async (ids) => {
+    if (!window.__aegVfx) return { error: 'no __aegVfx hook' };
+    const coverage = window.__aegVfx.coverage();
+    const profiles = window.__aegVfx.profiles();
+    window.__aegVfx.clear();
+    const spawned = [];
+    for (const id of ids) { spawned.push({ id, kind: window.__aegVfx.spawn(id) }); await new Promise((r) => setTimeout(r, 25)); }
+    await new Promise((r) => setTimeout(r, 450)); // let update()/WebGL run on every object
+    const live = window.__aegVfx.kinds();
+    // reduced-motion pass must also render without error
+    window.__aegVfx.clear(); window.__aegVfx.setReduced(true);
+    for (const id of [6, 7, 8, 34, 40]) window.__aegVfx.spawn(id);
+    await new Promise((r) => setTimeout(r, 200));
+    window.__aegVfx.setReduced(false); window.__aegVfx.clear();
+    const afterClear = window.__aegVfx.kinds().length;
+    return { coverage, profileCount: profiles.length, spawned, live, afterClear };
+  }, vfxReps);
+  if (!vfxResult || vfxResult.error) fail('VFX gallery hook missing: ' + JSON.stringify(vfxResult));
+  if (vfxResult.profileCount !== 40) fail('VFX profiles must cover all 40 spells, got ' + vfxResult.profileCount);
+  if (!Array.isArray(vfxResult.coverage) || vfxResult.coverage.length !== 0) {
+    fail('renderer is missing a VFX family builder: ' + JSON.stringify(vfxResult.coverage));
+  }
+  const badSpawn = vfxResult.spawned.filter((s) => !s.kind || typeof s.kind !== 'string');
+  if (badSpawn.length) fail('some spells produced no VFX kind (family builder error): ' + JSON.stringify(badSpawn));
+  const uniqueKinds = new Set(vfxResult.spawned.map((s) => s.kind));
+  if (uniqueKinds.size !== vfxReps.length) fail('VFX object kinds are not all distinct across families: ' + JSON.stringify(vfxResult.spawned));
+  if (vfxResult.afterClear !== 0) fail('VFX gallery did not dispose spawned objects on clear: ' + vfxResult.afterClear);
+
+  // ---- Weather zone family smoke -------------------------------------------
+  // Every weather zone (including the reaction-only Fire/Frozen strips that no
+  // single spell casts) must draw a DISTINCT object and animate WebGL frames
+  // with no errors, then dispose cleanly — including a reduced-motion pass.
+  const weatherKinds = ['Wet', 'Fog', 'Gust', 'Fire', 'Frozen', 'Oil'];
+  const weatherResult = await page.evaluate(async (kinds) => {
+    if (!window.__aegVfx || !window.__aegVfx.spawnZone) return { error: 'no spawnZone hook' };
+    window.__aegVfx.clear();
+    const spawned = [];
+    for (const k of kinds) { spawned.push({ k, kind: window.__aegVfx.spawnZone(k) }); await new Promise((r) => setTimeout(r, 25)); }
+    await new Promise((r) => setTimeout(r, 420)); // run update()/WebGL on each zone
+    window.__aegVfx.clear(); window.__aegVfx.setReduced(true);
+    for (const k of kinds) window.__aegVfx.spawnZone(k);
+    await new Promise((r) => setTimeout(r, 200));
+    window.__aegVfx.setReduced(false); window.__aegVfx.clear();
+    return { spawned, afterClear: window.__aegVfx.kinds().length };
+  }, weatherKinds);
+  if (!weatherResult || weatherResult.error) fail('weather zone hook missing: ' + JSON.stringify(weatherResult));
+  const badZone = weatherResult.spawned.filter((s) => !s.kind || typeof s.kind !== 'string');
+  if (badZone.length) fail('some weather zones produced no VFX kind: ' + JSON.stringify(weatherResult.spawned));
+  const uniqueZoneKinds = new Set(weatherResult.spawned.map((s) => s.kind));
+  if (uniqueZoneKinds.size !== weatherKinds.length) fail('weather zone families are not all visually distinct: ' + JSON.stringify(weatherResult.spawned));
+  if (weatherResult.afterClear !== 0) fail('weather gallery did not dispose zones on clear: ' + weatherResult.afterClear);
+
+  // Production transient path (not the gallery) must receive the animation clock.
+  const releaseMotion = await page.evaluate(async () => {
+    const kind = window.__aegVfx.productionRelease(17); // Aether Surge ribbons
+    const before = window.__aegVfx.productionMotion();
+    await new Promise((r) => setTimeout(r, 260));
+    const after = window.__aegVfx.productionMotion();
+    const count = window.__aegVfx.productionCount();
+    return { kind, before, after, count };
+  });
+  if (releaseMotion.kind !== 'aetherSurge' || releaseMotion.count < 1
+      || releaseMotion.before === releaseMotion.after) {
+    fail('production release VFX did not animate with the arena clock: ' + JSON.stringify(releaseMotion));
+  }
+  const playerHitDistances = await page.evaluate(() => window.__aegVfx.playerHitSafety(8));
+  if (!Array.isArray(playerHitDistances) || playerHitDistances.length < 2
+      || playerHitDistances.some((d) => d < 1.5)) {
+    fail('player-hit VFX spawned too close to the first-person camera: ' + JSON.stringify(playerHitDistances));
+  }
+
+  // ---- Arcane academy + wizard component metadata (renderer debug hook) ------
+  const academy = await page.evaluate(() => (window.__aegVfx && window.__aegVfx.academy) ? window.__aegVfx.academy() : { error: 'no academy hook' });
+  if (!academy || academy.error) fail('academy stats hook missing: ' + JSON.stringify(academy));
+  const comp = academy.components || {};
+  const missingComp = ['sky', 'moon', 'stars', 'academy', 'backWall', 'platform'].filter((k) => !comp[k]);
+  if (missingComp.length) fail('academy is missing components: ' + missingComp.join(','));
+  if (!(comp.arcadeColumns >= 4)) fail('academy has too few arcade columns: ' + comp.arcadeColumns);
+  if (!(comp.archedWindows >= 3)) fail('academy has too few arched windows: ' + comp.archedWindows);
+  if (!(comp.braziers >= 2)) fail('academy has too few braziers: ' + comp.braziers);
+  if (!(comp.floatingLights >= 4)) fail('academy has too few floating lanterns: ' + comp.floatingLights);
+  if (!(comp.distantTowers >= 3)) fail('academy has too few distant towers: ' + comp.distantTowers);
+  const wiz = academy.wizard || {};
+  for (const part of ['robe', 'hat', 'hood', 'belt', 'staff', 'boots', 'hand']) {
+    if (!(wiz.parts || []).includes(part)) fail('wizard is missing part: ' + part);
+  }
+  if (!wiz.hasStaff) fail('wizard has no visible staff');
+  if (!(wiz.robeLayers >= 2)) fail('wizard robe should be layered');
+  if (!(academy.firstPerson && academy.firstPerson.gloveParts >= 4 && academy.firstPerson.hasWand)) {
+    fail('first-person gloves/wand metadata missing: ' + JSON.stringify(academy.firstPerson));
+  }
+  if (!(academy.budget && academy.budget.lightBudgetOk && academy.budget.transparentBudgetOk)) {
+    fail('academy exceeds mobile light/transparent budget: ' + JSON.stringify(academy.budget));
+  }
+  console.log('ACADEMY', JSON.stringify(academy.budget), 'columns', comp.arcadeColumns, 'towers', comp.distantTowers);
+
   if (errors.length) fail('console/page errors: ' + errors.slice(0, 4).join(' | '));
   if (http404.length) fail('unexpected 404s: ' + http404.slice(0, 4).join(' | '));
   if (!state.onMain) fail('did not return to the main menu after practice');

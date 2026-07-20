@@ -25,6 +25,9 @@ import { run as practiceBot } from './practiceBot.test.js';
 import { run as coaching } from './coaching.test.js';
 import { run as gust } from './gust.test.js';
 import { run as lab } from './lab.test.js';
+import { run as spellVfx } from './spellVfx.test.js';
+import { run as cooldowns } from './cooldowns.test.js';
+import { run as protection } from './protection.test.js';
 
 console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
@@ -54,6 +57,9 @@ const modules = [
   ['coaching', coaching],
   ['gust', gust],
   ['lab', lab],
+  ['spellVfx', spellVfx],
+  ['cooldowns', cooldowns],
+  ['protection', protection],
 ];
 
 let pass = 0, fail = 0;

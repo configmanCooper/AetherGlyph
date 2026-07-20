@@ -90,8 +90,9 @@ async function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
       await page.mouse.up();
       await wait(160);
     }
-    const btns = await page.$$('#spellbar .spell-btn');
-    for (let k = 0; k < Math.min(3, btns.length); k += 1) { await btns[k].click(); await wait(140); }
+    // Spellbar buttons select drawing guides and rebuild the bar, so stale
+    // element handles would detach. The two real drawn casts above are enough to
+    // populate the live duel screenshot without using any test-only shortcuts.
     await wait(1600);
     await page.screenshot({ path: path.join(out, '03-duel.png') });
 

@@ -4,9 +4,34 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.0.3 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.1.0 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
-service, and the deterministic shared simulation.
+service, and the deterministic shared simulation. 1.1.0 adds a dedicated,
+data-driven spell visual-effects system: every one of the 40 spells now has a
+unique silhouette and motion (Flame Wave is a travelling wall of flame, Arcane
+Missile a ringed rocket, Chain Lightning a branching bolt, etc.) rendered with
+pooled Three.js geometry, per-effect budgets, reduced-motion fallbacks, and no
+external assets.
+
+The 1.1.0 visual pass also stages the duel inside an **original grand arcane
+academy** — a moonlit gothic-magical hall of symmetric stone arcades, tall
+arched windows carrying abstract original sigils, hanging banners, distant
+towers, floating lanterns, and animated braziers — with each duelist rendered as
+a layered-robe wizard (hood, hat, belt, mantle, boots, gloved hands, and a
+crystal-tipped staff) and a detailed first-person glove + wand. Weather zones now
+read as real weather: falling rain with splash ripples, a drifting fog bank, a
+sweeping curved wind wall, visibly burning fire, frosty ice, and glossy oil. The
+academy stays within a small mobile light/transparent budget and honours the
+reduced-motion setting.
+
+Alongside the visuals, 1.1.0 re-tunes the balance data (still driven only by
+`design/spells.csv`): **protective spells last 3× longer** (Ward 1.4→4.2s,
+Barrier Dome 1.5→4.5s, Reflect 0.4→1.2s, Blink evade 0.35→1.05s, Grounding
+Mantle 5→15s, Mirror Twin 4→12s, Phoenix Covenant 5→15s; Stone Wall stays a 24s
+environmental zone), and **every one of the 40 spells now carries a deliberate
+2–60 second cooldown scaled to its power**. These data changes bump
+`BALANCE_VERSION`; the rendering itself does not touch the deterministic
+simulation or wire protocol.
 
 **Practice vs AI (Solo Phase B) is implemented.** A fully offline single-player
 mode offers exactly **Easy, Medium, Hard** against a *fair* AI: every tier drives
@@ -56,8 +81,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10003 /
-versionName 1.0.3). Online play connects to a configurable authoritative service
+`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10100 /
+versionName 1.1.0). Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
 
@@ -307,7 +332,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10003` / `versionName 1.0.3`, no cleartext production traffic,
+  `versionCode 10100` / `versionName 1.1.0`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume + haptics via `@capacitor/app` and
   `@capacitor/haptics`.
