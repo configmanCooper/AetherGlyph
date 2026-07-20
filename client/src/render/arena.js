@@ -17,7 +17,7 @@ import { effectFor, PROJECTILE, CHANNEL, ZONE, SHIELD, BARRIER } from '@shared/s
 import { getSpellVfx, getReactionVfx } from './spellVfxProfiles.js';
 import {
   makeProjectileVfx, makeImpactVfx, makeZoneVfx, makeReleaseVfx,
-  makeWardVfx, makeDomeVfx, makeBeamVfx, makeCastCueVfx, makeReactionVfx,
+  makeWardVfx, makeDomeVfx, makeReflectGuardVfx, makeBeamVfx, makeCastCueVfx, makeReactionVfx,
 } from './spellVfx.js';
 
 const ARC_W = 3.2;
@@ -317,84 +317,263 @@ export class Arena {
     }
   }
 
-  // A layered, readable wizard: robe + tunic, hem trim + belt, a shoulder
-  // mantle with pauldrons, boots, gloved hands, an expressive hood + wizard hat,
-  // and a visible staff with a glowing crystal. Symmetric between duelists —
-  // only the robe colour + accent differ. userData.hand/aura drive cast tells.
+  // A readable, front-facing academy duelist assembled from simple procedural
+  // primitives (no external assets). The silhouette reads as a person, not a
+  // stack of cones: planted legs + boots, a layered flared robe skirt separated
+  // from a tailored bodice, a shoulder mantle with pauldrons, two ARTICULATED
+  // arms (upper + fore + hand) — the off arm grips a held staff, the cast arm
+  // carries the school-tintable aura — a neck + head with an expressive FACE
+  // (eyes, brows, nose, moustache, silver beard) framed (not hidden) by a
+  // back-cowl hood and an asymmetric brimmed hat. The model's FRONT is +Z
+  // (placket / buckle / crest / face), so _buildEnemy leaves rotation.y = 0 to
+  // face the player. Colours are kept off pure-black; only robe colour + accent
+  // differ between duelists. userData drives idle/cast animation + debug stats.
   _robeFigure(color, accent = 0x8b6bff) {
     const g = new THREE.Group();
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xe8d9c0, roughness: 0.7 });
-    const darker = new THREE.Color(color).multiplyScalar(0.55).getHex();
-    const trimMat = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.35, roughness: 0.5 });
+    const base = new THREE.Color(color);
+    const darkHex = base.clone().multiplyScalar(0.62).getHex();   // under-robe (lifted off black)
+    const midHex = base.clone().multiplyScalar(0.82).getHex();    // front panels
+    const liteHex = base.clone().lerp(new THREE.Color(0xffffff), 0.16).getHex();
+    const hatHex = base.clone().multiplyScalar(0.7).getHex();
+
+    const robeMat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+    const underMat = new THREE.MeshStandardMaterial({ color: darkHex, roughness: 0.9 });
+    const panelMat = new THREE.MeshStandardMaterial({ color: midHex, roughness: 0.85 });
+    const mantleMat = new THREE.MeshStandardMaterial({ color: midHex, roughness: 0.82, side: THREE.DoubleSide });
+    const trimMat = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.45, roughness: 0.5 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xe9d6ba, emissive: 0x3a2c1e, emissiveIntensity: 0.18, roughness: 0.7 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0xd9d4e4, roughness: 0.85 }); // silver beard / brows
+    const leatherMat = new THREE.MeshStandardMaterial({ color: 0x4a3b2e, roughness: 0.7, metalness: 0.15 }); // belt / boots / staff
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x8a7f9c, roughness: 0.45, metalness: 0.55 });   // buckle / claw
+    const hatMat = new THREE.MeshStandardMaterial({ color: hatHex, roughness: 0.85 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0xf3f2f6, roughness: 0.4 });
+    const pupilMat = new THREE.MeshStandardMaterial({ color: 0x241d33, roughness: 0.5 });
     const parts = {};
 
-    // Outer robe + inner tunic (two layers) with a lit hem trim.
-    const robe = new THREE.Mesh(new THREE.ConeGeometry(0.72, 2.0, 14), new THREE.MeshStandardMaterial({ color, roughness: 0.85 }));
-    robe.position.y = 1.0; g.add(robe); parts.robe = robe;
-    const tunic = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.7, 12), new THREE.MeshStandardMaterial({ color: darker, roughness: 0.9 }));
-    tunic.position.y = 0.95; g.add(tunic); parts.tunic = tunic;
-    const hem = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.07, 6, 20), trimMat);
-    hem.rotation.x = Math.PI / 2; hem.position.y = 0.16; g.add(hem); parts.trim = hem;
-    const placket = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5, 0.05), trimMat);
-    placket.position.set(0, 1.05, 0.5); g.add(placket);
+    // ---- lower body: two planted legs + boots (robe is separated above) ----
+    const legMat = new THREE.MeshStandardMaterial({ color: base.clone().multiplyScalar(0.5).getHex(), roughness: 0.9 });
+    const legGeo = new THREE.CylinderGeometry(0.11, 0.1, 0.72, 8);
+    const bootGeo = new THREE.BoxGeometry(0.24, 0.22, 0.44);
+    const bootCuffGeo = new THREE.TorusGeometry(0.14, 0.035, 6, 12);
+    for (const sx of [-0.17, 0.17]) {
+      const leg = new THREE.Mesh(legGeo, legMat); leg.position.set(sx, 0.54, 0); g.add(leg);
+      const boot = new THREE.Mesh(bootGeo, leatherMat); boot.position.set(sx, 0.12, 0.09); g.add(boot);
+      const cuff = new THREE.Mesh(bootCuffGeo, trimMat); cuff.rotation.x = Math.PI / 2; cuff.position.set(sx, 0.26, 0.02); g.add(cuff);
+    }
+    parts.legs = true; parts.boots = true;
 
-    // Belt at the waist.
-    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.08, 6, 18), new THREE.MeshStandardMaterial({ color: 0x2a2233, roughness: 0.7, metalness: 0.3 }));
-    belt.rotation.x = Math.PI / 2; belt.position.y = 1.02; g.add(belt); parts.belt = belt;
-    const buckle = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), trimMat); buckle.position.set(0, 1.02, 0.5); g.add(buckle);
+    // ---- layered robe skirt: flared frustums (not a full spike cone) with an
+    // open front (two swept panels) + a lit hem. Planted on the ground group. ----
+    const underSkirt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.58, 1.22, 16, 1, true), underMat);
+    underSkirt.position.y = 0.79; g.add(underSkirt);
+    const overSkirt = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.64, 1.0, 16, 1, true), robeMat);
+    overSkirt.position.y = 0.92; g.add(overSkirt); parts.robe = overSkirt;
+    const panelGeo = new THREE.BoxGeometry(0.26, 1.02, 0.05);
+    const lPanel = new THREE.Mesh(panelGeo, panelMat); lPanel.position.set(-0.15, 0.92, 0.42); lPanel.rotation.set(0.05, 0, 0.13); g.add(lPanel);
+    const rPanel = new THREE.Mesh(panelGeo, panelMat); rPanel.position.set(0.15, 0.92, 0.42); rPanel.rotation.set(0.05, 0, -0.13); g.add(rPanel);
+    const hem = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.06, 6, 22), trimMat);
+    hem.rotation.x = Math.PI / 2; hem.position.y = 0.42; g.add(hem); parts.trim = hem;
+    parts.robePanels = true;
 
-    // Shoulder mantle + pauldrons.
-    const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.55, 14, 1, true), new THREE.MeshStandardMaterial({ color: darker, roughness: 0.85, side: THREE.DoubleSide }));
-    mantle.position.y = 1.72; g.add(mantle); parts.mantle = mantle;
-    const pauldronGeo = new THREE.SphereGeometry(0.17, 10, 8);
-    for (const sx of [-0.42, 0.42]) { const p = new THREE.Mesh(pauldronGeo, trimMat); p.position.set(sx, 1.72, 0); p.scale.y = 0.7; g.add(p); }
+    // ================= upper body (breathes as one unit) =================
+    const torso = new THREE.Group(); g.add(torso);
+
+    // Tailored bodice + inner tunic layer, front placket (opening) + V-collar.
+    const bodice = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.6, 14), robeMat);
+    bodice.position.y = 1.5; torso.add(bodice);
+    const tunic = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.32, 0.52, 12), underMat);
+    tunic.position.y = 1.3; torso.add(tunic); parts.tunic = tunic;
+    const placket = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.66, 0.05), trimMat);
+    placket.position.set(0, 1.5, 0.31); torso.add(placket);
+    const collarGeo = new THREE.BoxGeometry(0.26, 0.05, 0.06);
+    const lCollar = new THREE.Mesh(collarGeo, trimMat); lCollar.position.set(-0.09, 1.73, 0.26); lCollar.rotation.z = -0.5; torso.add(lCollar);
+    const rCollar = new THREE.Mesh(collarGeo, trimMat); rCollar.position.set(0.09, 1.73, 0.26); rCollar.rotation.z = 0.5; torso.add(rCollar);
+    parts.collar = true;
+
+    // Academy crest / sigil on the chest (disc + star).
+    const crest = new THREE.Group();
+    const crestDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16), new THREE.MeshStandardMaterial({ color: liteHex, roughness: 0.55, metalness: 0.25 }));
+    crestDisc.rotation.x = Math.PI / 2; crest.add(crestDisc);
+    const crestStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), trimMat); crestStar.scale.set(1, 1, 0.45); crestStar.position.z = 0.03; crest.add(crestStar);
+    crest.position.set(0, 1.58, 0.32); torso.add(crest); parts.crest = true;
+
+    // Belt + buckle at the waist.
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.055, 6, 20), leatherMat);
+    belt.rotation.x = Math.PI / 2; belt.position.y = 1.21; torso.add(belt); parts.belt = belt;
+    const buckle = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), metalMat); buckle.position.set(0, 1.21, 0.31); torso.add(buckle);
+
+    // Shoulder mantle (short cape) + pauldrons.
+    const mantle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.52, 0.42, 16, 1, true), mantleMat);
+    mantle.position.y = 1.66; torso.add(mantle); parts.mantle = true;
+    const pauldronGeo = new THREE.SphereGeometry(0.14, 10, 8);
+    for (const sx of [-0.37, 0.37]) { const p = new THREE.Mesh(pauldronGeo, trimMat); p.position.set(sx, 1.74, 0); p.scale.y = 0.66; torso.add(p); }
     parts.shoulders = true;
 
-    // Boots.
-    const bootGeo = new THREE.BoxGeometry(0.24, 0.2, 0.42);
-    for (const sx of [-0.2, 0.2]) { const b = new THREE.Mesh(bootGeo, new THREE.MeshStandardMaterial({ color: 0x201a2c, roughness: 0.9 })); b.position.set(sx, 0.1, 0.14); g.add(b); }
-    parts.boots = true;
+    // ---- two articulated arms (shoulder pivot -> upper + elbow + fore + hand) ----
+    const upperGeo = new THREE.CylinderGeometry(0.1, 0.09, 0.4, 8);
+    const foreGeo = new THREE.CylinderGeometry(0.085, 0.075, 0.4, 8);
+    const jointGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const handGeo = new THREE.SphereGeometry(0.11, 10, 8);
+    const armCuffGeo = new THREE.TorusGeometry(0.088, 0.028, 6, 10);
+    const makeArm = () => {
+      const arm = new THREE.Group(); // origin = shoulder
+      const sj = new THREE.Mesh(jointGeo, robeMat); arm.add(sj);
+      const upper = new THREE.Mesh(upperGeo, robeMat); upper.position.y = -0.22; arm.add(upper);
+      const elbow = new THREE.Mesh(jointGeo, robeMat); elbow.position.y = -0.44; elbow.scale.setScalar(0.82); arm.add(elbow);
+      const fore = new THREE.Mesh(foreGeo, robeMat); fore.position.y = -0.66; arm.add(fore);
+      const cuff = new THREE.Mesh(armCuffGeo, trimMat); cuff.rotation.x = Math.PI / 2; cuff.position.y = -0.85; arm.add(cuff);
+      const hand = new THREE.Mesh(handGeo, skinMat); hand.position.y = -0.92; arm.add(hand);
+      return { arm, hand };
+    };
 
-    // Head + expressive hood + tall wizard hat.
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), skinMat);
-    head.position.y = 2.12; g.add(head); parts.head = head;
-    const hood = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.6, 12, 1, true), new THREE.MeshStandardMaterial({ color: darker, roughness: 0.9, side: THREE.DoubleSide }));
-    hood.position.y = 2.28; g.add(hood); parts.hood = hood;
-    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 16), new THREE.MeshStandardMaterial({ color: 0x2c2148, roughness: 0.85 }));
-    hatBrim.position.y = 2.42; g.add(hatBrim);
-    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.36, 1.0, 14), new THREE.MeshStandardMaterial({ color: 0x2c2148, roughness: 0.85 }));
-    hat.position.y = 2.95; hat.rotation.z = 0.12; g.add(hat); parts.hat = hat;
-    const hatBand = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.05, 6, 16), trimMat);
-    hatBand.rotation.x = Math.PI / 2; hatBand.position.y = 2.55; g.add(hatBand);
+    // Off arm (left) — swept forward + inward to grip the staff.
+    const off = makeArm();
+    off.arm.position.set(-0.34, 1.72, 0.02);
+    off.arm.rotation.set(-0.24, 0.05, -0.16);
+    torso.add(off.arm); parts.leftArm = true;
 
-    // Off hand + casting hand (with a school-tintable aura).
-    const offHand = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), skinMat);
-    offHand.position.set(-0.55, 1.3, 0.2); g.add(offHand);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), skinMat);
-    hand.position.set(0.55, 1.35, 0.2); g.add(hand); parts.hand = hand;
-    const aura = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    // Cast arm (right) — carries the tintable aura, extends toward the player.
+    const cast = makeArm();
+    cast.arm.position.set(0.34, 1.72, 0.02);
+    const restCastX = -0.16;
+    cast.arm.rotation.set(restCastX, -0.05, 0.14);
+    torso.add(cast.arm); parts.rightArm = true;
+    const hand = cast.hand; parts.hand = hand;
+    const aura = new THREE.Mesh(new THREE.SphereGeometry(0.23, 16, 16), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     hand.add(aura);
 
-    // Visible staff with a glowing crystal head, held in the off hand.
-    const staff = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 2.3, 8), new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.8 }));
-    staff.add(shaft);
-    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
-    crystal.position.y = 1.25; staff.add(crystal);
-    const claw = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.03, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a2233, metalness: 0.4, roughness: 0.6 }));
-    claw.position.y = 1.1; claw.rotation.x = Math.PI / 2; staff.add(claw);
-    staff.position.set(-0.6, 1.15, 0.24); staff.rotation.z = 0.16; g.add(staff);
-    parts.staff = staff; parts.staffCrystal = crystal;
+    // ---- neck + head (its own pivot for the "looking at you" tilt) ----
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.11, 0.16, 10), skinMat);
+    neck.position.y = 1.88; torso.add(neck); parts.neck = true;
+    const head = new THREE.Group(); head.position.y = 2.05; torso.add(head); parts.head = true;
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 16), skinMat); head.add(skull);
 
-    g.userData = { hand, aura, robe, staff, hood, belt, staffCrystal: crystal, parts, robeLayers: 2 };
+    // Expressive face on the +Z front: eyes (with pupils), angled brows, a nose,
+    // a moustache and a swept silver beard framing the chin.
+    const eyeGeo = new THREE.SphereGeometry(0.052, 10, 8);
+    const pupilGeo = new THREE.SphereGeometry(0.026, 8, 6);
+    const browGeo = new THREE.BoxGeometry(0.14, 0.03, 0.04);
+    for (const sx of [-0.1, 0.1]) {
+      const eye = new THREE.Mesh(eyeGeo, eyeMat); eye.position.set(sx, 0.04, 0.21); eye.scale.set(1, 0.85, 0.7); head.add(eye);
+      const pupil = new THREE.Mesh(pupilGeo, pupilMat); pupil.position.set(0, 0, 0.045); eye.add(pupil);
+      const brow = new THREE.Mesh(browGeo, hairMat); brow.position.set(sx, 0.13, 0.2); brow.rotation.z = sx < 0 ? 0.16 : -0.16; head.add(brow);
+    }
+    parts.eyes = true; parts.brows = true;
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.15, 8), skinMat);
+    nose.rotation.x = Math.PI / 2; nose.position.set(0, -0.02, 0.25); head.add(nose); parts.nose = true;
+    const moustache = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.08), hairMat);
+    moustache.position.set(0, -0.1, 0.2); moustache.rotation.x = 0.2; head.add(moustache);
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.34, 12), hairMat);
+    beard.rotation.x = Math.PI; beard.position.set(0, -0.26, 0.11); beard.scale.set(1, 1, 0.7); head.add(beard); parts.beard = true;
+
+    // Back-cowl hood (rear half only) so it frames the face without hiding it.
+    const hood = new THREE.Mesh(
+      new THREE.ConeGeometry(0.4, 0.62, 14, 1, true, Math.PI / 2, Math.PI),
+      new THREE.MeshStandardMaterial({ color: darkHex, roughness: 0.9, side: THREE.DoubleSide }),
+    );
+    hood.position.set(0, 0.06, -0.03); hood.rotation.x = -0.14; head.add(hood); parts.hood = hood;
+
+    // Asymmetric brimmed wizard hat: shaped drooping brim, banded leaning crown,
+    // a small star sigil. The brim sits above the brows, framing the face.
+    const brim = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.14, 20, 1, true), hatMat);
+    brim.position.set(0, 0.29, 0); brim.rotation.set(0.05, 0, 0.06); head.add(brim);
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(0.31, 1.0, 16), hatMat);
+    crown.position.set(0.04, 0.78, -0.01); crown.rotation.z = 0.16; head.add(crown); parts.hat = true;
+    const crownTip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.34, 12), hatMat);
+    crownTip.position.set(0.16, 1.24, -0.02); crownTip.rotation.z = 0.5; head.add(crownTip);
+    const hatBand = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.045, 6, 16), trimMat);
+    hatBand.rotation.x = Math.PI / 2; hatBand.position.set(0, 0.33, 0); hatBand.rotation.z = 0.06; head.add(hatBand);
+    const hatStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), trimMat); hatStar.position.set(0, 0.52, 0.24); head.add(hatStar);
+
+    // ---- staff, positioned so the OFF hand actually grips it (computed) ----
+    torso.updateMatrixWorld(true);
+    const gripPos = off.hand.getWorldPosition(new THREE.Vector3()); // g-local (g at origin during build)
+    const staff = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 2.5, 8), leatherMat);
+    shaft.position.y = 1.15; staff.add(shaft);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x2c2438, roughness: 0.6 }));
+    grip.position.y = gripPos.y; staff.add(grip); parts.grip = true;
+    const crook = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 14, Math.PI * 1.2), metalMat);
+    crook.position.y = 2.34; crook.rotation.x = Math.PI / 2; crook.rotation.z = -0.3; staff.add(crook);
+    const crystal = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.15, 0),
+      new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    crystal.position.y = 2.5; staff.add(crystal);
+    staff.position.set(gripPos.x, 0, gripPos.z);
+    torso.add(staff); parts.staff = staff; parts.staffCrystal = true;
+
+    g.userData = {
+      // cast-tell + legacy contract
+      hand, aura, robe: overSkirt, staff, hood, belt, staffCrystal: crystal, parts,
+      robeLayers: 3, robePanels: 4,
+      // animation rig
+      torso, head, castArm: cast.arm, offArm: off.arm, offHand: off.hand, staffShaft: shaft,
+      rest: { torsoY: 0, castArmX: restCastX, headX: 0.14 },
+      anim: { enabled: false, breath: 0, castRaise: 0 },
+      // debug metadata
+      meta: { eyes: 2, nose: true, beard: true, brows: true, arms: 2, articulated: true, crest: true, mantle: true },
+    };
+    // Start in the static rest pose (correct look under reduced motion / frame 0).
+    head.rotation.x = 0.14;
     return g;
   }
 
   _buildEnemy() {
-    this.enemy = this._robeFigure(0x3a2d5e, 0xb98bff);
+    this.enemy = this._robeFigure(0x4c3c72, 0xb98bff);
     this.enemy.position.set(0, 0, ENEMY_Z);
-    this.enemy.rotation.y = Math.PI; // face the player
+    // The figure's front (placket, buckle, crest, face) is built on +Z and the
+    // camera/player stand at +Z, so no yaw is needed to face the player. (The
+    // previous rotation.y = PI turned the model's BACK to the camera.)
+    this.enemy.rotation.y = 0;
     this.scene.add(this.enemy);
+  }
+
+  // Restrained opponent animation: idle breathing + robe/head sway (skipped
+  // under reduced motion) plus a casting tell — the cast arm extends toward the
+  // player while the aura and staff crystal light up in the school colour. The
+  // casting tell is gameplay-relevant, so it stays active (snapping instantly)
+  // even under reduced motion; only the decorative idle sway is suppressed.
+  _animateEnemy(dtMs, enemyState) {
+    const e = this.enemy; if (!e) return;
+    const ud = e.userData; const t = this._t;
+    const casting = enemyState && enemyState.casting ? enemyState.casting : null;
+    const prog = casting ? 1 - casting.ticks / Math.max(1, casting.totalTicks || 1) : 0;
+
+    // Aura tint + staff crystal glow (school-coloured cast tell).
+    const aura = ud.aura, crystal = ud.staffCrystal;
+    if (casting) {
+      const sp = SPELLS_BY_ID[casting.spellId];
+      const col = SCHOOL_COLOR[sp?.school] || 0x8b6bff;
+      if (aura) { aura.material.color.setHex(col); aura.material.opacity = 0.3 + prog * 0.6; }
+      if (crystal) { crystal.material.color.setHex(col); crystal.material.opacity = 0.6 + prog * 0.4; }
+    } else {
+      if (aura) aura.material.opacity *= 0.85;
+      if (crystal) crystal.material.opacity += (0.5 - crystal.material.opacity) * 0.1;
+    }
+
+    // Cast arm extension toward the player (0 at rest, forward+up while casting).
+    const targetRaise = casting ? 0.5 + prog * 0.7 : 0;
+    const k = this.reduced ? 1 : 1 - Math.exp(-12 * Math.max(0, dtMs) * 0.001);
+    ud.anim.castRaise += (targetRaise - ud.anim.castRaise) * k;
+    if (ud.castArm) ud.castArm.rotation.x = ud.rest.castArmX - ud.anim.castRaise;
+
+    // Idle life: breathing bob + robe/shoulder sway + head looking at the player.
+    if (this.reduced) {
+      if (ud.torso) { ud.torso.position.y = ud.rest.torsoY; ud.torso.rotation.z = 0; }
+      if (ud.robe) ud.robe.rotation.z = 0;
+      if (ud.head) ud.head.rotation.set(ud.rest.headX, 0, 0);
+      ud.anim.enabled = false; ud.anim.breath = 0;
+      return;
+    }
+    const breath = Math.sin(t * 1.5);
+    if (ud.torso) { ud.torso.position.y = ud.rest.torsoY + breath * 0.014; ud.torso.rotation.z = Math.sin(t * 0.7) * 0.012; }
+    if (ud.robe) ud.robe.rotation.z = Math.sin(t * 0.6 + 0.5) * 0.02;
+    if (ud.head) {
+      ud.head.rotation.x = ud.rest.headX + breath * 0.03;
+      ud.head.rotation.y = Math.sin(t * 0.5) * 0.05;
+    }
+    ud.anim.enabled = true; ud.anim.breath = +breath.toFixed(3);
   }
 
   _buildHands() {
@@ -442,16 +621,19 @@ export class Arena {
     this.handRig.add(this.rightHand);
   }
 
-  // Ward (frontal rune disc) + Barrier Dome (layered sphere) visuals per wizard.
+  // Ward (frontal rune disc) + Barrier Dome (layered sphere) + Reflect (angled
+  // mirror plane) visuals per wizard.
   _buildGuards() {
     this.pWard = makeWardVfx(this.reduced); this.pWard.object3D.visible = false; this.scene.add(this.pWard.object3D);
     this.eWard = makeWardVfx(this.reduced); this.eWard.object3D.visible = false; this.scene.add(this.eWard.object3D);
     this.pDome = makeDomeVfx(this.reduced); this.pDome.object3D.visible = false; this.scene.add(this.pDome.object3D);
     this.eDome = makeDomeVfx(this.reduced); this.eDome.object3D.visible = false; this.scene.add(this.eDome.object3D);
+    this.pReflect = makeReflectGuardVfx(this.reduced); this.pReflect.object3D.visible = false; this.scene.add(this.pReflect.object3D);
+    this.eReflect = makeReflectGuardVfx(this.reduced); this.eReflect.object3D.visible = false; this.scene.add(this.eReflect.object3D);
   }
 
   _disposeGuards() {
-    for (const g of [this.pWard, this.eWard, this.pDome, this.eDome]) {
+    for (const g of [this.pWard, this.eWard, this.pDome, this.eDome, this.pReflect, this.eReflect]) {
       if (g) { this.scene.remove(g.object3D); g.dispose(); }
     }
   }
@@ -482,6 +664,7 @@ export class Arena {
     this.camera.position.x = Math.sin(this._idleT) * 1.2;
     this.camera.lookAt(0, 1.5, ENEMY_Z);
     this._t += dtMs * 0.001;
+    this._animateEnemy(dtMs, null);
     this._updateAcademy(dtMs);
     this._updateEffects(dtMs);
     this._updateDebug(dtMs);
@@ -522,6 +705,25 @@ export class Arena {
       if (o.isLine || o.isLineSegments || o.isLineLoop) lines++;
     });
     const wiz = (this.enemy && this.enemy.userData) || {};
+    const meta = wiz.meta || {};
+
+    // Front-facing check: the model's front is local +Z; the player stands at
+    // +Z relative to the enemy, so a positive dot means it faces the camera.
+    let facing = { towardCamera: false, dot: 0 };
+    let staffHeld = false, gripGap = null;
+    if (this.enemy) {
+      const fwd = new THREE.Vector3(0, 0, 1)
+        .applyQuaternion(this.enemy.getWorldQuaternion(new THREE.Quaternion())).normalize();
+      const dot = fwd.dot(new THREE.Vector3(0, 0, 1)); // player is +Z from the enemy
+      facing = { towardCamera: dot > 0.25, dot: +dot.toFixed(3) };
+      if (wiz.offHand && wiz.staffShaft) {
+        const hp = wiz.offHand.getWorldPosition(new THREE.Vector3());
+        const sp = wiz.staffShaft.getWorldPosition(new THREE.Vector3());
+        gripGap = +Math.hypot(hp.x - sp.x, hp.z - sp.z).toFixed(3); // horizontal distance to the shaft
+        staffHeld = gripGap < 0.25;
+      }
+    }
+
     return {
       components: {
         sky: !!this._sky, moon: !!this._moon, stars: !!this._stars,
@@ -534,9 +736,30 @@ export class Arena {
       wizard: {
         parts: Object.keys(wiz.parts || {}),
         hasStaff: !!wiz.staff, hasHood: !!wiz.hood, hasBelt: !!wiz.belt,
-        robeLayers: wiz.robeLayers || 0,
+        robeLayers: wiz.robeLayers || 0, robePanels: wiz.robePanels || 0,
+        facing,
+        face: { eyes: meta.eyes || 0, nose: !!meta.nose, beard: !!meta.beard, brows: !!meta.brows },
+        arms: { count: meta.arms || 0, articulated: !!meta.articulated },
+        staffHeld, gripGap,
+        hasCrest: !!meta.crest, hasMantle: !!meta.mantle,
+        animation: {
+          enabled: !this.reduced,
+          breath: (wiz.anim && wiz.anim.breath) || 0,
+          castRaise: +(((wiz.anim && wiz.anim.castRaise) || 0).toFixed(3)),
+          reducedMotion: this.reduced,
+        },
       },
       firstPerson: { gloveParts: this._gloveParts || 0, hasWand: !!this.wandTip },
+      guards: {
+        ward: this.pWard && this.pWard.kind,
+        barrier: this.pDome && this.pDome.kind,
+        reflect: this.pReflect && this.pReflect.kind,
+        distinct: new Set([
+          this.pWard && this.pWard.kind,
+          this.pDome && this.pDome.kind,
+          this.pReflect && this.pReflect.kind,
+        ].filter(Boolean)).size === 3,
+      },
       budget: {
         lights, meshes, transparent, points, lines,
         lightBudgetOk: lights <= 8, transparentBudgetOk: transparent <= 110,
@@ -569,22 +792,8 @@ export class Arena {
     this.camera.position.y = 1.7 + shakeY;
     this.camera.lookAt(this.enemy.position.x, 1.5 + shakeY * 0.5, ENEMY_Z);
 
-    // Enemy casting tell: raise + tint the aura by school, and light the staff.
-    const eAura = this.enemy.userData.aura;
-    const eCrystal = this.enemy.userData.staffCrystal;
-    if (enemy.casting) {
-      const sp = SPELLS_BY_ID[enemy.casting.spellId];
-      const col = SCHOOL_COLOR[sp?.school] || 0x8b6bff;
-      eAura.material.color.setHex(col);
-      const prog = 1 - enemy.casting.ticks / Math.max(1, enemy.casting.totalTicks || 1);
-      eAura.material.opacity = 0.3 + prog * 0.6;
-      this.enemy.userData.hand.position.y = 1.35 + prog * 0.5;
-      if (eCrystal) { eCrystal.material.color.setHex(col); eCrystal.material.opacity = 0.6 + prog * 0.4; }
-    } else {
-      eAura.material.opacity *= 0.85;
-      this.enemy.userData.hand.position.y += (1.35 - this.enemy.userData.hand.position.y) * 0.2;
-      if (eCrystal) eCrystal.material.opacity += (0.55 - eCrystal.material.opacity) * 0.1;
-    }
+    // Enemy idle breathing + casting tell (arm extension, aura + staff glow).
+    this._animateEnemy(dtMs, enemy);
 
     // Player wand tip glows during own windup.
     if (player.casting) {
@@ -628,6 +837,7 @@ export class Arena {
   _syncGuards(w, z) {
     const ward = w.id === 0 ? this.pWard : this.eWard;
     const dome = w.id === 0 ? this.pDome : this.eDome;
+    const reflect = w.id === 0 ? this.pReflect : this.eReflect;
     ward.object3D.visible = !!w.shield;
     if (w.shield) {
       ward.object3D.position.set(wizardX(w), 1.1, z + (z > 0 ? -0.6 : 0.6));
@@ -638,6 +848,14 @@ export class Arena {
     if (w.barrier) {
       dome.object3D.position.set(wizardX(w), 1.2, z);
       dome.update({ dtMs: 16, strength: 1, time: this._t });
+    }
+    // Reflect is a persistent state visual tied to the live reflect window; it
+    // vanishes the same tick a projectile consumes it (reflectTicks -> 0).
+    reflect.object3D.visible = w.reflectTicks > 0;
+    if (w.reflectTicks > 0) {
+      reflect.object3D.position.set(wizardX(w), 1.15, z + (z > 0 ? -0.55 : 0.55));
+      reflect.object3D.lookAt(0, 1.15, 0);
+      reflect.update({ dtMs: 16, strength: 1, time: this._t });
     }
   }
 
@@ -1002,6 +1220,26 @@ export class Arena {
     this.scene.add(handle.object3D);
     const entry = { handle, age: 0, life: 2600, kind: handle.kind };
     entry.tick = (dt) => { entry.age += dt; handle.update({ dtMs: dt, fade: 1 - entry.age / entry.life, time: this._t, reduced: this.reduced }); };
+    while (this._debug.length >= 16) { const old = this._debug.shift(); this.scene.remove(old.handle.object3D); old.handle.dispose(); }
+    this._debug.push(entry);
+    return entry.kind;
+  }
+
+  // Spawn any of the three persistent guard visuals (Ward / Barrier Dome /
+  // Reflect) into the dev gallery so the smoke test can confirm they draw
+  // DISTINCT objects, animate WebGL frames, and dispose cleanly. Never wired to
+  // production UI (the live guards are driven by _syncGuards from sim state).
+  debugSpawnGuard(kind) {
+    const k = String(kind).toLowerCase();
+    const handle = k === 'ward' ? makeWardVfx(this.reduced)
+      : k === 'dome' || k === 'barrier' ? makeDomeVfx(this.reduced)
+        : k === 'reflect' ? makeReflectGuardVfx(this.reduced)
+          : null;
+    if (!handle) return null;
+    handle.object3D.position.set(0, 1.2, ENEMY_Z + 2);
+    this.scene.add(handle.object3D);
+    const entry = { handle, age: 0, life: 2200, kind: handle.kind };
+    entry.tick = (dt) => { entry.age += dt; handle.update({ dtMs: dt, strength: 1, time: this._t }); };
     while (this._debug.length >= 16) { const old = this._debug.shift(); this.scene.remove(old.handle.object3D); old.handle.dispose(); }
     this._debug.push(entry);
     return entry.kind;

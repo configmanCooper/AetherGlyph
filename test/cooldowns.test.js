@@ -8,6 +8,8 @@ import { dirname, join } from 'node:path';
 import { createHarness } from './tiny.js';
 import { parseCsv, rowsToSpells } from '../scripts/generate-spells.js';
 import { SPELL_CATALOG, SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
+import { effectFor } from '../shared/src/sim/spellEffects.js';
+import { STATUSES, ZONE } from '../shared/src/sim/constants.js';
 import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { TICK_HZ } from '../shared/src/sim/constants.js';
@@ -16,15 +18,43 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CSV_PATH = join(__dirname, '..', 'design', 'spells.csv');
 
 // The single reviewed source-of-truth cooldown table (seconds), keyed by id.
+// Rebalanced so every persistent protective / buff / debuff / control /
+// environment / secret spell carries a cooldown >= 2x its active effect
+// duration (see the data-driven check below) while staying within [2, 60]s.
 const TARGET_COOLDOWNS = {
-  1: 3, 2: 4, 3: 2, 4: 5, 5: 5, 6: 9, 7: 18, 8: 24, 9: 24,
-  10: 8, 11: 18, 12: 7, 13: 10, 14: 6, 15: 24,
-  16: 14, 17: 20, 18: 16, 19: 16, 20: 18,
-  21: 9, 22: 12, 23: 12, 24: 14, 25: 20,
+  1: 18, 2: 18, 3: 18, 4: 5, 5: 5, 6: 18, 7: 18, 8: 24, 9: 24,
+  10: 26, 11: 18, 12: 8, 13: 10, 14: 6, 15: 48,
+  16: 36, 17: 36, 18: 30, 19: 36, 20: 30,
+  21: 24, 22: 24, 23: 24, 24: 14, 25: 20,
   26: 12, 27: 14, 28: 6, 29: 16, 30: 20,
-  31: 10, 32: 12, 33: 8, 34: 24, 35: 14, 36: 16,
+  31: 42, 32: 42, 33: 8, 34: 24, 35: 36, 36: 48,
   37: 32, 38: 45, 39: 60, 40: 50,
 };
+
+// The active/lingering window (seconds) a spell's effect occupies, derived from
+// the SAME machine-usable effect + status + zone data the sim runs on (never a
+// hand-copied number). Instantaneous spells (no lingering state) return 0 and
+// are unconstrained by the 2x rule below.
+function activeDurationS(eff) {
+  if (!eff) return 0;
+  switch (eff.type) {
+    case 'shield': case 'barrier': case 'mirror': case 'phoenix': case 'channel':
+      return eff.durationS || 0;
+    case 'reflect': return eff.windowS || 0;
+    case 'blink': return eff.evadeS || 0;
+    case 'zone': return (ZONE.durations[eff.zoneKind]) || 0;
+    case 'buff': return (STATUSES[eff.self] && STATUSES[eff.self].durationS) || 0;
+    case 'projectile':
+      // A projectile's lingering effect is the status it leaves behind (a DoT,
+      // slow or flag). Conditional, sub-second stuns are not a persistent state.
+      return (eff.status && STATUSES[eff.status.name] && STATUSES[eff.status.name].durationS) || 0;
+    case 'hex':
+      if (eff.status && STATUSES[eff.status.name]) return STATUSES[eff.status.name].durationS;
+      if (eff.conditionalControl && eff.conditionalControl.durationS) return eff.conditionalControl.durationS;
+      return 0;
+    default: return 0;
+  }
+}
 
 export function run() {
   const { ok, eq, report } = createHarness();
@@ -50,8 +80,9 @@ export function run() {
     if (!inRange) { rangeOk = false; outOfRange.push(`${s.id}:${cd}`); }
   }
   ok(rangeOk, `all 40 cooldowns are within [2,60]s (offenders: ${outOfRange.join(',') || 'none'})`);
-  // The extremes are explicitly present so the range endpoints stay meaningful.
-  eq(Math.min(...SPELL_CATALOG.map((s) => s.cooldown_s)), 2, 'shortest cooldown is 2s (Spark Dart)');
+  // The upper endpoint stays meaningful (Phoenix is the deliberate 60s ceiling);
+  // the lower endpoint need only remain within the reviewed [2,60] band.
+  ok(Math.min(...SPELL_CATALOG.map((s) => s.cooldown_s)) >= 2, 'shortest cooldown is still >= 2s');
   eq(Math.max(...SPELL_CATALOG.map((s) => s.cooldown_s)), 60, 'longest cooldown is 60s (Phoenix Covenant)');
 
   // ---- 3. generated catalog matches the canonical CSV exactly --------------
@@ -64,24 +95,60 @@ export function run() {
   }
   ok(csvMatchesGen, 'generated cooldowns match design/spells.csv (regenerate with npm run gen:spells)');
 
-  // ---- 4. representative power ordering -------------------------------------
+  // ---- 4. data-driven rule: cooldown >= 2x active effect duration ----------
+  // The core rebalance invariant: no persistent protective / buff / debuff /
+  // control / environment / secret spell may be re-applied before its own effect
+  // expires, so its cooldown must be at least TWICE its active window. Durations
+  // are derived from the same effect/status/zone data the sim runs on, and the
+  // check covers EVERY relevant spell (not a hand-picked few). Instantaneous
+  // spells (0s window) are exempt from the lower bound but still capped at 60s.
   const cd = (id) => SPELLS_BY_ID[id].cooldown_s;
-  // Cheap spammable basics are the shortest.
-  ok(cd(3) <= cd(1) && cd(1) < cd(6), 'basic bolts (Spark Dart <= Ember Bolt) are shorter than Flame Wave');
-  // Heavy charged offensives out-cost light single-target bolts.
+  const durFailures = [];
+  let persistentCovered = 0;
+  for (const s of SPELL_CATALOG) {
+    const dur = activeDurationS(effectFor(s.id));
+    if (dur > 0) {
+      persistentCovered++;
+      if (s.cooldown_s < 2 * dur) durFailures.push(`${s.name}(${s.id}) cd ${s.cooldown_s}s < 2x${dur}s`);
+    }
+    if (s.cooldown_s > 60) durFailures.push(`${s.name}(${s.id}) cd ${s.cooldown_s}s > 60s cap`);
+  }
+  ok(durFailures.length === 0,
+    `every persistent spell has cooldown >= 2x its active duration and <= 60s (offenders: ${durFailures.join('; ') || 'none'})`);
+  ok(persistentCovered >= 30,
+    `the 2x-duration rule actually spans the persistent roster (covered ${persistentCovered} spells)`);
+
+  // Spot-check the headline reviewed windows explicitly (belt-and-braces on top
+  // of the generic rule): active window seconds -> minimum required cooldown.
+  const REVIEWED = { 10: 12.6, 11: 9, 12: 3.6, 14: 1.05, 15: 24, 16: 18, 17: 18, 18: 15, 19: 18, 20: 15,
+    21: 12, 22: 12, 23: 12, 25: 6, 26: 4.5, 29: 6, 31: 21, 32: 21, 35: 18, 36: 24, 37: 12, 38: 18, 39: 15 };
+  let reviewedOk = true;
+  for (const [id, dur] of Object.entries(REVIEWED)) {
+    if (!(cd(Number(id)) >= 2 * dur)) reviewedOk = false;
+  }
+  ok(reviewedOk, 'every reviewed protective/status/environment window is out-cooled by >= 2x');
+
+  // ---- 5. representative power ordering (consistent with the new table) -----
+  // Status-applying bolts (leave a 9s DoT/slow) out-cool the no-status basics.
+  ok(cd(1) === 18 && cd(2) === 18 && cd(3) === 18 && cd(6) === 18,
+    'the four status-applying bolts sit at 2x their 9s status (18s)');
+  ok(cd(4) < cd(1) && cd(5) < cd(1), 'no-status bolts (Stone Shard/Arcane Missile) are the cheapest offense');
+  // Heavy charged nukes still out-cost the light status bolts.
   ok(cd(8) > cd(6) && cd(9) > cd(2), 'heavy nukes (Fireball/Ice Comet) cost more than light bolts');
-  // The four secret spells carry the heaviest cooldowns of the roster.
-  const secretCds = [37, 38, 39, 40].map(cd);
-  const nonSecretMax = SPELL_CATALOG.filter((s) => !s.secret).reduce((m, s) => Math.max(m, s.cooldown_s), 0);
-  ok(Math.min(...secretCds) > nonSecretMax, 'every secret spell out-cools every non-secret spell');
-  // The signature ultimate (Phoenix) is the single longest.
-  ok(cd(39) >= cd(40) && cd(39) >= cd(38) && cd(39) >= cd(37), 'Phoenix Covenant has the longest cooldown');
+  // Protective utility scales with its active window, not its category: Ward's
+  // 12.6s window out-cools Barrier Dome's 9s, and Stone Wall's 24s cover is the
+  // longest-held protection so it carries the longest defensive cooldown.
+  ok(cd(10) > cd(11), 'Ward (longer 12.6s window) out-cools Barrier Dome (9s)');
+  ok(cd(15) > cd(10) && cd(15) > cd(14), 'Stone Wall (24s cover) out-cools Ward and Blink');
   // Strong control / lockdown costs more than a light interrupt.
   ok(cd(30) > cd(28), 'Thunderclap (hard stun) out-cools Concussive Blast (light interrupt)');
-  // Protective utility scaled up with its new, longer active windows.
-  ok(cd(11) > cd(10) && cd(15) > cd(14), 'Barrier Dome > Ward and Stone Wall > Blink (stronger protection, longer cooldown)');
+  // The signature ultimate (Phoenix) is the single longest on the roster; the
+  // secret cohort is no longer required to out-cool every non-secret (Stone Wall
+  // and Rune Snare now match the mid secrets at 48s).
+  ok(cd(39) >= cd(40) && cd(39) >= cd(38) && cd(39) >= cd(37), 'Phoenix Covenant has the longest cooldown');
+  eq(cd(39), Math.max(...SPELL_CATALOG.map((s) => s.cooldown_s)), 'Phoenix Covenant is the global cooldown ceiling');
 
-  // ---- 5. shared simulation enforces cooldowns for every adapter ------------
+  // ---- 6. shared simulation enforces cooldowns for every adapter ------------
   // Practice vs AI's LocalMatch and the authoritative online MatchRoom both call
   // this same Sim.step/beginCast path.
   const sim = new Sim({

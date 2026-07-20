@@ -121,7 +121,7 @@ export const CAMPAIGN = [
       { id: 'bolt3', text: 'Land a third Ember Bolt using the dotted guide', predicate: 'land-spell:1:3', expectSpell: 1 },
     ],
     remediation: ['regress-guide', 'show-ghost'],
-    maxTicks: 1200,
+    maxTicks: 3000,
     solution: (sim, t) => {
       if (t.facts.hitsOnOppBySpell.get(1) >= 3) return IDLE;
       return pc(sim, 1) ? { move: 0, cast: 1, castQuality: 1 } : IDLE;
@@ -204,7 +204,7 @@ export const CAMPAIGN = [
     maxTicks: 2400,
     solution: (sim, t) => {
       const p = sim.wizards[0];
-      if (t.facts.blockedDamage < 20) {
+      if (t.facts.blockedDamage < 8) {
         if (!p.shield && pc(sim, 10)) return { cast: 10, castQuality: 1 };
         return IDLE;
       }
@@ -335,21 +335,20 @@ export const CAMPAIGN = [
     narration: [
       'Oil is slick and flammable. Ember ignites it for a capped burst.',
       'Rain washes Oil away before it can catch. You may own only two zones.',
-      'Wash one Oil slick with Rain, then ignite another with Ember.',
+      'Wash the instructor\'s Oil slick with Rain, then place and ignite your own.',
     ],
     timerEnabled: false, pressureEnabled: false,
-    playerLoadout: [31, 32, 1], opponentLoadout: [1],
+    playerLoadout: [31, 32, 1], opponentLoadout: [31],
     taughtSpells: [
       { id: 31, enterStage: 1, exitStage: 1 },
       { id: 32, enterStage: 1, exitStage: 1 },
       { id: 1, enterStage: 1, exitStage: 1 },
     ],
     drills: [],
-    opponent: { type: 'script', config: { behavior: 'idle' } },
+    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 0, cast: 31 }] } },
     objectives: [
-      { id: 'oil-wash', text: 'Place an Oil slick to wash away', predicate: 'create-zone:Oil', expectSpell: 31 },
-      { id: 'wash', text: 'Wash the Oil slick with Rain', predicate: 'reaction:WashedGround', expectSpell: 32 },
-      { id: 'oil-fire', text: 'Place another Oil slick to ignite', predicate: 'create-zone:Oil:2', expectSpell: 31 },
+      { id: 'wash', text: 'Wash the instructor\'s Oil slick with Rain', predicate: 'reaction:WashedGround', expectSpell: 32 },
+      { id: 'oil-fire', text: 'Place an Oil slick to ignite', predicate: 'create-zone:Oil', expectSpell: 31 },
       { id: 'ignite', text: 'Ignite the Oil slick with Ember', predicate: 'reaction:FlashFire', expectSpell: 1 },
     ],
     clues: ['phoenixOil'],
@@ -359,8 +358,7 @@ export const CAMPAIGN = [
       const washed = t.facts.reactionsSetPlayer.has('WashedGround');
       const flashed = t.facts.reactionsSetPlayer.has('FlashFire');
       if (!washed) {
-        if (!playerZone(sim, 'Oil') && pc(sim, 31)) return { cast: 31, castQuality: 1 };
-        if (playerZone(sim, 'Oil') && pc(sim, 32)) return { cast: 32, castQuality: 1 };
+        if (sim.zones.some((z) => z.kind === 'Oil') && pc(sim, 32)) return { cast: 32, castQuality: 1 };
         return IDLE;
       }
       if (!flashed) {
@@ -625,7 +623,7 @@ export const CAMPAIGN = [
     timerEnabled: true, pressureEnabled: true,
     loadoutRule: 'legal',
     playerLoadout: PRESETS_BY_KEY['storm-tempo'].ids.slice(),
-    opponentLoadout: PRESETS_BY_KEY['stone-warden'].ids.slice(),
+    opponentLoadout: PRESETS_BY_KEY['prismatic-hybrid'].ids.slice(),
     taughtSpells: [],
     drills: [],
     opponent: { type: 'practice', difficulty: 'medium' },
@@ -718,7 +716,7 @@ export const CAMPAIGN = [
       { id: 'answer', text: 'Land Flame Wave in the counterattack', predicate: 'land-spell:6' },
     ],
     remediation: ['slow-script'],
-    maxTicks: 2400,
+    maxTicks: 4500,
     solution: (sim, t) => {
       const p = sim.wizards[0];
       if (t.facts.blockedDamage < 20) {

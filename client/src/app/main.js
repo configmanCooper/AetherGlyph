@@ -1521,6 +1521,7 @@ if (typeof window !== 'undefined') {
     profiles: () => VFX_IDS.map((id) => ({ id, kind: SPELL_VFX[id].kind, family: SPELL_VFX[id].family, school: SPELL_VFX[id].school })),
     spawn: (id) => { try { return arena.debugSpawn(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnZone: (kind) => { try { return arena.debugSpawnZone(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    spawnGuard: (kind) => { try { return arena.debugSpawnGuard(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnReaction: (name) => { try { return arena.debugSpawnReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
     productionReaction: (name) => { try { return arena.debugProductionReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
     reactionProfiles: () => REACTION_VFX_NAMES.map((n) => ({ name: n, kind: REACTION_VFX[n].kind, vfx: REACTION_VFX[n].vfx, anchor: REACTION_VFX[n].anchor })),

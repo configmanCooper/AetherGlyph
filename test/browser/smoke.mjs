@@ -589,6 +589,32 @@ try {
   if (uniqueZoneKinds.size !== weatherKinds.length) fail('weather zone families are not all visually distinct: ' + JSON.stringify(weatherResult.spawned));
   if (weatherResult.afterClear !== 0) fail('weather gallery did not dispose zones on clear: ' + weatherResult.afterClear);
 
+  // ---- Persistent guard family smoke ---------------------------------------
+  // Ward, Barrier Dome and Reflect are the three standing guard visuals. Each
+  // must draw a DISTINCT object, animate WebGL frames, survive a reduced-motion
+  // pass, and dispose cleanly. Reflect is the new persistent Reflect-window
+  // visual and must not collapse into Ward's or the Dome's silhouette.
+  const guardKinds = ['ward', 'dome', 'reflect'];
+  const guardResult = await page.evaluate(async (kinds) => {
+    if (!window.__aegVfx || !window.__aegVfx.spawnGuard) return { error: 'no spawnGuard hook' };
+    window.__aegVfx.clear();
+    const spawned = [];
+    for (const k of kinds) { spawned.push({ k, kind: window.__aegVfx.spawnGuard(k) }); await new Promise((r) => setTimeout(r, 25)); }
+    await new Promise((r) => setTimeout(r, 420)); // run update()/WebGL on each guard
+    window.__aegVfx.clear(); window.__aegVfx.setReduced(true);
+    for (const k of kinds) window.__aegVfx.spawnGuard(k);
+    await new Promise((r) => setTimeout(r, 200));
+    window.__aegVfx.setReduced(false); window.__aegVfx.clear();
+    return { spawned, afterClear: window.__aegVfx.kinds().length };
+  }, guardKinds);
+  if (!guardResult || guardResult.error) fail('guard gallery hook missing: ' + JSON.stringify(guardResult));
+  const badGuard = (guardResult.spawned || []).filter((s) => !s.kind || typeof s.kind !== 'string');
+  if (badGuard.length) fail('some guard visuals produced no VFX kind: ' + JSON.stringify(guardResult.spawned));
+  const uniqueGuardKinds = new Set((guardResult.spawned || []).map((s) => s.kind));
+  if (uniqueGuardKinds.size !== guardKinds.length) fail('guard visuals are not all visually distinct: ' + JSON.stringify(guardResult.spawned));
+  if (!uniqueGuardKinds.has('reflectGuard')) fail('persistent Reflect guard visual missing from gallery: ' + JSON.stringify(guardResult.spawned));
+  if (guardResult.afterClear !== 0) fail('guard gallery did not dispose visuals on clear: ' + guardResult.afterClear);
+
   // Production transient path (not the gallery) must receive the animation clock.
   const releaseMotion = await page.evaluate(async () => {
     const kind = window.__aegVfx.productionRelease(17); // Aether Surge ribbons
@@ -666,18 +692,50 @@ try {
   if (!(comp.floatingLights >= 4)) fail('academy has too few floating lanterns: ' + comp.floatingLights);
   if (!(comp.distantTowers >= 3)) fail('academy has too few distant towers: ' + comp.distantTowers);
   const wiz = academy.wizard || {};
-  for (const part of ['robe', 'hat', 'hood', 'belt', 'staff', 'boots', 'hand']) {
+  for (const part of ['robe', 'hat', 'hood', 'belt', 'staff', 'boots', 'hand',
+    'eyes', 'nose', 'beard', 'brows', 'neck', 'leftArm', 'rightArm', 'crest', 'mantle']) {
     if (!(wiz.parts || []).includes(part)) fail('wizard is missing part: ' + part);
   }
   if (!wiz.hasStaff) fail('wizard has no visible staff');
   if (!(wiz.robeLayers >= 2)) fail('wizard robe should be layered');
+  // Opponent must visibly FACE the first-person camera (front is local +Z).
+  if (!(wiz.facing && wiz.facing.towardCamera && wiz.facing.dot > 0.5)) {
+    fail('opponent wizard is not facing the camera: ' + JSON.stringify(wiz.facing));
+  }
+  // A readable face at duel distance: two eyes, a nose and a beard.
+  if (!(wiz.face && wiz.face.eyes >= 2 && wiz.face.nose && wiz.face.beard && wiz.face.brows)) {
+    fail('wizard face missing eyes/nose/beard/brows: ' + JSON.stringify(wiz.face));
+  }
+  // Articulated arms (upper + fore + hand), one per side.
+  if (!(wiz.arms && wiz.arms.count >= 2 && wiz.arms.articulated)) {
+    fail('wizard arms are not articulated: ' + JSON.stringify(wiz.arms));
+  }
+  // Staff must be gripped by a hand, not floating.
+  if (!wiz.staffHeld) fail('wizard staff is not held by a hand (grip gap ' + wiz.gripGap + ')');
+  // Layered robe panels + academy crest/sigil.
+  if (!(wiz.robePanels >= 2)) fail('wizard robe has too few panels: ' + wiz.robePanels);
+  if (!wiz.hasCrest) fail('wizard robe missing an academy crest');
+  if (!wiz.hasMantle) fail('wizard missing a shoulder mantle');
+  // Idle/casting animation state hook is present and reports live motion.
+  if (!wiz.animation || typeof wiz.animation.enabled !== 'boolean' || typeof wiz.animation.reducedMotion !== 'boolean') {
+    fail('wizard animation state metadata missing: ' + JSON.stringify(wiz.animation));
+  }
   if (!(academy.firstPerson && academy.firstPerson.gloveParts >= 4 && academy.firstPerson.hasWand)) {
     fail('first-person gloves/wand metadata missing: ' + JSON.stringify(academy.firstPerson));
+  }
+  // Three persistent guard visuals (Ward, Barrier Dome, Reflect) exist and are
+  // visually DISTINCT — Reflect must not reuse Ward's or the Dome's kind.
+  const guards = academy.guards || {};
+  if (!(guards.reflect === 'reflectGuard' && guards.ward === 'ward' && guards.barrier === 'barrierDome' && guards.distinct)) {
+    fail('persistent guard visuals (ward/barrier/reflect) missing or not distinct: ' + JSON.stringify(guards));
   }
   if (!(academy.budget && academy.budget.lightBudgetOk && academy.budget.transparentBudgetOk)) {
     fail('academy exceeds mobile light/transparent budget: ' + JSON.stringify(academy.budget));
   }
   console.log('ACADEMY', JSON.stringify(academy.budget), 'columns', comp.arcadeColumns, 'towers', comp.distantTowers);
+  console.log('WIZARD', JSON.stringify(wiz.facing), 'staffHeld', wiz.staffHeld, wiz.gripGap,
+    'face', JSON.stringify(wiz.face), 'arms', JSON.stringify(wiz.arms),
+    'panels', wiz.robePanels, 'anim', JSON.stringify(wiz.animation));
 
   if (errors.length) fail('console/page errors: ' + errors.slice(0, 4).join(' | '));
   if (http404.length) fail('unexpected 404s: ' + http404.slice(0, 4).join(' | '));

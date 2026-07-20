@@ -827,6 +827,60 @@ export function makeDomeVfx(reduced) {
   };
 }
 
+// Persistent Reflect state visual — the standing counterpart to Ward, shown for
+// the whole 3.6s Reflect window (both duelists) and hidden the instant a
+// projectile consumes it. Deliberately DISTINCT from Ward's flat Arcane rune
+// disc: an angled, faceted MIRROR pane on a Gale/silver palette with a sharp
+// rotated-diamond silhouette, a rotating rune-edge of mirrored facets, and a
+// central reflection chevron. Kept translucent + rim-lit so it reads as a
+// glinting deflection plane without masking the opponent or the draw pad.
+export function makeReflectGuardVfx(reduced) {
+  const c = VFX_SCHOOL_PALETTE.Gale;
+  const silver = 0xd6e4ea;
+  const g = new THREE.Group();
+
+  // Slanted mirror pane: a plane turned 45° into a diamond and tilted back, so
+  // it reads as an angled reflective surface rather than a frontal disc.
+  const pane = mesh(G.plane(), matBasic(silver, 0.13, true));
+  pane.scale.set(1.7, 1.7, 1); pane.rotation.set(0.18, 0, Math.PI / 4); g.add(pane);
+
+  // Sharp diamond silhouette (outer) + a nested inner diamond for depth.
+  const diamond = paramLine(4, (u) => { const a = u * Math.PI * 2 + Math.PI / 2; return [Math.cos(a) * 1.3, Math.sin(a) * 1.3, 0]; }, c.core, 0.95, true); g.add(diamond.line);
+  const inner = paramLine(4, (u) => { const a = u * Math.PI * 2 + Math.PI / 2; return [Math.cos(a) * 0.74, Math.sin(a) * 0.74, 0]; }, silver, 0.7, true); g.add(inner.line);
+
+  // Rotating rune-edge: mirrored chevron facets set tangent to the rim. They
+  // spin opposite Ward's runes so the two guards never read the same in motion.
+  const facets = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const f = mesh(G.plane(), matBasic(c.glow, 0.55)); f.scale.set(0.42, 0.1, 1);
+    f.position.set(Math.cos(a) * 1.0, Math.sin(a) * 1.0, 0.02); f.rotation.z = a + Math.PI / 2; facets.add(f);
+  }
+  g.add(facets);
+
+  // Central reflection chevron (two angled bars meeting at a point) — the mark
+  // that visually distinguishes a deflection plane from a solid shield.
+  const chevron = new THREE.Group();
+  for (const s of [-1, 1]) {
+    const bar = mesh(G.plane(), matBasic(c.core, 0.6)); bar.scale.set(0.08, 0.62, 1);
+    bar.position.set(s * 0.2, 0, 0.03); bar.rotation.z = s * 0.6; chevron.add(bar);
+  }
+  g.add(chevron);
+
+  return {
+    object3D: g, kind: 'reflectGuard', family: 'reflectGuard',
+    update(ctx) {
+      const st = ctx.strength ?? 1;
+      const shimmer = reduced ? 1 : (0.78 + Math.sin((ctx.time || 0) * 5.5) * 0.22);
+      pane.material.opacity = (0.09 + st * 0.11) * shimmer;
+      diamond.line.material.opacity = 0.55 + st * 0.4; inner.line.material.opacity = 0.4 + st * 0.3;
+      for (const f of facets.children) f.material.opacity = 0.35 + st * 0.35;
+      if (!reduced) { const s = ctx.time || 0; facets.rotation.z = -s * 0.9; chevron.rotation.z = Math.sin(s * 2.4) * 0.06; }
+    },
+    dispose() { disposeTree(g); },
+  };
+}
+
 export function makeBeamVfx(spellId, reduced) {
   const profile = getSpellVfx(spellId) || { colors: VFX_SCHOOL_PALETTE.Prismatic };
   const c = profile.colors;

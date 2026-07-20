@@ -86,7 +86,7 @@ export function run() {
     let starts = 0, firstStart = null, travelTicks = null;
     let dodged = false, playerDamaged = false;
     const dodgedProjectiles = new Set();
-    for (let i = 0; i < 500 && !rainSim.ended; i++) {
+    for (let i = 0; i < 1400 && !rainSim.ended; i++) {
       const incoming = rainSim.projectiles.find((p) => p.owner === 1 && p.spellId === 3);
       const shouldDodge = incoming && incoming.ticks <= 1 && !dodgedProjectiles.has(incoming.id);
       if (shouldDodge) dodgedProjectiles.add(incoming.id);

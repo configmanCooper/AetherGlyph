@@ -32,6 +32,16 @@ import { CAMPAIGN_BY_ID, nextLessonId } from './campaign.js';
 const TICK_MS = 1000 / TICK_HZ;
 const MAX_CATCHUP = 6;
 
+// Build the shared Sim rules for a lesson (kept in one place so the initial arm
+// and every series-round re-arm stay identical).
+function lessonRules(lesson) {
+  return {
+    timer: !!lesson.timerEnabled,
+    pressure: !!lesson.pressureEnabled,
+    projectileTravelScale: lesson.projectileTravelScale || 1,
+  };
+}
+
 export const STATES = Object.freeze({
   INTRO: 'INTRO', CALIBRATE: 'CALIBRATE', ARMING: 'ARMING', ACTIVE: 'ACTIVE',
   ATTEMPT_FAILED: 'ATTEMPT_FAILED', REMEDIATE: 'REMEDIATE', SUCCESS: 'SUCCESS', PAUSED: 'PAUSED',
@@ -185,11 +195,7 @@ export class TutorialRunner {
     this.sim = new Sim({
       seed: this.seed,
       loadouts,
-      rules: {
-        timer: !!lesson.timerEnabled,
-        pressure: !!lesson.pressureEnabled,
-        projectileTravelScale: lesson.projectileTravelScale || 1,
-      },
+      rules: lessonRules(lesson),
     });
     this._applyArena(lesson.arena);
     this.bot = this._buildOpponent(lesson.opponent);
@@ -419,11 +425,7 @@ export class TutorialRunner {
     this.sim = new Sim({
       seed: this.seed,
       loadouts: [makeLoadout(lesson.playerLoadout), makeLoadout(lesson.opponentLoadout)],
-      rules: {
-        timer: !!lesson.timerEnabled,
-        pressure: !!lesson.pressureEnabled,
-        projectileTravelScale: lesson.projectileTravelScale || 1,
-      },
+      rules: lessonRules(lesson),
     });
     this._applyArena(lesson.arena);
     this.bot = this._buildOpponent(lesson.opponent);

@@ -171,10 +171,20 @@ export function run() {
   const l08Guides = [];
   const rL08 = new TutorialRunner('L08', { seed: 2, onGuide: (g) => l08Guides.push(g) });
   rL08.arm();
-  eq(l08Guides.at(-1).spellId, 31, 'L08 starts with the Oil Script guide');
-  rL08.objectiveStatus['oil-wash'] = true;
+  eq(l08Guides.at(-1).spellId, 32, 'L08 starts with the Rain guide for the instructor\'s Oil');
+  rL08.objectiveStatus.wash = true;
   rL08._advanceGuideOnObjective(rL08.lesson.objectives[0]);
-  eq(l08Guides.at(-1).spellId, 32, 'L08 switches to Rain for the wash objective');
+  eq(l08Guides.at(-1).spellId, 31, 'L08 switches to Oil Script after washing the instructor\'s slick');
+  rL08.objectiveStatus['oil-fire'] = true;
+  rL08._advanceGuideOnObjective(rL08.lesson.objectives[1]);
+  eq(l08Guides.at(-1).spellId, 1, 'L08 switches to Ember Bolt after placing the player\'s Oil');
+  const immediateRain = new TutorialRunner('L08', { seed: 2 });
+  immediateRain.arm();
+  for (let i = 0; i < 120; i++) {
+    immediateRain._stepOnce(i === 0 ? { cast: 32, castQuality: 1 } : {});
+  }
+  ok(immediateRain.tracker.facts.reactionsSetPlayer.has('WashedGround'),
+    'L08 accepts an immediate guided Rain cast after the instructor starts Oil');
 
   const l09Guides = [];
   const rL09 = new TutorialRunner('L09', { seed: 2, onGuide: (g) => l09Guides.push(g) });
