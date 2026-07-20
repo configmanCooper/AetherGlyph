@@ -4,9 +4,11 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.2.1 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.2.2 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
-service, and the deterministic shared simulation. 1.2.1 adds a **persistent
+service, and the deterministic shared simulation. 1.2.2 makes **Blink conceal its
+caster for 3 seconds** while retaining its shorter 1.05s evade window, and raises
+Blink's cooldown to 9 seconds. 1.2.1 adds a **persistent
 Reflect visual** — a standing, angled mirror-plane guard that shows for the whole
 3.6s Reflect window (both duelists) and vanishes the instant a projectile is
 deflected — and **rebalances every cooldown** so no persistent protective, buff,
@@ -35,7 +37,11 @@ The three standing guard visuals stay visually distinct: Ward is a frontal
 Arcane rune disc, Barrier Dome a layered sphere, and Reflect an angled,
 silver/Gale mirror plane with a sharp rotated-diamond silhouette, a rotating
 rune-edge of mirrored facets and a central reflection chevron — readable without
-masking the opponent or the draw pad. Weather zones now
+masking the opponent or the draw pad. Active statuses now appear directly on both
+wizard representations: the opponent gains a pulsing, orbiting aura and the
+first-person gloves/wand glow in status-specific colors (fiery orange for Burning,
+icy blue for Chilled/Frozen, electric yellow for Static, and distinct colors for
+every other buff or debuff). Weather zones now
 read as real weather: falling rain with splash ripples, a drifting fog bank, a
 sweeping curved wind wall, visibly burning fire, frosty ice, and glossy oil. The
 academy stays within a small mobile light/transparent budget and honours the
@@ -43,12 +49,12 @@ reduced-motion setting.
 
 Alongside the visuals, the live balance data remains driven only by
 `design/spells.csv`. **Ward lasts 12.6s, Barrier Dome lasts 9s, and Reflect
-lasts 3.6s**; Blink evade lasts 1.05s, Grounding Mantle 15s, Mirror Twin 12s,
+lasts 3.6s**; Blink is invisible for 3s with a 1.05s evade window, Grounding Mantle 15s, Mirror Twin 12s,
 Phoenix Covenant 15s, and Stone Wall remains a 24s environmental zone. In 1.2.1
 every persistent protective / buff / debuff / control / environment / secret
 spell carries a **cooldown of at least twice its active effect duration** while
 staying within a deliberate **5–60 second** band scaled to its power — e.g. Ward
-26s, Barrier Dome 18s, Reflect 8s, Stone Wall 48s, Haste 36s, Oil/Rain 42s, Fog
+26s, Barrier Dome 18s, Reflect 8s, Blink 9s, Stone Wall 48s, Haste 36s, Oil/Rain 42s, Fog
 36s, Rune Snare 48s, and Phoenix Covenant the 60s ceiling. These data changes
 bump `BALANCE_VERSION`; the rendering itself does not touch the deterministic
 simulation or wire protocol.
@@ -101,8 +107,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10201 /
-versionName 1.2.1). Online play connects to a configurable authoritative service
+`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10202 /
+versionName 1.2.2). Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
 
@@ -352,7 +358,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10201` / `versionName 1.2.1`, no cleartext production traffic,
+  `versionCode 10202` / `versionName 1.2.2`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume + haptics via `@capacitor/app` and
   `@capacitor/haptics`.

@@ -723,6 +723,26 @@ try {
   if (!(academy.firstPerson && academy.firstPerson.gloveParts >= 4 && academy.firstPerson.hasWand)) {
     fail('first-person gloves/wand metadata missing: ' + JSON.stringify(academy.firstPerson));
   }
+  const statusNames = ['Burning', 'Chilled', 'Sloth', 'Soaked', 'Static', 'Sundered', 'Weakened',
+    'Marked', 'Blinded', 'Veiled', 'Rooted', 'Frozen', 'Stunned', 'Haste', 'Grounded',
+    'AetherSurge', 'Attunement', 'Phoenix'];
+  const statusPreview = await page.evaluate((names) => names.map((name) => ({
+    name,
+    state: window.__aegVfx.wizardState([name], [name], 0, 0),
+  })), statusNames);
+  for (const preview of statusPreview) {
+    if (preview.state.error || !preview.state.playerStatusVisible || !preview.state.enemyStatusVisible) {
+      fail('status model indicator missing for ' + preview.name + ': ' + JSON.stringify(preview.state));
+    }
+  }
+  const statusColors = new Set(statusPreview.map((preview) => preview.state.enemyColor));
+  if (statusColors.size < 16) fail('status model colors are not sufficiently distinct: ' + statusColors.size);
+  const blinkVisibility = await page.evaluate(() =>
+    window.__aegVfx.wizardState(['Burning'], ['Static'], 180, 180));
+  if (blinkVisibility.playerModelVisible || blinkVisibility.enemyModelVisible
+      || blinkVisibility.playerStatusVisible || blinkVisibility.enemyStatusVisible) {
+    fail('Blink invisibility leaves wizard/status graphics visible: ' + JSON.stringify(blinkVisibility));
+  }
   // Three persistent guard visuals (Ward, Barrier Dome, Reflect) exist and are
   // visually DISTINCT — Reflect must not reuse Ward's or the Dome's kind.
   const guards = academy.guards || {};

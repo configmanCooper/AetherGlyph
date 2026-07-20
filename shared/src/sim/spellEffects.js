@@ -92,7 +92,7 @@ export const SPELL_EFFECTS = {
   11: { type: BARRIER, absorb: 60, durationS: 9, blocksOffense: true, school: 'Arcane' }, // Barrier Dome
   12: { type: REFLECT, windowS: 3.6, school: 'Gale' }, // Reflect
   13: { type: DISPEL, statuses: 2, orZone: true, school: 'Arcane' }, // Dispel
-  14: { type: BLINK, arcDelta: 0.5, evadeS: 1.05, escapesRoot: true, school: 'Arcane' }, // Blink
+  14: { type: BLINK, arcDelta: 0.5, evadeS: 1.05, invisibleS: 3, escapesRoot: true, school: 'Arcane' }, // Blink
   15: { type: ZONE, zoneKind: 'Cover', school: 'Stone' }, // Stone Wall
 
   // === Buffs (5) ===========================================================

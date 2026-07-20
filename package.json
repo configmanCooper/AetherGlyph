@@ -1,6 +1,6 @@
 {
   "name": "aetherglyph",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "type": "module",
   "description": "Aetherglyph: Arcane Duels — Android-first, draw-to-cast 1v1 wizard duel. 1.0 release: complete offline solo campaign, Practice vs AI (fair Easy/Medium/Hard) with post-round coaching, and the authoritative online service, all on the deterministic shared simulation. Vanilla ES modules + Three.js, no build step.",

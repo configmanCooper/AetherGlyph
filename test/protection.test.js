@@ -34,6 +34,7 @@ export function run() {
   eq(effectFor(11).durationS, 9, 'Barrier Dome lasts 9s');
   eq(effectFor(12).windowS, 3.6, 'Reflect window is 3.6s');
   eq(effectFor(14).evadeS, 1.05, 'Blink evade lasts 1.05s (was 0.35s)');
+  eq(effectFor(14).invisibleS, 3, 'Blink invisibility lasts 3s');
   eq(STATUSES.Grounded.durationS, 15, 'Grounded status lasts 15s (was 5s)');
   eq(effectFor(37).durationS, 12, 'Mirror Twin decoy lasts 12s (was 4s)');
   eq(effectFor(39).durationS, 15, 'Phoenix Covenant aura lasts 15s (was 5s)');
@@ -57,11 +58,20 @@ export function run() {
   near(firstSeen(11, (w) => w.barrier && w.barrier.ticks), sToTicks(9), 2, 'Barrier Dome grants a ~9s barrier in-sim');
   near(firstSeen(12, (w) => w.reflectTicks), sToTicks(3.6), 2, 'Reflect grants a ~3.6s window in-sim');
   near(firstSeen(14, (w) => w.evadeTicks), sToTicks(1.05), 2, 'Blink grants a ~1.05s evade in-sim');
+  near(firstSeen(14, (w) => w.invisibleTicks), sToTicks(3), 2, 'Blink grants ~3s of invisibility in-sim');
   near(firstSeen(37, (w) => w.mirrorTicks), sToTicks(12), 2, 'Mirror Twin holds a ~12s decoy in-sim');
   near(firstSeen(20, (w) => w.statuses.Grounded && w.statuses.Grounded.ticks), sToTicks(15), 2,
     'Grounding Mantle grants ~15s of Grounded in-sim');
   near(firstSeen(39, (w) => w.statuses.Phoenix && w.statuses.Phoenix.ticks), sToTicks(15), 2,
     'Phoenix Covenant grants a ~15s aura in-sim');
+  const blinkSim = new Sim({ seed: 6, loadouts: [[spellWithGesture(14)], [spellWithGesture(1)]] });
+  blinkSim.wizards[0].aether = 100;
+  blinkSim.step({ 0: { cast: 14, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 60 && blinkSim.wizards[0].invisibleTicks <= 0; t++) blinkSim.step({ 0: {}, 1: {} });
+  ok(blinkSim.snapshot().wizards[0].invisibleTicks > 0, 'authoritative snapshots include Blink invisibility');
+  const visibleHash = blinkSim.hash();
+  blinkSim.wizards[0].invisibleTicks -= 1;
+  ok(blinkSim.hash() !== visibleHash, 'deterministic state hashes include Blink invisibility');
 
   // ---- 5. anti-stall: Barrier still blocks the caster's own offence --------
   const sim = new Sim({ seed: 7, loadouts: [[spellWithGesture(11), spellWithGesture(1)], [spellWithGesture(1)]] });

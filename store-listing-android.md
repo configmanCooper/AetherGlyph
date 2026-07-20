@@ -33,6 +33,8 @@ raise stone cover, and chain elemental reactions your rival can exploit too.
   shoulder mantle, articulated arms gripping a crystal-tipped staff, an expressive
   bearded face under an asymmetric wizard hat, and a restrained breathing idle —
   plus your own gloved hand and wand in first person.
+  Buffs and debuffs pulse directly on both wizard models in effect-specific
+  colors, and Blink makes its caster disappear from view for three seconds.
   Weather looks like weather: rain falls with splash ripples, fog drifts in a
   dense bank, wind sweeps as a curved wall, fire visibly burns, and ice frosts
   the ground — tuned to stay smooth and readable on a phone.

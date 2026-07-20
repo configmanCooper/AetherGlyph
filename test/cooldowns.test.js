@@ -23,7 +23,7 @@ const CSV_PATH = join(__dirname, '..', 'design', 'spells.csv');
 // duration (see the data-driven check below) while staying within [2, 60]s.
 const TARGET_COOLDOWNS = {
   1: 18, 2: 18, 3: 18, 4: 5, 5: 5, 6: 18, 7: 18, 8: 24, 9: 24,
-  10: 26, 11: 18, 12: 8, 13: 10, 14: 6, 15: 48,
+  10: 26, 11: 18, 12: 8, 13: 10, 14: 9, 15: 48,
   16: 36, 17: 36, 18: 30, 19: 36, 20: 30,
   21: 24, 22: 24, 23: 24, 24: 14, 25: 20,
   26: 12, 27: 14, 28: 6, 29: 16, 30: 20,
@@ -41,7 +41,7 @@ function activeDurationS(eff) {
     case 'shield': case 'barrier': case 'mirror': case 'phoenix': case 'channel':
       return eff.durationS || 0;
     case 'reflect': return eff.windowS || 0;
-    case 'blink': return eff.evadeS || 0;
+    case 'blink': return Math.max(eff.evadeS || 0, eff.invisibleS || 0);
     case 'zone': return (ZONE.durations[eff.zoneKind]) || 0;
     case 'buff': return (STATUSES[eff.self] && STATUSES[eff.self].durationS) || 0;
     case 'projectile':
@@ -120,7 +120,7 @@ export function run() {
 
   // Spot-check the headline reviewed windows explicitly (belt-and-braces on top
   // of the generic rule): active window seconds -> minimum required cooldown.
-  const REVIEWED = { 10: 12.6, 11: 9, 12: 3.6, 14: 1.05, 15: 24, 16: 18, 17: 18, 18: 15, 19: 18, 20: 15,
+  const REVIEWED = { 10: 12.6, 11: 9, 12: 3.6, 14: 3, 15: 24, 16: 18, 17: 18, 18: 15, 19: 18, 20: 15,
     21: 12, 22: 12, 23: 12, 25: 6, 26: 4.5, 29: 6, 31: 21, 32: 21, 35: 18, 36: 24, 37: 12, 38: 18, 39: 15 };
   let reviewedOk = true;
   for (const [id, dur] of Object.entries(REVIEWED)) {

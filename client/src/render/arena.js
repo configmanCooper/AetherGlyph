@@ -2,8 +2,8 @@
 //
 // Renders the opposing wizard, the player's own hands/wand cues, projectiles,
 // shields/barriers, the dueling platform + focus stones, and reactive lighting.
-// All gameplay-readable state (health/resources/status) lives in the HTML HUD;
-// this module only draws the world and consumes sim events for effects.
+// Health/resources remain in the HTML HUD; this module also mirrors active
+// statuses onto both wizard representations with compact color-coded auras.
 //
 // The per-spell visual identity lives in ./spellVfx.js (data-driven by
 // ./spellVfxProfiles.js). This module owns object lifetime: it creates a VFX
@@ -30,6 +30,19 @@ const SCHOOL_COLOR = {
   Ember: 0xff6a3d, Tide: 0x54c8ff, Storm: 0xffe14d, Stone: 0xb08a5a,
   Gale: 0x9be8d8, Arcane: 0xb98bff, Umbra: 0x7a6f99, Prismatic: 0xffffff,
 };
+
+const STATUS_COLOR = {
+  Burning: 0xff4a1c, Chilled: 0x64d8ff, Sloth: 0xa56de2, Soaked: 0x368cff,
+  Static: 0xffe45c, Sundered: 0xff7a4d, Weakened: 0xb56cff, Marked: 0xff4fd8,
+  Blinded: 0xf4f4ff, Veiled: 0x7863aa, Rooted: 0x70cf5c, Frozen: 0xb9f4ff,
+  Stunned: 0xffff73, Haste: 0x63ff9b, Grounded: 0xc6a878,
+  AetherSurge: 0x45f6ff, Attunement: 0xff8738, Phoenix: 0xffd36a,
+};
+const STATUS_PRIORITY = [
+  'Frozen', 'Stunned', 'Burning', 'Rooted', 'Static', 'Chilled', 'Soaked',
+  'Marked', 'Sundered', 'Weakened', 'Sloth', 'Blinded', 'Veiled',
+  'Phoenix', 'Grounded', 'AetherSurge', 'Attunement', 'Haste',
+];
 
 // Heavy impacts that briefly shake the camera (skipped under reduced motion).
 const SHAKE_BY_SPELL = { 6: 0.05, 8: 0.11, 9: 0.09, 30: 0.06, 34: 0.13, 40: 0.03 };
@@ -60,6 +73,7 @@ export class Arena {
     this._buildAcademy();
     this._buildEnemy();
     this._buildHands();
+    this._buildStatusIndicators();
 
     this.projMeshes = new Map(); // projectile id -> { handle, dir, lastPos, prog, spellId }
     this.zoneMeshes = new Map(); // zone id -> handle
@@ -587,6 +601,7 @@ export class Arena {
     const gloveMat = new THREE.MeshStandardMaterial({ color: 0x35507a, roughness: 0.7 });
     const cuffMat = new THREE.MeshStandardMaterial({ color: 0x1f2f4a, roughness: 0.6, metalness: 0.2 });
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x8b6bff, emissive: 0x5a3fb0, emissiveIntensity: 0.4, roughness: 0.5 });
+    this._handStatusMats = { glove: gloveMat, trim: trimMat };
     this._gloveParts = 0;
 
     // Left glove: palm + a cuff + three stubby knuckles.
@@ -619,6 +634,91 @@ export class Arena {
     this.rightHand.add(this.wandTip);
     this.rightHand.position.set(0.46, -0.42, -0.9); this.rightHand.rotation.set(0.2, -0.15, 0);
     this.handRig.add(this.rightHand);
+  }
+
+  _makeStatusAura(radius) {
+    const group = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, Math.max(0.018, radius * 0.035), 8, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.75,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+      }),
+    );
+    group.add(ring);
+    const orbs = [];
+    for (let i = 0; i < 3; i++) {
+      const orb = new THREE.Mesh(
+        new THREE.SphereGeometry(Math.max(0.035, radius * 0.09), 8, 6),
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff, transparent: true, opacity: 0.85,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        }),
+      );
+      group.add(orb); orbs.push(orb);
+    }
+    group.visible = false;
+    group.userData.statusAura = { ring, orbs, radius };
+    return group;
+  }
+
+  _buildStatusIndicators() {
+    this.enemyStatusAura = this._makeStatusAura(0.92);
+    this.scene.add(this.enemyStatusAura);
+    this.playerStatusAura = this._makeStatusAura(0.17);
+    this.playerStatusAura.position.set(0, -0.01, 0.04);
+    this.leftHand.add(this.playerStatusAura);
+  }
+
+  _activeStatusStyles(w) {
+    const statuses = w?.statuses || {};
+    return STATUS_PRIORITY
+      .filter((name) => statuses[name] && statuses[name].ticks > 0)
+      .map((name) => ({ name, color: STATUS_COLOR[name] }));
+  }
+
+  _syncStatusAura(aura, styles, hidden = false) {
+    const data = aura.userData.statusAura;
+    aura.visible = !hidden && styles.length > 0;
+    if (!aura.visible) return;
+    const pulse = this.reduced ? 1 : 1 + Math.sin(this._t * 5.2) * 0.09;
+    aura.scale.setScalar(pulse);
+    data.ring.material.color.setHex(styles[0].color);
+    data.ring.material.opacity = this.reduced ? 0.72 : 0.58 + Math.sin(this._t * 6.5) * 0.18;
+    for (let i = 0; i < data.orbs.length; i++) {
+      const orb = data.orbs[i], style = styles[i];
+      orb.visible = !!style;
+      if (!style) continue;
+      orb.material.color.setHex(style.color);
+      const angle = this._t * (this.reduced ? 0 : 1.4) + i * (Math.PI * 2 / 3);
+      orb.position.set(Math.cos(angle) * data.radius, Math.sin(angle) * data.radius, 0.03);
+    }
+  }
+
+  _syncStatusIndicators(player, enemy) {
+    const playerStyles = this._activeStatusStyles(player);
+    const enemyStyles = this._activeStatusStyles(enemy);
+    this._syncStatusAura(this.playerStatusAura, playerStyles, player?.invisibleTicks > 0);
+    this._syncStatusAura(this.enemyStatusAura, enemyStyles, enemy?.invisibleTicks > 0);
+    this.enemyStatusAura.position.set(wizardX(enemy || { arcPos: 0 }), 1.4, ENEMY_Z + 0.08);
+    this.enemyStatusAura.lookAt(this.camera.position);
+
+    const primary = playerStyles[0];
+    const mats = this._handStatusMats;
+    if (primary) {
+      const pulse = this.reduced ? 0.7 : 0.55 + Math.sin(this._t * 6.2) * 0.25;
+      mats.glove.emissive.setHex(primary.color); mats.glove.emissiveIntensity = pulse;
+      mats.trim.color.setHex(primary.color); mats.trim.emissive.setHex(primary.color);
+      mats.trim.emissiveIntensity = 0.65 + pulse * 0.45;
+    } else {
+      mats.glove.emissive.setHex(0x000000); mats.glove.emissiveIntensity = 0;
+      mats.trim.color.setHex(0x8b6bff); mats.trim.emissive.setHex(0x5a3fb0); mats.trim.emissiveIntensity = 0.4;
+    }
+  }
+
+  _syncWizardVisibility(player, enemy) {
+    this.enemy.visible = !(enemy?.invisibleTicks > 0);
+    this.handRig.visible = !(player?.invisibleTicks > 0);
   }
 
   // Ward (frontal rune disc) + Barrier Dome (layered sphere) + Reflect (angled
@@ -664,6 +764,8 @@ export class Arena {
     this.camera.position.x = Math.sin(this._idleT) * 1.2;
     this.camera.lookAt(0, 1.5, ENEMY_Z);
     this._t += dtMs * 0.001;
+    this._syncWizardVisibility({ invisibleTicks: 0 }, { invisibleTicks: 0 });
+    this._syncStatusIndicators({ statuses: {} }, { statuses: {}, arcPos: 0 });
     this._animateEnemy(dtMs, null);
     this._updateAcademy(dtMs);
     this._updateEffects(dtMs);
@@ -760,6 +862,11 @@ export class Arena {
           this.pReflect && this.pReflect.kind,
         ].filter(Boolean)).size === 3,
       },
+      statusIndicators: {
+        player: !!this.playerStatusAura,
+        enemy: !!this.enemyStatusAura,
+        covered: STATUS_PRIORITY.slice(),
+      },
       budget: {
         lights, meshes, transparent, points, lines,
         lightBudgetOk: lights <= 8, transparentBudgetOk: transparent <= 110,
@@ -774,6 +881,7 @@ export class Arena {
     const player = sim.wizards[0];
     const enemy = sim.wizards[1];
     this._lastPlayer = player; this._lastEnemy = enemy;
+    this._syncWizardVisibility(player, enemy);
 
     // Camera follows the player's strafe position; opponent under soft lock.
     const px = wizardX(player);
@@ -794,6 +902,7 @@ export class Arena {
 
     // Enemy idle breathing + casting tell (arm extension, aura + staff glow).
     this._animateEnemy(dtMs, enemy);
+    this._syncStatusIndicators(player, enemy);
 
     // Player wand tip glows during own windup.
     if (player.casting) {
@@ -1243,6 +1352,31 @@ export class Arena {
     while (this._debug.length >= 16) { const old = this._debug.shift(); this.scene.remove(old.handle.object3D); old.handle.dispose(); }
     this._debug.push(entry);
     return entry.kind;
+  }
+
+  debugWizardState(playerStatuses = [], enemyStatuses = [], playerInvisibleTicks = 0, enemyInvisibleTicks = 0) {
+    const makeWizard = (names, invisibleTicks) => ({
+      arcPos: 0,
+      invisibleTicks: Number(invisibleTicks) || 0,
+      statuses: Object.fromEntries((Array.isArray(names) ? names : [names])
+        .filter((name) => STATUS_COLOR[name])
+        .map((name) => [name, { ticks: 60, stacks: 1 }])),
+    });
+    const player = makeWizard(playerStatuses, playerInvisibleTicks);
+    const enemy = makeWizard(enemyStatuses, enemyInvisibleTicks);
+    this._syncWizardVisibility(player, enemy);
+    this._syncStatusIndicators(player, enemy);
+    const result = {
+      playerModelVisible: this.handRig.visible,
+      enemyModelVisible: this.enemy.visible,
+      playerStatusVisible: this.playerStatusAura.visible && this.handRig.visible,
+      enemyStatusVisible: this.enemyStatusAura.visible,
+      playerColor: this.playerStatusAura.userData.statusAura.ring.material.color.getHex(),
+      enemyColor: this.enemyStatusAura.userData.statusAura.ring.material.color.getHex(),
+    };
+    this._syncWizardVisibility({ invisibleTicks: 0 }, { invisibleTicks: 0 });
+    this._syncStatusIndicators({ statuses: {} }, { statuses: {}, arcPos: 0 });
+    return result;
   }
 
   debugClear() {

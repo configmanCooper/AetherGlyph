@@ -51,6 +51,7 @@ function makeWizard(id, loadout, spawnArc) {
     reflectTicks: 0,
     deflectTicks: 0,           // Gust Wall light-projectile deflect window
     evadeTicks: 0,              // brief post-Blink evade window
+    invisibleTicks: 0,          // post-Blink visual invisibility window
     mirrorTicks: 0,             // Mirror Twin decoy still up
     phoenixUsed: false,         // Phoenix save spent this round
     recoveryTicks: 0,           // post-cast / reject recovery lockout
@@ -558,6 +559,7 @@ export class Sim {
     const limit = Math.max(0.1, 1 - this.pressureLevel * 0.12);
     w.arcPos = Math.max(-limit, Math.min(limit, w.arcPos + dir * eff.arcDelta));
     w.evadeTicks = sToTicks(eff.evadeS);
+    w.invisibleTicks = sToTicks(eff.invisibleS);
     this.emit('blink', { caster: w.id });
   }
 
@@ -854,6 +856,7 @@ export class Sim {
     if (w.reflectTicks > 0) w.reflectTicks -= 1;
     if (w.deflectTicks > 0) w.deflectTicks -= 1;
     if (w.evadeTicks > 0) w.evadeTicks -= 1;
+    if (w.invisibleTicks > 0) w.invisibleTicks -= 1;
     if (w.mirrorTicks > 0) { w.mirrorTicks -= 1; if (w.mirrorTicks <= 0) this.emit('mirrorEnd', { caster: w.id }); }
     // Resonance expiry.
     w.resonance = w.resonance.filter((r) => (r.ticks -= 1) > 0);
@@ -1106,7 +1109,7 @@ export class Sim {
         barrier: w.barrier ? { absorb: w.barrier.absorb, ticks: w.barrier.ticks } : null,
         reflectTicks: w.reflectTicks, tenacityTicks: w.tenacityTicks,
         deflectTicks: w.deflectTicks,
-        evadeTicks: w.evadeTicks, mirrorTicks: w.mirrorTicks,
+        evadeTicks: w.evadeTicks, invisibleTicks: w.invisibleTicks, mirrorTicks: w.mirrorTicks,
         sidestepCharges: w.sidestepCharges, recoveryTicks: w.recoveryTicks,
         statuses: Object.fromEntries(Object.entries(w.statuses).map(([k, v]) => [k, { stacks: v.stacks, ticks: v.ticks }])),
         cooldowns: { ...w.cooldowns }, resonance: w.resonance.map((r) => r.school),
@@ -1125,7 +1128,7 @@ export class Sim {
         w.casting ? w.casting.spellId : 0, w.casting ? w.casting.ticks : 0,
         w.channel ? w.channel.spellId : 0, w.channel ? w.channel.ticks : 0,
         w.focusing ? 1 : 0, w.braceTicks, w.reflectTicks, w.tenacityTicks,
-        w.deflectTicks, w.evadeTicks, w.mirrorTicks,
+        w.deflectTicks, w.evadeTicks, w.invisibleTicks, w.mirrorTicks,
         w.shield ? q(w.shield.absorb, 100) : 0, w.barrier ? q(w.barrier.absorb, 100) : 0,
         w.sidestepCharges, w.recoveryTicks,
       );
