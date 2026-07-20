@@ -88,9 +88,9 @@ export const SPELL_EFFECTS = {
   },
 
   // === Defensive (6) =======================================================
-  10: { type: SHIELD, absorb: 30, durationS: 4.2, frontal: true, school: 'Arcane' }, // Ward
-  11: { type: BARRIER, absorb: 60, durationS: 4.5, blocksOffense: true, school: 'Arcane' }, // Barrier Dome
-  12: { type: REFLECT, windowS: 1.2, school: 'Gale' }, // Reflect
+  10: { type: SHIELD, absorb: 30, durationS: 12.6, frontal: true, school: 'Arcane' }, // Ward
+  11: { type: BARRIER, absorb: 60, durationS: 9, blocksOffense: true, school: 'Arcane' }, // Barrier Dome
+  12: { type: REFLECT, windowS: 3.6, school: 'Gale' }, // Reflect
   13: { type: DISPEL, statuses: 2, orZone: true, school: 'Arcane' }, // Dispel
   14: { type: BLINK, arcDelta: 0.5, evadeS: 1.05, escapesRoot: true, school: 'Arcane' }, // Blink
   15: { type: ZONE, zoneKind: 'Cover', school: 'Stone' }, // Stone Wall

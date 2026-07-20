@@ -4,7 +4,7 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.1.1 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.1.2 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
 service, and the deterministic shared simulation. 1.1.0 adds a dedicated,
 data-driven spell visual-effects system: every one of the 40 spells now has a
@@ -24,12 +24,12 @@ sweeping curved wind wall, visibly burning fire, frosty ice, and glossy oil. The
 academy stays within a small mobile light/transparent budget and honours the
 reduced-motion setting.
 
-Alongside the visuals, 1.1.0 re-tunes the balance data (still driven only by
-`design/spells.csv`): **protective spells last 3× longer** (Ward 1.4→4.2s,
-Barrier Dome 1.5→4.5s, Reflect 0.4→1.2s, Blink evade 0.35→1.05s, Grounding
-Mantle 5→15s, Mirror Twin 4→12s, Phoenix Covenant 5→15s; Stone Wall stays a 24s
-environmental zone), and **every one of the 40 spells now carries a deliberate
-2–60 second cooldown scaled to its power**. These data changes bump
+Alongside the visuals, the live balance data remains driven only by
+`design/spells.csv`. In 1.1.2, **Ward lasts 12.6s, Barrier Dome lasts 9s, and
+Reflect lasts 3.6s**. Blink evade lasts 1.05s, Grounding Mantle 15s, Mirror Twin
+12s, Phoenix Covenant 15s, and Stone Wall remains a 24s environmental zone.
+Every one of the 40 spells carries a deliberate **2–60 second cooldown scaled to
+its power**. These data changes bump
 `BALANCE_VERSION`; the rendering itself does not touch the deterministic
 simulation or wire protocol.
 
@@ -81,8 +81,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10101 /
-versionName 1.1.1). Online play connects to a configurable authoritative service
+`com.configmancooper.aetherglyph`, API 24 → 36, landscape, versionCode 10102 /
+versionName 1.1.2). Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
 
@@ -332,7 +332,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10101` / `versionName 1.1.1`, no cleartext production traffic,
+  `versionCode 10102` / `versionName 1.1.2`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume + haptics via `@capacitor/app` and
   `@capacitor/haptics`.

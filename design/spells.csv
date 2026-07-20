@@ -8,9 +8,9 @@ id,name,school,category,gesture,aether,charges,cooldown_s,min_cast_s,loadout_poi
 7,Chain Lightning,Storm,Offensive,long zigzag,34,1,18,0.85,3,"18 damage; jumps through Wet zones","Stuns only when target is Soaked or has Static 3","Dispel setup; Grounding Mantle; Blink",false
 8,Fireball,Ember,Offensive,clockwise triangle,45,1,24,1.05,3,"30 slow area damage; destroys cover","Oil causes a capped secondary burst","Sidestep; Barrier; interrupt windup",false
 9,Ice Comet,Tide,Offensive,inward spiral,40,1,24,1.10,3,"26 area damage; apply Chilled for 9 sec","Freezes Wet ground briefly","Blink; Barrier; interrupt windup",false
-10,Ward,Arcane,Defensive,open right bracket,15,0,8,0.32,1,"30 health frontal shield for 4.2 sec","Efficient only when facing threat","Flank angle; Quake; sustained pressure",false
-11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,18,0.72,2,"360 degree barrier for 4.5 sec","Caster cannot use offense while active","Wait; Sunder; Quake",false
-12,Reflect,Gale,Defensive,check mark,20,0,7,0.30,2,"Reflect projectile during 1.2 sec window","Perfect timing grants half Sigil Charge","Area spell; feint; delayed projectile",false
+10,Ward,Arcane,Defensive,open right bracket,15,0,8,0.32,1,"30 health frontal shield for 12.6 sec","Efficient only when facing threat","Flank angle; Quake; sustained pressure",false
+11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,18,0.72,2,"360 degree barrier for 9 sec","Caster cannot use offense while active","Wait; Sunder; Quake",false
+12,Reflect,Gale,Defensive,check mark,20,0,7,0.30,2,"Reflect projectile during 3.6 sec window","Perfect timing grants half Sigil Charge","Area spell; feint; delayed projectile",false
 13,Dispel,Arcane,Defensive,counterclockwise circle,22,0,10,0.55,1,"Remove two harmful statuses or one zone edge","Destroys Mark and setup investment","Bait it; reapply later; direct damage",false
 14,Blink,Arcane,Defensive,double short directional strokes,18,0,6,0.30,2,"Short movement burst with brief evade","Escapes Root but not already resolved damage","Track landing; area zone; delay release",false
 15,Stone Wall,Stone,Defensive,low square,26,0,24,0.78,2,"Create destructible line-of-sight cover for up to 24 sec","Can channel Focus behind it","Quake; Fireball; reposition",false

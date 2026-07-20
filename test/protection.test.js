@@ -1,7 +1,6 @@
-// protection.test.js — protective spells last 3x longer than the original
-// active windows. Locks the canonical duration data (spellEffects.js +
-// constants.js) AND proves the deterministic sim actually reads the new,
-// longer windows. Anti-stall / zone-duration rules stay intact.
+// protection.test.js — locks the requested protection-duration tuning
+// (spellEffects.js + constants.js) and proves the deterministic sim actually
+// reads the longer windows. Anti-stall / zone-duration rules stay intact.
 
 import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
@@ -30,20 +29,20 @@ function firstSeen(id, pick, prime = {}) {
 export function run() {
   const { ok, eq, near, report } = createHarness();
 
-  // ---- 1. canonical duration data is exactly the 3x target -----------------
-  eq(effectFor(10).durationS, 4.2, 'Ward active duration is 4.2s (was 1.4s)');
-  eq(effectFor(11).durationS, 4.5, 'Barrier Dome lasts 4.5s (was 1.5s)');
-  eq(effectFor(12).windowS, 1.2, 'Reflect window is 1.2s (was 0.4s)');
+  // ---- 1. canonical duration data matches the latest requested targets ------
+  eq(effectFor(10).durationS, 12.6, 'Ward active duration is 12.6s');
+  eq(effectFor(11).durationS, 9, 'Barrier Dome lasts 9s');
+  eq(effectFor(12).windowS, 3.6, 'Reflect window is 3.6s');
   eq(effectFor(14).evadeS, 1.05, 'Blink evade lasts 1.05s (was 0.35s)');
   eq(STATUSES.Grounded.durationS, 15, 'Grounded status lasts 15s (was 5s)');
   eq(effectFor(37).durationS, 12, 'Mirror Twin decoy lasts 12s (was 4s)');
   eq(effectFor(39).durationS, 15, 'Phoenix Covenant aura lasts 15s (was 5s)');
   eq(STATUSES.Phoenix.durationS, 15, 'Phoenix status default duration is 15s');
 
-  // ---- 2. exact 3x multiplier over the documented prior windows ------------
-  near(effectFor(10).durationS / 1.4, 3, 1e-6, 'Ward is exactly 3x its old window');
-  near(effectFor(11).durationS / 1.5, 3, 1e-6, 'Barrier Dome is exactly 3x');
-  near(effectFor(12).windowS / 0.4, 3, 1e-6, 'Reflect is exactly 3x');
+  // ---- 2. requested multipliers over the immediately previous windows -------
+  near(effectFor(10).durationS / 4.2, 3, 1e-6, 'Ward is 3x its previous 4.2s window');
+  near(effectFor(11).durationS / 4.5, 2, 1e-6, 'Barrier Dome is 2x its previous 4.5s window');
+  near(effectFor(12).windowS / 1.2, 3, 1e-6, 'Reflect is 3x its previous 1.2s window');
   near(effectFor(14).evadeS / 0.35, 3, 1e-6, 'Blink evade is exactly 3x');
   near(STATUSES.Grounded.durationS / 5, 3, 1e-6, 'Grounded is exactly 3x');
   near(effectFor(37).durationS / 4, 3, 1e-6, 'Mirror Twin is exactly 3x');
@@ -54,9 +53,9 @@ export function run() {
   eq(ZONE.durations.Cover, 24, 'Stone Wall stays a 24s environmental cover zone');
 
   // ---- 4. the sim actually grants the new longer windows -------------------
-  near(firstSeen(10, (w) => w.shield && w.shield.ticks), sToTicks(4.2), 2, 'Ward grants a ~4.2s shield in-sim');
-  near(firstSeen(11, (w) => w.barrier && w.barrier.ticks), sToTicks(4.5), 2, 'Barrier Dome grants a ~4.5s barrier in-sim');
-  near(firstSeen(12, (w) => w.reflectTicks), sToTicks(1.2), 2, 'Reflect grants a ~1.2s window in-sim');
+  near(firstSeen(10, (w) => w.shield && w.shield.ticks), sToTicks(12.6), 2, 'Ward grants a ~12.6s shield in-sim');
+  near(firstSeen(11, (w) => w.barrier && w.barrier.ticks), sToTicks(9), 2, 'Barrier Dome grants a ~9s barrier in-sim');
+  near(firstSeen(12, (w) => w.reflectTicks), sToTicks(3.6), 2, 'Reflect grants a ~3.6s window in-sim');
   near(firstSeen(14, (w) => w.evadeTicks), sToTicks(1.05), 2, 'Blink grants a ~1.05s evade in-sim');
   near(firstSeen(37, (w) => w.mirrorTicks), sToTicks(12), 2, 'Mirror Twin holds a ~12s decoy in-sim');
   near(firstSeen(20, (w) => w.statuses.Grounded && w.statuses.Grounded.ticks), sToTicks(15), 2,
