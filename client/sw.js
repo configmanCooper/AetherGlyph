@@ -10,7 +10,7 @@
 // unaffected. CACHE_VERSION is tied to the app version and is asserted by
 // test/packaging.test.js; bump it in lockstep with package.json "version".
 
-const CACHE_VERSION = '1.1.0';
+const CACHE_VERSION = '1.1.1';
 const CACHE_NAME = `aetherglyph-shell-v${CACHE_VERSION}`;
 
 // Core app shell precached on install (best-effort; a miss never fails install).

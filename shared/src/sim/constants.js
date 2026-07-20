@@ -74,24 +74,24 @@ export const CAST = {
 // by an opponent and shown as beneficial in the HUD.
 export const STATUSES = {
   // Debuffs / crowd control ------------------------------------------------
-  Burning:  { durationS: 3, maxStacks: 2, dps: 2, kind: 'dot', harmful: true },
-  Chilled:  { durationS: 4.5, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
-  Sloth:    { durationS: 5.5, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
-  Soaked:   { durationS: 6, maxStacks: 1, lightningBonus: 0.25, kind: 'flag', harmful: true },
-  Static:   { durationS: 4.5, maxStacks: 3, kind: 'flag', harmful: true },
-  Sundered: { durationS: 5.5, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
-  Weakened: { durationS: 5, maxStacks: 1, damageDealt: 0.22, kind: 'amp', harmful: true },
-  Marked:   { durationS: 6, maxStacks: 1, markBonus: 0.35, kind: 'flag', harmful: true },
-  Blinded:  { durationS: 2, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
-  Veiled:   { durationS: 2, maxStacks: 1, kind: 'flag', harmful: true },   // Veil Hex (visual)
-  Rooted:   { durationS: 1.5, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
+  Burning:  { durationS: 9, maxStacks: 2, dps: 2, kind: 'dot', harmful: true },
+  Chilled:  { durationS: 9, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Sloth:    { durationS: 12, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Soaked:   { durationS: 12, maxStacks: 1, lightningBonus: 0.25, kind: 'flag', harmful: true },
+  Static:   { durationS: 9, maxStacks: 3, kind: 'flag', harmful: true },
+  Sundered: { durationS: 12, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
+  Weakened: { durationS: 12, maxStacks: 1, damageDealt: 0.22, kind: 'amp', harmful: true },
+  Marked:   { durationS: 15, maxStacks: 1, markBonus: 0.35, kind: 'flag', harmful: true },
+  Blinded:  { durationS: 6, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
+  Veiled:   { durationS: 6, maxStacks: 1, kind: 'flag', harmful: true },   // Veil Hex (visual)
+  Rooted:   { durationS: 4.5, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
   Frozen:   { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   // Self buffs -------------------------------------------------------------
-  Haste:       { durationS: 6, maxStacks: 1, haste: 0.15, kind: 'buff' },
+  Haste:       { durationS: 18, maxStacks: 1, haste: 0.15, kind: 'buff' },
   Grounded:    { durationS: 15, maxStacks: 1, dmgReduction: 0.15, moveSlow: 0.15, kind: 'buff' },
-  AetherSurge: { durationS: 6, maxStacks: 1, aetherPerS: 5, kind: 'buff' },
-  Attunement:  { durationS: 6, maxStacks: 1, school: 'Ember', costMul: 0.85, kind: 'buff' },
+  AetherSurge: { durationS: 18, maxStacks: 1, aetherPerS: 5, kind: 'buff' },
+  Attunement:  { durationS: 18, maxStacks: 1, school: 'Ember', costMul: 0.85, kind: 'buff' },
   Phoenix:     { durationS: 15, maxStacks: 1, kind: 'buff' },
 };
 

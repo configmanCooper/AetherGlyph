@@ -18,6 +18,7 @@
 
 import { canWizardCast } from './scriptBot.js';
 import { DuelBot } from '../../../shared/src/bot/bot.js';
+import { PracticeBot } from '../../../shared/src/bot/practiceBot.js';
 import { isHeavyProjectile } from '../../../shared/src/sim/spellEffects.js';
 import { PRESETS_BY_KEY } from '../../../shared/src/balance/loadouts.js';
 
@@ -632,7 +633,7 @@ export const CAMPAIGN = [
       { id: 'win', text: 'Win a best-of-three against the Medium AI', predicate: 'win-series' },
     ],
     remediation: ['retry'],
-    solutionBot: 'archmage',
+    solutionBot: 'practice-hard',
     maxTicks: 21000,
   },
 
@@ -997,6 +998,11 @@ export function makeStudent(lesson, seed = 12345) {
     return (sim, tracker) => lesson.solution(sim, tracker) || {};
   }
   if (lesson.solutionBot) {
+    if (lesson.solutionBot.startsWith('practice-')) {
+      const difficulty = lesson.solutionBot.slice('practice-'.length);
+      const bot = new PracticeBot(0, { difficulty, seed: (seed ^ 0x1379) >>> 0 });
+      return (sim) => bot.act(sim);
+    }
     const bot = new DuelBot(0, { difficulty: lesson.solutionBot, seed: (seed ^ 0x1379) >>> 0 });
     return (sim) => bot.act(sim);
   }

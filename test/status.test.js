@@ -13,19 +13,31 @@ export function run() {
   const { ok, eq, near, report } = createHarness();
   let sim, a, b;
 
-  eq(STATUSES.Chilled.durationS, 4.5, 'Chilled setup window lasts 4.5s');
-  eq(STATUSES.Soaked.durationS, 6, 'Soaked setup window lasts 6s');
-  eq(STATUSES.Static.durationS, 4.5, 'Static stacks last 4.5s');
-  eq(STATUSES.Sundered.durationS, 5.5, 'Sundered payoff window lasts 5.5s');
-  eq(STATUSES.Marked.durationS, 6, 'Marked payoff window lasts 6s');
-  eq(STATUSES.Sloth.durationS, 5.5, 'Sloth lasts 5.5s');
+  eq(STATUSES.Burning.durationS, 9, 'Burning lasts 3x its baseline');
+  eq(STATUSES.Chilled.durationS, 9, 'Chilled lasts 3x its baseline');
+  eq(STATUSES.Soaked.durationS, 12, 'Soaked lasts 3x its baseline');
+  eq(STATUSES.Static.durationS, 9, 'Static lasts 3x its baseline');
+  eq(STATUSES.Sundered.durationS, 12, 'Sundered lasts 3x its baseline');
+  eq(STATUSES.Weakened.durationS, 12, 'Weakened lasts 3x its baseline');
+  eq(STATUSES.Marked.durationS, 15, 'Marked lasts 3x its baseline');
+  eq(STATUSES.Sloth.durationS, 12, 'Sloth lasts 3x its baseline');
+  eq(STATUSES.Blinded.durationS, 6, 'Blinded lasts 3x its baseline');
+  eq(STATUSES.Veiled.durationS, 6, 'Veiled lasts 3x its baseline');
+  eq(STATUSES.Rooted.durationS, 4.5, 'Rooted lasts 3x its baseline');
+  eq(STATUSES.Haste.durationS, 18, 'Haste lasts 3x its baseline');
+  eq(STATUSES.AetherSurge.durationS, 18, 'Aether Surge lasts 3x its baseline');
+  eq(STATUSES.Attunement.durationS, 18, 'Attunement lasts 3x its baseline');
+  eq(STATUSES.Grounded.durationS, 15, 'Grounded remains at its 3x duration');
+  eq(STATUSES.Phoenix.durationS, 15, 'Phoenix remains at its 3x duration');
+  eq(STATUSES.Frozen.durationS, 1, 'Freeze remains capped for anti-lock safety');
+  eq(STATUSES.Stunned.durationS, 1, 'Stun remains capped for anti-lock safety');
 
-  // Burning DoT: ~2 dmg/sec for 3 sec.
+  // Burning DoT: ~2 dmg/sec for 9 sec.
   sim = freshSim(); b = sim.wizards[1];
   sim.applyStatus(b, 'Burning', 1);
   const hp = b.health;
   for (let t = 0; t < Math.round(STATUSES.Burning.durationS * TICK_HZ); t++) sim.step({ 0: {}, 1: {} });
-  near(hp - b.health, 6, 1.0, 'Burning deals ~6 over 3s');
+  near(hp - b.health, 18, 1.0, 'Burning deals ~18 over 9s');
 
   // Sundered increases incoming direct damage by 20%.
   sim = freshSim(); a = sim.wizards[0]; b = sim.wizards[1];
