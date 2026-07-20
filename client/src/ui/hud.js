@@ -3,7 +3,7 @@
 // / best-of-three series score. Statuses use text + icon, never color alone
 // (accessibility, MASTERPLAN §4).
 
-import { MATCH, AETHER, SIGIL } from '@shared/sim/constants.js';
+import { MATCH, AETHER, SIGIL, TICK_HZ } from '@shared/sim/constants.js';
 import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
 
 const STATUS_ICON = {
@@ -19,6 +19,11 @@ const ZONE_ICON = {
 };
 
 const BUFFS = new Set(['Haste', 'Grounded', 'AetherSurge', 'Attunement', 'Phoenix']);
+
+function cooldownText(ticks) {
+  const seconds = Math.max(0, ticks) / TICK_HZ;
+  return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.ceil(seconds)}s`;
+}
 
 export class HUD {
   constructor(root) {
@@ -132,9 +137,17 @@ export class HUD {
     for (const [id, btn] of this.spellButtons) {
       const sp = SPELLS_BY_ID[id];
       if (btn.dataset.guideOnly === 'true') {
-        btn.classList.remove('cooldown', 'disabled');
+        const ticks = Math.max(0, w.cooldowns[id] || 0);
+        const cd = ticks > 0;
+        btn.classList.toggle('cooldown', cd);
+        btn.classList.toggle('disabled', cd);
         const cost = btn.querySelector('.sb-cost');
-        if (cost) cost.textContent = `${sp.aether}${sp.charges ? ' ' + '#'.repeat(sp.charges) : ''}`;
+        if (cost) cost.textContent = cd
+          ? cooldownText(ticks)
+          : `${sp.aether}${sp.charges ? ' ' + '#'.repeat(sp.charges) : ''}`;
+        btn.title = cd
+          ? `${sp.name} cooldown: ${cooldownText(ticks)} remaining\n${sp.effect}`
+          : `${sp.school} - ${sp.category}\n${sp.effect}`;
         continue;
       }
       const cd = (w.cooldowns[id] || 0) > 0;
@@ -143,7 +156,7 @@ export class HUD {
       btn.classList.toggle('cooldown', cd);
       btn.classList.toggle('disabled', cd || poor || noCharge);
       const cdEl = btn.querySelector('.sb-cost');
-      if (cd && cdEl) cdEl.textContent = (w.cooldowns[id] / 60).toFixed(1) + 's';
+      if (cd && cdEl) cdEl.textContent = cooldownText(w.cooldowns[id]);
       else if (cdEl) cdEl.textContent = `${sp.aether}${sp.charges ? ' ' + '#'.repeat(sp.charges) : ''}`;
     }
   }

@@ -96,9 +96,13 @@ export function run() {
   ok(player.cooldowns[1] > 0, 'resolved Ember Bolt starts its shared simulation cooldown');
   const resolved = player.castsResolved;
   const rejected = player.castsRejected;
-  sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
+  const rejectEvents = sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });
   eq(player.castsResolved, resolved, 'an immediate recast does not resolve during cooldown');
   eq(player.castsRejected, rejected + 1, 'an immediate gesture recast is rejected during cooldown');
+  const cooldownReject = rejectEvents.find((e) => e.type === 'castRejected' && e.spellId === 1);
+  eq(cooldownReject?.reason, 'cooldown', 'cooldown rejection identifies its reason');
+  ok(cooldownReject?.cooldownTicks > 0 && cooldownReject?.cooldownSeconds > 0,
+    'cooldown rejection reports ticks and seconds remaining');
   while (player.cooldowns[1] > 0) sim.step({ 0: {}, 1: {} });
   player.aether = 100;
   sim.step({ 0: { cast: 1, castQuality: 1, castWasGesture: true }, 1: {} });

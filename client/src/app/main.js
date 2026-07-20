@@ -33,8 +33,8 @@ import { chooseOpponentLoadout, PRACTICE_PROFILES } from '@shared/bot/practiceBo
 import { coachReport } from '@shared/analytics/coach.js';
 import { renderCoachReport } from '../ui/coach.js';
 import { versionTag } from '@shared/protocol/version.js';
-import { SPELL_VFX, VFX_IDS } from '../render/spellVfxProfiles.js';
-import { vfxFamilyCoverage } from '../render/spellVfx.js';
+import { SPELL_VFX, VFX_IDS, REACTION_VFX, REACTION_VFX_NAMES } from '../render/spellVfxProfiles.js';
+import { vfxFamilyCoverage, reactionVfxCoverage } from '../render/spellVfx.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -243,8 +243,9 @@ function labPageIds() {
 
 function selectLabSpell(id) {
   labSelectedId = id;
-  const selected = makeLoadout([id]);
-  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(selected);
+  // A guide is visual help only. Recognition always compares against the full
+  // public laboratory catalog, exactly like Blank mode.
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(LAB_PUBLIC_IDS));
   gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
   setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
   const canvas = $('#draw-canvas');
@@ -296,6 +297,8 @@ function renderLabSpellbar() {
 
 function startLab() {
   mode = 'lab';
+  document.body.classList.add('mode-lab');
+  document.body.classList.remove('mode-tutorial');
   series = null;
   resetLastCast();
   labPage = 0;
@@ -350,6 +353,7 @@ function resolveOpponentPracticeIds(playerPracticeIds, seed) {
 
 function startPractice() {
   mode = 'practice';
+  document.body.classList.remove('mode-lab', 'mode-tutorial');
   series = null;
   resetLastCast();
   const seed = practiceSeed != null ? practiceSeed : resolvePracticeSeed();
@@ -656,6 +660,7 @@ function applyCalibration(cal) {
 // Arm the sim + show HUD/coach for the current tutorial lesson (post-calibration).
 function armTutorialLesson() {
   if (!tutorial) return;
+  document.body.classList.remove('mode-lab');
   resetLastCast();
   match = tutorial;
   running = true;
@@ -838,6 +843,12 @@ function handleEvents(events) {
       }
     } else if (e.type === 'damage') {
       audio.damage(); if (e.target === 0) haptic('damage');
+    } else if (e.type === 'castRejected' && e.caster === 0 && e.reason === 'cooldown') {
+      const spell = SPELLS_BY_ID[e.spellId];
+      const seconds = Number(e.cooldownSeconds) || 0;
+      const remaining = seconds < 10 ? `${seconds.toFixed(1)} seconds` : `${Math.ceil(seconds)} seconds`;
+      audio.reject(); haptic('reject');
+      toast(`${spell ? spell.name : 'That spell'} is on cooldown — ${remaining} remaining.`);
     } else if (e.type === 'reflect') { audio.reflect(); haptic('counter'); }
     else if (e.type === 'shield' || e.type === 'barrier') audio.shield();
     else if (e.type === 'focusComplete') audio.focus();
@@ -1162,6 +1173,7 @@ function cancelOnline() {
 
 function onOnlineMatchStart() {
   mode = 'online';
+  document.body.classList.remove('mode-lab', 'mode-tutorial');
   resetLastCast();
   match = online;
   series = null;
@@ -1392,7 +1404,7 @@ function returnToMainMenu() {
   if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
   mode = null; setNetStatus(null); hud.setSeries(null);
   gesture.setGuide(null);
-  document.body.classList.remove('mode-tutorial');
+  document.body.classList.remove('mode-tutorial', 'mode-lab');
   $('#coach-report').classList.add('hidden');
   $('#hud').classList.add('hidden'); $('#coach').classList.add('hidden'); showPanel('panel-main'); showOverlay(true);
 }
@@ -1509,6 +1521,10 @@ if (typeof window !== 'undefined') {
     profiles: () => VFX_IDS.map((id) => ({ id, kind: SPELL_VFX[id].kind, family: SPELL_VFX[id].family, school: SPELL_VFX[id].school })),
     spawn: (id) => { try { return arena.debugSpawn(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnZone: (kind) => { try { return arena.debugSpawnZone(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    spawnReaction: (name) => { try { return arena.debugSpawnReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    productionReaction: (name) => { try { return arena.debugProductionReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    reactionProfiles: () => REACTION_VFX_NAMES.map((n) => ({ name: n, kind: REACTION_VFX[n].kind, vfx: REACTION_VFX[n].vfx, anchor: REACTION_VFX[n].anchor })),
+    reactionCoverage: () => { try { return reactionVfxCoverage(); } catch { return ['error']; } },
     productionRelease: (id) => { try { return arena.debugProductionRelease(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
     productionMotion: () => { try { return arena.debugProductionMotion(); } catch { return null; } },
     productionCount: () => { try { return arena.debugProductionCount(); } catch { return -1; } },

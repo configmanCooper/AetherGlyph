@@ -72,6 +72,18 @@ export function run() {
   eq(evs0[0].target, 1, 'slot 0 events pass through');
   eq(remapEventForSlot({ type: 'roundEnd', winner: 'draw' }, 1).winner, 'draw', 'draw winner is not remapped');
 
+  // Reaction events carry a slot-bearing targetId (flipped per recipient) AND a
+  // purely spatial `center` arc position that must NEVER be flipped, even when it
+  // happens to equal 0 or 1 (arc positions are shared, not per-slot).
+  const react = { type: 'reaction', name: 'ConductiveArc', category: 'conduct', casterId: 0, targetId: 1, center: 1 };
+  const react1 = remapEventForSlot({ ...react }, 1);
+  eq(react1.casterId, 1, 'slot 1: reaction casterId is flipped to the local opponent');
+  eq(react1.targetId, 0, 'slot 1: reaction targetId is flipped to local self');
+  eq(react1.center, 1, 'slot 1: reaction center (arc position) is preserved, not flipped');
+  const react0 = remapEventForSlot({ ...react }, 0);
+  eq(react0.casterId, 0, 'slot 0: reaction event passes through (caster)');
+  eq(react0.targetId, 1, 'slot 0: reaction event passes through (target)');
+
   // --- compatibility gate ------------------------------------------------
   ok(isCompatible({ protocol: PROTOCOL_VERSION, balance: BALANCE_VERSION, roster: ROSTER_CHECKSUM }), 'matching version is compatible');
   ok(!isCompatible({ protocol: PROTOCOL_VERSION + 1, balance: BALANCE_VERSION, roster: ROSTER_CHECKSUM }), 'protocol mismatch is incompatible');

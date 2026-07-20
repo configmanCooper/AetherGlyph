@@ -74,6 +74,19 @@ export function run() {
   ok(cond.includes('ConductiveArc'), 'Wet + Storm -> Conductive Arc');
   ok(sim.hasStatus(sim.wizards[1], 'Soaked'), 'Conductive Arc applies Soaked');
 
+  // The reaction event additively carries spatial fields (targetId + center) so
+  // the renderer can anchor its VFX (e.g. a caster->target lightning arc) without
+  // altering deterministic behaviour or breaking existing consumers.
+  sim = mk([32, 3]);
+  fire(sim, 32);
+  const arcEvent = fire(sim, 3).find((e) => e.type === 'reaction' && e.name === 'ConductiveArc');
+  ok(arcEvent && arcEvent.casterId === 0 && arcEvent.targetId === 1,
+    'Conductive Arc event identifies caster + target for a caster->target arc');
+  ok(arcEvent && typeof arcEvent.center === 'number',
+    'reaction event carries a numeric world center for VFX anchoring');
+  ok(arcEvent && 'name' in arcEvent && 'category' in arcEvent,
+    'reaction event preserves its original name + category (backward compatible)');
+
   // Wet + Frost -> Frozen Ground: a Frozen slow surface appears.
   sim = mk([32, 2, 1]);
   fire(sim, 32);

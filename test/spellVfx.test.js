@@ -7,12 +7,16 @@
 
 import { createHarness } from './tiny.js';
 import { SPELL_CATALOG, SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
+import { REACTIONS } from '../shared/src/sim/reactions.js';
 import {
   SPELL_VFX, VFX_IDS, VFX_FAMILIES, VFX_SCHOOL_PALETTE, VFX_BUDGET_CAP,
   getSpellVfx, everySpellHasVfx, allVfxKinds, validateAllProfiles, isValidColor, vfxColorList,
+  REACTION_VFX, REACTION_VFX_NAMES, REACTION_VFX_BUILDERS,
+  getReactionVfx, allReactionVfxKinds, validateAllReactionVfx,
 } from '../client/src/render/spellVfxProfiles.js';
 
 const ALLOWED_TARGETS = new Set(['travel', 'self', 'enemy', 'link', 'zone']);
+const REACTION_ANCHORS = new Set(['center', 'target', 'link']);
 
 export function run() {
   const { ok, eq, report } = createHarness();
@@ -85,6 +89,58 @@ export function run() {
   }
   ok(projTargetsOk, 'all projectile families anchor to travel');
   ok(zoneTargetsOk, 'all zone families anchor to the ground zone');
+
+  // ---- 7. environmental reaction VFX: full, distinct, valid coverage --------
+  // Every reaction the sim can emit (shared/src/sim/reactions.js) must have a
+  // data-driven visual signifier profile so the renderer can draw it.
+  const reactionNames = REACTIONS.map((r) => r.name);
+  eq(REACTION_VFX_NAMES.length, reactionNames.length, 'reaction VFX table covers every sim reaction');
+  const missingReaction = reactionNames.filter((n) => !getReactionVfx(n));
+  ok(missingReaction.length === 0, `no reaction lacks a VFX profile (missing: ${missingReaction.join(',') || 'none'})`);
+  eq(REACTION_VFX_NAMES.slice().sort().join(','), reactionNames.slice().sort().join(','),
+    'reaction VFX names match the sim reaction set exactly (no stray/extra)');
+
+  const reactionErrs = validateAllReactionVfx(reactionNames);
+  ok(reactionErrs.length === 0, `all reaction profiles structurally valid (${reactionErrs.slice(0, 3).join(' | ') || 'ok'})`);
+
+  const rKinds = allReactionVfxKinds();
+  eq(new Set(rKinds).size, reactionNames.length, 'every reaction has a UNIQUE effect kind (distinct signifier)');
+  // A healthy spread of distinct builders (not one generic burst reused).
+  ok(REACTION_VFX_BUILDERS.length >= 12, `reaction builders are diverse (${REACTION_VFX_BUILDERS.length} distinct)`);
+
+  let rColorsOk = true, rSchoolsOk = true, rAnchorsOk = true, rTextOk = true, rReducedOk = true, rBudgetOk = true;
+  for (const name of REACTION_VFX_NAMES) {
+    const p = REACTION_VFX[name];
+    for (const col of [p.colors.core, p.colors.glow, p.colors.trail]) if (!isValidColor(col)) rColorsOk = false;
+    if (!VFX_SCHOOL_PALETTE[p.school]) rSchoolsOk = false;
+    if (!REACTION_ANCHORS.has(p.anchor)) rAnchorsOk = false;
+    if (!p.silhouette || !p.motion || !p.vfx || !p.kind) rTextOk = false;
+    if (p.reducedSafe !== true) rReducedOk = false;
+    const b = p.budget || {};
+    if (b.meshes > VFX_BUDGET_CAP.meshes || b.particles > VFX_BUDGET_CAP.particles || b.trail > VFX_BUDGET_CAP.trail) rBudgetOk = false;
+  }
+  ok(rColorsOk, 'all reaction profile colors are valid 24-bit ints');
+  ok(rSchoolsOk, 'every reaction profile uses a known school palette');
+  ok(rAnchorsOk, 'every reaction profile has a valid world anchor');
+  ok(rTextOk, 'every reaction profile has kind + vfx + silhouette + motion');
+  ok(rReducedOk, 'every reaction profile is marked reduced-motion safe');
+  ok(rBudgetOk, 'every reaction profile stays within the per-effect object budget caps');
+
+  // ConductiveArc is the headline Storm reaction: an electric branching LINK
+  // (its own lightning-style builder), NOT a generic burst.
+  eq(getReactionVfx('ConductiveArc').kind, 'reaction:conductiveArc', 'ConductiveArc has its distinct lightning kind');
+  eq(getReactionVfx('ConductiveArc').vfx, 'arc', 'ConductiveArc uses the dedicated arc (lightning) builder');
+  eq(getReactionVfx('ConductiveArc').anchor, 'link', 'ConductiveArc links caster and target');
+  eq(getReactionVfx('ConductiveArc').school, 'Storm', 'ConductiveArc reads as a Storm/electric reaction');
+  // Fire reactions read as flame, water reactions as Tide, stone as Stone.
+  eq(getReactionVfx('FlashFire').school, 'Ember', 'Flash Fire reads as an Ember eruption');
+  eq(getReactionVfx('SpreadingFlame').vfx, 'flameSweep', 'Spreading Flame uses a sweeping-fire builder');
+  eq(getReactionVfx('Spectrum').school, 'Prismatic', 'Spectrum reads as a Prismatic/multicolor reaction');
+  // Distinct builders for the visually-grouped families (must not collapse).
+  const airBuilders = new Set(['ClearedAir', 'BacklitFog', 'DriftingOil'].map((n) => getReactionVfx(n).vfx));
+  eq(airBuilders.size, 3, 'ClearedAir / BacklitFog / DriftingOil each have a distinct identity');
+  const stoneBuilders = new Set(['Rubble', 'FracturedCover'].map((n) => getReactionVfx(n).vfx));
+  eq(stoneBuilders.size, 2, 'Rubble and Fractured Cover have distinct stone identities');
 
   return report('spellVfx');
 }

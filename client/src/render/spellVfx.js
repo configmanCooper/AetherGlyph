@@ -22,7 +22,10 @@
 // readable silhouette (no trails, particles, pulsing, flicker or flashes).
 
 import * as THREE from 'three';
-import { getSpellVfx, VFX_SCHOOL_PALETTE, VFX_FAMILIES } from './spellVfxProfiles.js';
+import {
+  getSpellVfx, VFX_SCHOOL_PALETTE, VFX_FAMILIES,
+  getReactionVfx, REACTION_VFX_BUILDERS,
+} from './spellVfxProfiles.js';
 
 const FORWARD = new THREE.Vector3(0, 0, 1);
 const _v = new THREE.Vector3();
@@ -1133,6 +1136,375 @@ export function makeReleaseVfx(spellId, reduced, opts = {}) {
   handle.anchorHeight = RELEASE_HEIGHT[profile.family] ?? 1.4;
   handle.target = profile.target;
   return handle;
+}
+
+// ==========================================================================
+//  ENVIRONMENTAL REACTION VFX — a distinct, disposable signifier per reaction.
+//
+//  Each builder returns a self-timed transient handle (family 'reaction') that
+//  the arena drives through its production effect path (_pushEffect /
+//  _updateEffects) with the shared animation clock and retires + disposes when
+//  update() returns false. Reduced motion collapses each to a static, readable
+//  silhouette. Anchors: builders lay their content around a local GROUND origin
+//  (y≈0); airborne/billboard bursts centre their content a little higher.
+// ==========================================================================
+
+function groundRing(color, opacity) { const r = ringMesh(color, opacity); r.rotation.x = -Math.PI / 2; return r; }
+function groundDisc(color, opacity, additive = true) { const d = discMesh(color, opacity, additive); d.rotation.x = -Math.PI / 2; return d; }
+
+const REACTION_BUILDERS = {
+  // ---- ConductiveArc: headline jagged branching lightning between two points --
+  arc(profile, reduced, ctx) {
+    const c = profile.colors;
+    const to = (ctx && ctx.localTo) ? ctx.localTo.clone() : new THREE.Vector3(0, 0, -3);
+    const g = new THREE.Group();
+    const segs = reduced ? 7 : 12, branchSegs = reduced ? 0 : 5;
+    const arr = new Float32Array((segs + branchSegs) * 2 * 3);
+    const bg = ownBuffer(new THREE.BufferGeometry());
+    bg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const bolt = new THREE.LineSegments(bg, lineMat(c.core, 0.95)); bolt.frustumCulled = false; g.add(bolt);
+    const capA = glow(0.18, c.core, 0.9); g.add(capA);
+    const capB = glow(0.22, c.glow, 0.85); capB.position.copy(to); g.add(capB);
+    const from0 = new THREE.Vector3(0, 0, 0);
+    const rnd = mulberry(97);
+    const rebuild = () => {
+      let o = fillJagged(arr, 0, from0, to, segs, Math.min(0.6, to.length() * 0.11 + 0.15), rnd);
+      if (branchSegs) {
+        const mid = from0.clone().lerp(to, 0.35 + rnd() * 0.3);
+        const off = new THREE.Vector3((rnd() - 0.5) * 1.4, 0.4 + rnd() * 0.7, (rnd() - 0.5) * 1.4);
+        fillJagged(arr, o, mid, mid.clone().add(off), branchSegs, 0.45, rnd);
+      }
+      bg.attributes.position.needsUpdate = true;
+    };
+    rebuild();
+    let acc = 0;
+    return transient(profile.kind, 'reaction', g, reduced ? 420 : 640, (t, age, cx) => {
+      const fade = 1 - t;
+      const flick = reduced ? 1 : ((Math.floor(age / 55) % 2) ? 1 : 0.5);
+      bolt.material.opacity = 0.95 * fade * flick;
+      capA.material.opacity = 0.9 * fade; capB.material.opacity = 0.85 * fade;
+      if (reduced) return;
+      acc += cx.dtMs || 16; if (acc > 40) { acc = 0; rebuild(); }
+    });
+  },
+
+  // ---- Doused: water splash ring + rising droplets extinguishing flames -------
+  splash(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const ring = groundRing(c.glow, 0.8); ring.position.y = 0.03; g.add(ring);
+    const ring2 = groundRing(c.core, 0.6); ring2.position.y = 0.05; g.add(ring2);
+    const drops = makePoints(reduced ? 0 : 16, c.core, 0.16, reduced);
+    if (drops.count) g.add(drops.pts);
+    const seed = [];
+    for (let i = 0; i < drops.count; i++) seed.push({ a: (i / drops.count) * Math.PI * 2, r: 0.1 + Math.random() * 0.5, vy: 1.6 + Math.random() * 1.4 });
+    return transient(profile.kind, 'reaction', g, reduced ? 380 : 620, (t) => {
+      const e = 1 - (1 - t) * (1 - t), fade = 1 - t;
+      ring.scale.setScalar(0.3 + e * 2.4); ring.material.opacity = 0.8 * fade;
+      ring2.scale.setScalar(0.2 + e * 1.6); ring2.material.opacity = 0.6 * fade;
+      for (let i = 0; i < drops.count; i++) {
+        const s = seed[i]; const y = Math.max(0, s.vy * t - 2.4 * t * t);
+        drops.positions[i * 3] = Math.cos(s.a) * (s.r + e * 0.9);
+        drops.positions[i * 3 + 1] = 0.05 + y;
+        drops.positions[i * 3 + 2] = Math.sin(s.a) * (s.r + e * 0.9);
+      }
+      if (drops.count) { drops.geometry.attributes.position.needsUpdate = true; drops.pts.material.opacity = 0.9 * fade; }
+    });
+  },
+
+  // ---- WashedGround: a flat sheet of water washing the ground outward ---------
+  wash(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const sheet = groundDisc(c.trail, 0.5, false); sheet.position.y = 0.02; g.add(sheet);
+    const edge = groundRing(c.core, 0.85); edge.position.y = 0.04; g.add(edge);
+    const sheen = groundRing(c.glow, 0.4); sheen.position.y = 0.05; g.add(sheen);
+    const spray = makePoints(reduced ? 0 : 12, c.core, 0.12, reduced);
+    if (spray.count) g.add(spray.pts);
+    const seed = [];
+    for (let i = 0; i < spray.count; i++) seed.push({ a: (i / spray.count) * Math.PI * 2 });
+    return transient(profile.kind, 'reaction', g, reduced ? 420 : 700, (t) => {
+      const e = 1 - (1 - t) * (1 - t), fade = 1 - t, r = 0.3 + e * 2.6;
+      sheet.scale.setScalar(r); sheet.material.opacity = 0.5 * (1 - t * 0.8);
+      edge.scale.setScalar(r); edge.material.opacity = 0.85 * fade;
+      sheen.scale.setScalar(r * 0.7); sheen.material.opacity = 0.4 * fade;
+      for (let i = 0; i < spray.count; i++) { const s = seed[i]; spray.positions[i * 3] = Math.cos(s.a) * r; spray.positions[i * 3 + 1] = 0.06; spray.positions[i * 3 + 2] = Math.sin(s.a) * r; }
+      if (spray.count) { spray.geometry.attributes.position.needsUpdate = true; spray.pts.material.opacity = 0.8 * fade; }
+    });
+  },
+
+  // ---- Grounded: lightning driven into the ground + radial grounding lines ----
+  grounding(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const segs = reduced ? 6 : 9;
+    const arr = new Float32Array(segs * 2 * 3);
+    const bg = ownBuffer(new THREE.BufferGeometry());
+    bg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const bolt = new THREE.LineSegments(bg, lineMat(c.core, 0.95)); bolt.frustumCulled = false; g.add(bolt);
+    const rnd = mulberry(41);
+    const rebuild = () => { fillJagged(arr, 0, _v.set(0, 2.4, 0), new THREE.Vector3(0, 0.02, 0), segs, 0.22, rnd); bg.attributes.position.needsUpdate = true; };
+    rebuild();
+    const spokes = new THREE.Group(); g.add(spokes);
+    const nSpokes = reduced ? 4 : 7;
+    for (let i = 0; i < nSpokes; i++) { const a = (i / nSpokes) * Math.PI * 2; spokes.add(paramLine(2, (u) => [Math.cos(a) * (0.2 + u * 1.3), 0.03, Math.sin(a) * (0.2 + u * 1.3)], c.glow, 0.8, false).line); }
+    const hit = glow(0.18, c.core, 0.9); hit.position.y = 0.06; g.add(hit);
+    let acc = 0;
+    return transient(profile.kind, 'reaction', g, reduced ? 420 : 640, (t, age, cx) => {
+      const fade = 1 - t;
+      bolt.material.opacity = 0.95 * fade; hit.material.opacity = 0.9 * fade;
+      spokes.scale.setScalar(0.6 + (1 - (1 - t) * (1 - t)) * 0.9);
+      for (const ln of spokes.children) ln.material.opacity = 0.8 * fade;
+      if (reduced) return;
+      acc += cx.dtMs || 16; if (acc > 45) { acc = 0; rebuild(); }
+    });
+  },
+
+  // ---- FrozenGround: ice crystals and frost spreading across the ground -------
+  frost(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const ring = groundRing(c.glow, 0.6); ring.position.y = 0.03; g.add(ring);
+    const crystals = [];
+    const n = reduced ? 4 : 8;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + 0.3, r = 0.4 + Math.random() * 1.2;
+      const m = mesh(G.octa(), matBasic(i % 2 ? c.core : c.glow, 0.9));
+      m.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); m.scale.setScalar(0.001);
+      m.rotation.y = Math.random() * Math.PI; m.userData.h = 0.12 + Math.random() * 0.2;
+      g.add(m); crystals.push(m);
+    }
+    return transient(profile.kind, 'reaction', g, reduced ? 520 : 820, (t) => {
+      const grow = Math.min(1, t * 2.2), fade = 1 - t * t;
+      ring.scale.setScalar(0.4 + (1 - (1 - t) * (1 - t)) * 1.8); ring.material.opacity = 0.6 * (1 - t);
+      for (const m of crystals) { const s = grow * m.userData.h * 2.4; m.scale.set(s * 0.5, s, s * 0.5); m.position.y = s * 0.5; m.material.opacity = 0.9 * fade; }
+    });
+  },
+
+  // ---- SteamVeil: billowing steam puffs rising and fading ---------------------
+  steam(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const puffs = [];
+    const n = reduced ? 3 : 7;
+    for (let i = 0; i < n; i++) {
+      const p = glow(0.32, i % 2 ? c.core : c.glow, 0);
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 0.5;
+      p.position.set(Math.cos(a) * r, 0.1 + Math.random() * 0.2, Math.sin(a) * r);
+      p.userData = { x: p.position.x, sp: 0.6 + Math.random() * 0.9, ph: Math.random(), sc: 0.5 + Math.random() * 0.6 };
+      g.add(p); puffs.push(p);
+    }
+    return transient(profile.kind, 'reaction', g, reduced ? 600 : 1000, (t) => {
+      for (const p of puffs) {
+        const lt = Math.min(1, t + p.userData.ph * 0.2);
+        p.position.y = 0.1 + lt * (1.4 * p.userData.sp);
+        p.position.x = p.userData.x + (reduced ? 0 : Math.sin(lt * 4 + p.userData.ph * 6) * 0.15);
+        p.scale.setScalar(p.userData.sc * (0.6 + lt * 1.6));
+        p.material.opacity = Math.sin(Math.min(1, lt) * Math.PI) * 0.5;
+      }
+    });
+  },
+
+  // ---- FlashFire: a flame eruption bursting upward off the ignited oil --------
+  flame(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const base = groundDisc(c.trail, 0.5, true); base.position.y = 0.04; base.scale.setScalar(1.1); g.add(base);
+    const tongues = [];
+    const n = reduced ? 4 : 7;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, r = 0.2 + Math.random() * 0.4;
+      const tng = mesh(G.cone(), matBasic(i % 2 ? c.core : c.glow, 0.85));
+      tng.position.set(Math.cos(a) * r, 0.3, Math.sin(a) * r); tng.scale.set(0.25, 0.9, 0.25);
+      tng.userData = { ph: Math.random() * 6 }; g.add(tng); tongues.push(tng);
+    }
+    const embers = makePoints(reduced ? 0 : 20, c.core, 0.13, reduced);
+    if (embers.count) g.add(embers.pts);
+    const eseed = [];
+    for (let i = 0; i < embers.count; i++) eseed.push({ a: Math.random() * Math.PI * 2, r: Math.random() * 0.5, vy: 1.5 + Math.random() * 1.8, ph: Math.random() });
+    return transient(profile.kind, 'reaction', g, reduced ? 480 : 780, (t, age, cx) => {
+      const fade = 1 - t, s = cx.time || 0;
+      base.scale.setScalar(1.1 + (1 - (1 - t) * (1 - t)) * 0.9); base.material.opacity = 0.5 * fade;
+      for (const tng of tongues) {
+        const fl = reduced ? 1 : (0.8 + Math.abs(Math.sin(s * 12 + tng.userData.ph)) * 0.5);
+        tng.scale.set(0.25, 0.9 * fl * (0.5 + fade), 0.25); tng.position.y = 0.3 + 0.9 * fl * 0.4;
+        tng.material.opacity = 0.85 * fade;
+      }
+      for (let i = 0; i < embers.count; i++) { const s2 = eseed[i], tt = Math.min(1, t + s2.ph * 0.15); embers.positions[i * 3] = Math.cos(s2.a) * (s2.r + tt * 0.4); embers.positions[i * 3 + 1] = 0.2 + s2.vy * tt; embers.positions[i * 3 + 2] = Math.sin(s2.a) * (s2.r + tt * 0.4); }
+      if (embers.count) { embers.geometry.attributes.position.needsUpdate = true; embers.pts.material.opacity = 0.9 * fade; }
+    });
+  },
+
+  // ---- SpreadingFlame: a curved wall of fire sweeping wider -------------------
+  flameSweep(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const row = new THREE.Group(); g.add(row);
+    const tongues = [];
+    const n = reduced ? 5 : 9;
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1) - 0.5);
+      const tng = mesh(G.cone(), matBasic(i % 2 ? c.core : c.glow, 0.85));
+      tng.position.set(x, 0.35, -0.2 * (1 - (2 * x) * (2 * x))); tng.scale.set(0.18, 0.8, 0.18);
+      tng.userData = { ph: i }; row.add(tng); tongues.push(tng);
+    }
+    const base = groundDisc(c.trail, 0.4, true); base.position.y = 0.03; g.add(base);
+    return transient(profile.kind, 'reaction', g, reduced ? 520 : 820, (t, age, cx) => {
+      const fade = 1 - t, s = cx.time || 0, width = 1.2 + (1 - (1 - t) * (1 - t)) * 2.4;
+      row.scale.set(width, 1, 1); base.scale.set(width, 1, 1.2); base.material.opacity = 0.4 * fade;
+      for (const tng of tongues) { const fl = reduced ? 1 : (0.8 + Math.abs(Math.sin(s * 11 + tng.userData.ph)) * 0.55); tng.scale.set(0.18, 0.8 * fl * (0.5 + fade), 0.18); tng.material.opacity = 0.85 * fade; }
+    });
+  },
+
+  // ---- ClearedAir: expanding gust rings + streaks clearing the air -----------
+  wind(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const rings = [];
+    for (let i = 0; i < 3; i++) { const r = groundRing(c.glow, 0.7); r.position.y = 0.6 + i * 0.3; g.add(r); rings.push(r); }
+    const streaks = [];
+    const n = reduced ? 0 : 6;
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const ln = paramLine(2, (u) => [Math.cos(a) * (0.4 + u * 1.2), 0.7, Math.sin(a) * (0.4 + u * 1.2)], c.core, 0.8, false).line; g.add(ln); streaks.push(ln); }
+    return transient(profile.kind, 'reaction', g, reduced ? 460 : 700, (t) => {
+      const fade = 1 - t;
+      for (let i = 0; i < rings.length; i++) { const ph = Math.min(1, t + i * 0.18); rings[i].scale.setScalar(0.3 + ph * 2.6); rings[i].material.opacity = 0.7 * (1 - ph); }
+      for (const ln of streaks) { ln.material.opacity = 0.8 * fade; ln.scale.setScalar(0.6 + (1 - (1 - t) * (1 - t)) * 1.2); }
+    });
+  },
+
+  // ---- BacklitFog: warm light blooming through drifting fog -------------------
+  backlight(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const halo = glow(0.6, c.glow, 0); halo.position.y = 0.7; g.add(halo);
+    const coreGlow = glow(0.3, c.core, 0); coreGlow.position.y = 0.7; g.add(coreGlow);
+    const ring = ringMesh(c.core, 0); ring.position.y = 0.7; g.add(ring);
+    const fog = [];
+    const n = reduced ? 2 : 5;
+    for (let i = 0; i < n; i++) { const p = glow(0.5, c.trail, 0); const a = Math.random() * Math.PI * 2; p.position.set(Math.cos(a) * 0.6, 0.6 + Math.random() * 0.4, Math.sin(a) * 0.6); g.add(p); fog.push(p); }
+    return transient(profile.kind, 'reaction', g, reduced ? 560 : 900, (t) => {
+      const bloom = Math.sin(Math.min(1, t) * Math.PI);
+      halo.scale.setScalar(1 + bloom * 1.6); halo.material.opacity = bloom * 0.55;
+      coreGlow.scale.setScalar(1 + bloom * 0.8); coreGlow.material.opacity = bloom * 0.7;
+      ring.scale.setScalar(1 + bloom * 2.2); ring.material.opacity = bloom * 0.4;
+      for (const p of fog) p.material.opacity = bloom * 0.3;
+    }, { billboard: true });
+  },
+
+  // ---- DriftingOil: a dark oil slick sliding sideways under a sheen -----------
+  oildrift(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const pool = groundDisc(0x0a0906, 0.85, false); pool.position.y = 0.02; pool.scale.setScalar(1.4); g.add(pool);
+    const sheen = groundRing(0x6a7fb0, 0.4); sheen.position.y = 0.04; sheen.scale.setScalar(1.4); g.add(sheen);
+    const glint = groundDisc(0xffffff, 0.22, true); glint.position.y = 0.05; glint.scale.setScalar(0.5); g.add(glint);
+    const arrow = paramLine(2, (u) => [u * 1.4, 0.05, 0], c.glow, 0.7, false).line; g.add(arrow);
+    return transient(profile.kind, 'reaction', g, reduced ? 620 : 900, (t, age, cx) => {
+      const fade = 1 - t, s = cx.time || 0, drift = (1 - (1 - t) * (1 - t)) * 1.2;
+      pool.position.x = drift; pool.material.opacity = 0.7 * fade;
+      sheen.position.x = drift; if (!reduced) sheen.material.color.setHSL((s * 0.05) % 1, 0.6, 0.6); sheen.material.opacity = 0.4 * fade;
+      glint.position.set(drift + (reduced ? 0.4 : Math.cos(s * 0.6) * 0.5), 0.05, reduced ? 0 : Math.sin(s * 0.6) * 0.5); glint.material.opacity = 0.2 * fade;
+      arrow.position.x = drift - 0.7; arrow.material.opacity = 0.7 * fade;
+    });
+  },
+
+  // ---- Rubble: stone fragments bursting out of collapsing cover --------------
+  rubble(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const dust = groundDisc(c.trail, 0.5, false); dust.position.y = 0.03; g.add(dust);
+    const rocks = [];
+    const n = reduced ? 0 : 10;
+    for (let i = 0; i < n; i++) {
+      const m = mesh(G.box(), matSolid(i % 2 ? c.glow : c.trail, { roughness: 1, flat: true }));
+      m.scale.setScalar(0.08 + Math.random() * 0.1);
+      const th = Math.random() * Math.PI * 2, ph = Math.random() * 0.6 + 0.2;
+      m.userData.vel = new THREE.Vector3(Math.cos(th) * Math.cos(ph), Math.sin(ph) + 0.8, Math.sin(th) * Math.cos(ph)).multiplyScalar(2 + Math.random() * 1.5);
+      g.add(m); rocks.push(m);
+    }
+    const chunk = mesh(G.ico(), matSolid(c.glow, { roughness: 1, flat: true })); chunk.scale.setScalar(0.2); chunk.position.y = 0.12; g.add(chunk);
+    return transient(profile.kind, 'reaction', g, reduced ? 420 : 760, (t, age, cx) => {
+      const dt = (cx.dtMs || 16) * 0.001;
+      dust.scale.setScalar(0.5 + (1 - (1 - t) * (1 - t)) * 2); dust.material.opacity = 0.5 * (1 - t);
+      for (const m of rocks) {
+        m.position.addScaledVector(m.userData.vel, dt); m.userData.vel.y -= 5 * dt;
+        m.rotation.x += dt * 5; m.rotation.z += dt * 4;
+        if (m.position.y < 0.03) { m.position.y = 0.03; m.userData.vel.y *= -0.3; m.userData.vel.x *= 0.6; m.userData.vel.z *= 0.6; }
+      }
+      chunk.rotation.y += dt * 2;
+    });
+  },
+
+  // ---- FracturedCover: a cracking fracture splitting the cover open -----------
+  fracture(profile, reduced) {
+    const c = profile.colors;
+    const g = new THREE.Group();
+    const nLines = reduced ? 2 : 4, segs = 4;
+    const arr = new Float32Array(nLines * segs * 2 * 3);
+    const bg = ownBuffer(new THREE.BufferGeometry());
+    bg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const cracks = new THREE.LineSegments(bg, lineMat(c.glow, 0.95)); cracks.frustumCulled = false; g.add(cracks);
+    const rnd = mulberry(63);
+    let o = 0;
+    for (let i = 0; i < nLines; i++) { const a = (i / nLines) * Math.PI + 0.2; o = fillJagged(arr, o, _v.set(0, 0.05, 0), new THREE.Vector3(Math.cos(a) * 1.2, 0.05, Math.sin(a) * 1.2), segs, 0.22, rnd); }
+    bg.attributes.position.needsUpdate = true;
+    const shards = [];
+    const n = reduced ? 0 : 8;
+    for (let i = 0; i < n; i++) {
+      const m = mesh(G.tetra(), matSolid(c.trail, { roughness: 1, flat: true }));
+      m.scale.setScalar(0.07 + Math.random() * 0.07);
+      const th = Math.random() * Math.PI * 2, ph = Math.random() * 0.5 + 0.2;
+      m.userData.vel = new THREE.Vector3(Math.cos(th) * Math.cos(ph), Math.sin(ph) + 0.6, Math.sin(th) * Math.cos(ph)).multiplyScalar(1.6 + Math.random());
+      g.add(m); shards.push(m);
+    }
+    return transient(profile.kind, 'reaction', g, reduced ? 420 : 680, (t, age, cx) => {
+      const dt = (cx.dtMs || 16) * 0.001;
+      cracks.material.opacity = 0.95 * (1 - t); cracks.scale.setScalar(0.4 + (1 - (1 - t) * (1 - t)) * 0.9);
+      for (const m of shards) { m.position.addScaledVector(m.userData.vel, dt); m.userData.vel.y -= 4 * dt; m.rotation.x += dt * 6; }
+    });
+  },
+
+  // ---- Spectrum: concentric multicolor spectral rings + prismatic motes ------
+  spectrum(profile, reduced) {
+    const g = new THREE.Group();
+    const rings = [];
+    for (let i = 0; i < 4; i++) { const r = ringMesh(0xffffff, 0); r.position.y = 0.6; rings.push(r); g.add(r); }
+    const motes = makePoints(reduced ? 0 : 16, 0xffffff, 0.14, reduced);
+    if (motes.count) { motes.pts.position.y = 0.6; g.add(motes.pts); }
+    const mseed = [];
+    for (let i = 0; i < motes.count; i++) mseed.push({ a: (i / motes.count) * Math.PI * 2, r: 0.3 + Math.random() * 0.6 });
+    return transient(profile.kind, 'reaction', g, reduced ? 520 : 860, (t, age, cx) => {
+      const s = cx.time || 0, fade = 1 - t;
+      for (let i = 0; i < rings.length; i++) {
+        const ph = Math.min(1, t + i * 0.12);
+        rings[i].scale.setScalar(0.3 + ph * 2.4);
+        rings[i].material.color.setHSL(reduced ? (i / rings.length) : ((s * 0.3 + i / rings.length) % 1), 1, 0.6);
+        rings[i].material.opacity = 0.7 * (1 - ph);
+      }
+      for (let i = 0; i < motes.count; i++) { const m = mseed[i], e = 1 - (1 - t) * (1 - t); motes.positions[i * 3] = Math.cos(m.a + s) * (m.r + e * 1.2); motes.positions[i * 3 + 1] = Math.sin(s * 2 + i) * 0.2; motes.positions[i * 3 + 2] = Math.sin(m.a + s) * (m.r + e * 1.2); }
+      if (motes.count) { motes.geometry.attributes.position.needsUpdate = true; motes.pts.material.opacity = 0.9 * fade; }
+    }, { billboard: true });
+  },
+};
+
+// Build the transient VFX handle for an environmental reaction. opts.from/opts.to
+// (world points) drive link reactions (ConductiveArc); the arena positions the
+// handle at opts.from and the arc is drawn to (to - from) in local space.
+export function makeReactionVfx(name, reduced, opts = {}) {
+  const profile = getReactionVfx(name);
+  const build = profile && REACTION_BUILDERS[profile.vfx];
+  if (!build) return null;
+  let localTo = null;
+  if (opts.to && opts.from) localTo = opts.to.clone().sub(opts.from);
+  const handle = build(profile, reduced, { localTo, radius: opts.radius });
+  handle.anchor = profile.anchor;
+  return handle;
+}
+
+// Renderer self-check: every reaction profile's builder must exist here.
+export function reactionVfxCoverage() {
+  const covered = new Set(Object.keys(REACTION_BUILDERS));
+  return REACTION_VFX_BUILDERS.filter((v) => !covered.has(v));
 }
 
 // Renderer self-check: every profile family must have a builder somewhere.

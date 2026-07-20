@@ -75,8 +75,11 @@ export function validateTraceEnvelope(env) {
 // ---- per-slot remapping -------------------------------------------------
 const flip = (i) => (i === 0 ? 1 : 0);
 
-// Slot-bearing fields present on Sim domain events (see sim.js emits).
-const SLOT_FIELDS = ['caster', 'target', 'owner', 'winner', 'by', 'casterId', 'source', 'attacker', 'victim'];
+// Slot-bearing fields present on Sim domain events (see sim.js emits). These hold
+// wizard slot ids (0/1) and are flipped for the remote recipient. NOTE: purely
+// spatial fields (e.g. reaction `center`, an arc position) are intentionally NOT
+// listed — arc positions are shared, not per-slot, so they must never be flipped.
+const SLOT_FIELDS = ['caster', 'target', 'targetId', 'owner', 'winner', 'by', 'casterId', 'source', 'attacker', 'victim'];
 
 function remapWizard(w, localId) {
   return { ...w, id: localId };

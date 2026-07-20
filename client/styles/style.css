@@ -210,6 +210,20 @@ body.reduced * { animation: none !important; transition: none !important; }
 .spell-btn.spell-cooldown-toggle { background: rgba(38,24,55,0.96); }
 .spell-btn:active { transform: translateY(1px); }
 
+/* Glyph Laboratory keeps its expanded controls below the drawing surface. */
+body.mode-lab .spellbar {
+  left: calc(8px + var(--safe-left)); right: calc(8px + var(--safe-right));
+  width: auto; max-width: none; transform: none; flex-wrap: nowrap;
+  justify-content: flex-start; overflow-x: auto; overflow-y: hidden;
+  padding: 2px 4px 4px; scrollbar-width: thin;
+}
+body.mode-lab .spell-btn { flex: 0 0 auto; }
+body.mode-lab .control-zone { bottom: calc(76px + var(--safe-bottom)); }
+body.mode-lab .draw-pad { height: min(34vh, 260px); }
+body.mode-lab .action-buttons {
+  bottom: calc(min(34vh, 260px) + 88px + var(--safe-bottom));
+}
+
 /* Loadout builder */
 .panel.wide { max-width: min(96vw, 760px); max-height: 88vh; overflow-y: auto; }
 .loadout-rules { color: var(--muted); font-size: 13px; margin: 0 0 10px; }

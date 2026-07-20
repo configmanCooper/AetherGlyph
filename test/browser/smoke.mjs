@@ -33,6 +33,20 @@ async function activate(page, selector) {
   await page.evaluate((s) => document.querySelector(s)?.click(), selector);
 }
 
+// Draw a horizontal Ember Bolt flick through the centre of the live draw pad.
+// Lab layout keeps its control strip below the pad, so hit-testing reaches the
+// canvas directly rather than relying on a test-only clear-band workaround.
+async function drawEmberFlick(page) {
+  const pad = await page.$('#draw-canvas');
+  const box = await pad.boundingBox();
+  const y = box.y + box.height * 0.45;
+  await page.mouse.move(box.x + box.width * 0.2, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width * 0.2 + (box.width * 0.6) * (i / 8), y);
+  await page.mouse.up();
+  return box;
+}
+
 const browser = await puppeteer.launch({
   executablePath: edge,
   headless: 'new',
@@ -243,6 +257,14 @@ try {
   await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
   const labInfo = await page.evaluate(() => (window.__aegTest ? window.__aegTest.info() : null));
   if (!labInfo || labInfo.mode !== 'lab' || labInfo.botActive) fail('Glyph Laboratory should have no active opponent: ' + JSON.stringify(labInfo));
+  const labLayout = await page.evaluate(() => {
+    const pad = document.querySelector('#draw-pad')?.getBoundingClientRect();
+    const bar = document.querySelector('#spellbar')?.getBoundingClientRect();
+    return pad && bar ? { padBottom: pad.bottom, barTop: bar.top } : null;
+  });
+  if (!labLayout || labLayout.padBottom > labLayout.barTop) {
+    fail('Glyph Laboratory spellbar overlaps the draw pad: ' + JSON.stringify(labLayout));
+  }
   const labFirst = await page.evaluate(() => ({
     spells: Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)),
     lastName: document.querySelector('#spellbar .spell-btn[data-spell]:last-of-type .sb-name')?.textContent,
@@ -278,6 +300,15 @@ try {
   if (!/Stone Shard/i.test(labStone.hint) || labStone.guide !== '4'
       || labStone.selected !== '4' || labStone.painted < 20) {
     fail('Glyph Laboratory selection did not update the Stone Shard guide: ' + JSON.stringify(labStone));
+  }
+  // The Stone Shard guide must not bias/restrict recognition: drawing an Ember
+  // flick still resolves as Ember Bolt against the full 36-spell catalog.
+  const beforeUnbiased = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
+  await drawEmberFlick(page);
+  await page.waitForFunction((n) => window.__aegTest.info().playerCastsResolved > n, { timeout: 5000 }, beforeUnbiased);
+  const unbiasedCast = await page.evaluate(() => document.querySelector('#last-cast')?.textContent || '');
+  if (!/Last cast: Ember Bolt/.test(unbiasedCast)) {
+    fail('selected Stone Shard guide biased recognition instead of accepting Ember Bolt: ' + unbiasedCast);
   }
 
   // Page through the full public catalog. Weather/environment spells must appear;
@@ -457,14 +488,29 @@ try {
       fail(`spellbar button must select a guide without casting (${diff}): ` + JSON.stringify({ beforeGuide, afterGuide, guideSpell }));
     }
     // Draw a real glyph, then force the round to a finish and read the coaching.
-    const pad = await page.$('#draw-canvas');
-    const box = await pad.boundingBox();
-    const py = box.y + box.height / 2;
-    await page.mouse.move(box.x + box.width * 0.2, py);
-    await page.mouse.down();
-    for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width * 0.2 + (box.width * 0.6) * (i / 8), py);
-    await page.mouse.up();
+    await drawEmberFlick(page);
     await new Promise((r) => setTimeout(r, 300));
+    if (diff === 'easy') {
+      await page.waitForFunction(() => window.__aegTest.info().playerCastsResolved > 0, { timeout: 5000 });
+      const guideCooldown = await page.evaluate((id) => {
+        const b = document.querySelector(`#spellbar .spell-btn[data-spell="${id}"]`);
+        return {
+          disabled: b?.classList.contains('disabled'),
+          cooldown: b?.classList.contains('cooldown'),
+          remaining: b?.querySelector('.sb-cost')?.textContent || '',
+        };
+      }, guideSpell);
+      if (!guideCooldown.disabled || !guideCooldown.cooldown || !/^\d+(?:\.\d)?s$/.test(guideCooldown.remaining)) {
+        fail('guide button did not show a grayed cooldown countdown: ' + JSON.stringify(guideCooldown));
+      }
+      // Draw the same valid glyph again while its live cooldown is active.
+      await drawEmberFlick(page);
+      await page.waitForFunction(() => /cooldown/i.test(document.querySelector('#toast')?.textContent || ''), { timeout: 5000 });
+      const cooldownToast = await page.evaluate(() => document.querySelector('#toast')?.textContent || '');
+      if (!/Ember Bolt is on cooldown/i.test(cooldownToast) || !/seconds remaining/i.test(cooldownToast)) {
+        fail('cooldown attempt did not explain the remaining time: ' + cooldownToast);
+      }
+    }
     await page.evaluate(() => window.__aegTest.forceEnd(0));
     await page.waitForSelector('#panel-result:not(.hidden)', { timeout: 5000 });
     await page.waitForSelector('#coach-report:not(.hidden)', { timeout: 5000 });
@@ -561,6 +607,52 @@ try {
       || playerHitDistances.some((d) => d < 1.5)) {
     fail('player-hit VFX spawned too close to the first-person camera: ' + JSON.stringify(playerHitDistances));
   }
+
+  // ---- Environmental reaction VFX gallery + production path -----------------
+  // Every reaction the sim can emit must draw a DISTINCT, animated, disposable
+  // signifier. ConductiveArc must be its own electric branching arc (a linked
+  // lightning kind), spawned through the SAME production handler the live sim
+  // drives — not a generic burst. A reduced-motion pass must also render.
+  const reactionResult = await page.evaluate(async () => {
+    if (!window.__aegVfx || !window.__aegVfx.spawnReaction) return { error: 'no reaction hook' };
+    const coverage = window.__aegVfx.reactionCoverage();
+    const profiles = window.__aegVfx.reactionProfiles();
+    window.__aegVfx.clear();
+    const spawned = [];
+    for (const p of profiles) { spawned.push({ name: p.name, kind: window.__aegVfx.spawnReaction(p.name) }); await new Promise((r) => setTimeout(r, 18)); }
+    await new Promise((r) => setTimeout(r, 450)); // run update()/WebGL on every reaction
+    const live = window.__aegVfx.kinds().length;
+    window.__aegVfx.clear(); window.__aegVfx.setReduced(true);
+    for (const p of profiles) window.__aegVfx.spawnReaction(p.name);
+    await new Promise((r) => setTimeout(r, 200));
+    window.__aegVfx.setReduced(false); window.__aegVfx.clear();
+    const afterClear = window.__aegVfx.kinds().length;
+    // Production path: spawn ConductiveArc through the same _spawnReaction the sim uses.
+    const prodArc = window.__aegVfx.productionReaction('ConductiveArc');
+    const prodCount = window.__aegVfx.productionCount();
+    return { coverage, profiles, spawned, live, afterClear, prodArc, prodCount };
+  });
+  if (!reactionResult || reactionResult.error) fail('reaction VFX hook missing: ' + JSON.stringify(reactionResult));
+  if (!Array.isArray(reactionResult.coverage) || reactionResult.coverage.length !== 0) {
+    fail('renderer is missing a reaction VFX builder: ' + JSON.stringify(reactionResult.coverage));
+  }
+  if (reactionResult.profiles.length !== 14) fail('reaction VFX must cover all 14 sim reactions, got ' + reactionResult.profiles.length);
+  const badReaction = reactionResult.spawned.filter((s) => !s.kind || typeof s.kind !== 'string');
+  if (badReaction.length) fail('some reactions produced no VFX kind (builder error): ' + JSON.stringify(badReaction));
+  const uniqueReactionKinds = new Set(reactionResult.spawned.map((s) => s.kind));
+  if (uniqueReactionKinds.size !== reactionResult.profiles.length) {
+    fail('reaction VFX object kinds are not all distinct: ' + JSON.stringify(reactionResult.spawned));
+  }
+  if (reactionResult.afterClear !== 0) fail('reaction gallery did not dispose spawned objects on clear: ' + reactionResult.afterClear);
+  const arcProfile = reactionResult.profiles.find((p) => p.name === 'ConductiveArc');
+  if (!arcProfile || arcProfile.vfx !== 'arc' || arcProfile.anchor !== 'link' || arcProfile.kind !== 'reaction:conductiveArc') {
+    fail('ConductiveArc must be a distinct linked electric arc: ' + JSON.stringify(arcProfile));
+  }
+  const arcSpawn = reactionResult.spawned.find((s) => s.name === 'ConductiveArc');
+  if (!arcSpawn || arcSpawn.kind !== 'reaction:conductiveArc') fail('ConductiveArc lightning kind missing from gallery: ' + JSON.stringify(arcSpawn));
+  if (reactionResult.prodArc !== 'reaction:conductiveArc') fail('ConductiveArc production VFX kind wrong: ' + reactionResult.prodArc);
+  if (!(reactionResult.prodCount >= 1)) fail('ConductiveArc production VFX did not spawn a live transient effect');
+  console.log('REACTIONS', reactionResult.spawned.length, 'distinct', uniqueReactionKinds.size);
 
   // ---- Arcane academy + wizard component metadata (renderer debug hook) ------
   const academy = await page.evaluate(() => (window.__aegVfx && window.__aegVfx.academy) ? window.__aegVfx.academy() : { error: 'no academy hook' });

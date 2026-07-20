@@ -14,10 +14,10 @@
 import * as THREE from 'three';
 import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
 import { effectFor, PROJECTILE, CHANNEL, ZONE, SHIELD, BARRIER } from '@shared/sim/spellEffects.js';
-import { getSpellVfx } from './spellVfxProfiles.js';
+import { getSpellVfx, getReactionVfx } from './spellVfxProfiles.js';
 import {
   makeProjectileVfx, makeImpactVfx, makeZoneVfx, makeReleaseVfx,
-  makeWardVfx, makeDomeVfx, makeBeamVfx, makeCastCueVfx,
+  makeWardVfx, makeDomeVfx, makeBeamVfx, makeCastCueVfx, makeReactionVfx,
 } from './spellVfx.js';
 
 const ARC_W = 3.2;
@@ -773,6 +773,7 @@ export class Arena {
         this._impactAt(e.spellId, new THREE.Vector3(rx, 1.4, rz + (rz > 0 ? -0.4 : 0.4)));
       } else if (e.type === 'reaction') {
         this.keyLight.intensity = 1.8;
+        this._spawnReaction(e);
       } else if (e.type === 'phoenixSave' || e.type === 'phoenix') {
         const id = e.target ?? e.caster;
         const w = sim.wizards[id];
@@ -816,6 +817,32 @@ export class Arena {
     if (!handle) return;
     const anchor = from.clone(); anchor.y = handle.anchorHeight ?? 1.4;
     this._pushEffect(handle, anchor);
+  }
+
+  // Spawn the transient VFX for an environmental reaction at a sensible world
+  // location: 'link' arcs between caster and target (ConductiveArc lightning),
+  // 'target' anchors at the affected wizard's feet, 'center' sits on the reacting
+  // ground zone (arc position -> world x). Animated + disposed via _updateEffects.
+  _spawnReaction(e) {
+    const profile = getReactionVfx(e.name);
+    if (!profile) return;
+    const centerX = (typeof e.center === 'number' ? e.center : 0) * ARC_W;
+    const casterId = (e.casterId === 0 || e.casterId === 1) ? e.casterId : 0;
+    const targetId = (e.targetId === 0 || e.targetId === 1) ? e.targetId : (casterId === 0 ? 1 : 0);
+    let anchor, from = null, to = null;
+    if (profile.anchor === 'link') {
+      from = this._wizardWorld(casterId, 1.3);
+      to = this._wizardWorld(targetId, 1.3);
+      anchor = from.clone();
+    } else if (profile.anchor === 'target') {
+      anchor = this._wizardWorld(targetId, 0.12);
+    } else {
+      anchor = new THREE.Vector3(centerX, 0.12, 0);
+    }
+    const handle = makeReactionVfx(e.name, this.reduced, { from, to });
+    if (!handle) return;
+    this._pushEffect(handle, anchor, !!handle.billboard);
+    if (SCHOOL_COLOR[profile.school]) this.keyLight.color.setHex(SCHOOL_COLOR[profile.school]);
   }
 
   _impactAt(spellId, worldPos) {
@@ -983,6 +1010,42 @@ export class Arena {
   debugClear() {
     for (const e of this._debug) { this.scene.remove(e.handle.object3D); e.handle.dispose(); }
     this._debug = [];
+  }
+
+  // Spawn a reaction VFX in the dev gallery (idle arena) so the smoke test can
+  // confirm each reaction draws a DISTINCT object, animates WebGL frames, and
+  // disposes cleanly. Never wired to production UI.
+  debugSpawnReaction(name) {
+    const profile = getReactionVfx(name);
+    if (!profile) return null;
+    let from = null, to = null, anchor;
+    if (profile.anchor === 'link') {
+      from = new THREE.Vector3(-1.6, 1.3, ENEMY_Z + 2); to = new THREE.Vector3(1.6, 1.3, ENEMY_Z + 2); anchor = from.clone();
+    } else {
+      anchor = new THREE.Vector3(0, 0.12, ENEMY_Z + 2);
+    }
+    const handle = makeReactionVfx(name, this.reduced, { from, to });
+    if (!handle) return null;
+    handle.object3D.position.copy(anchor);
+    this.scene.add(handle.object3D);
+    const entry = { handle, age: 0, life: 1100, kind: handle.kind };
+    entry.tick = (dt) => {
+      entry.age += dt;
+      if (handle.billboard) handle.object3D.quaternion.copy(this.camera.quaternion);
+      if (handle.update({ dtMs: dt, time: this._t }) === false) entry.age = entry.life;
+    };
+    while (this._debug.length >= 16) { const old = this._debug.shift(); this.scene.remove(old.handle.object3D); old.handle.dispose(); }
+    this._debug.push(entry);
+    return entry.kind;
+  }
+
+  // Drive the PRODUCTION reaction path (not the gallery): spawns via the same
+  // _spawnReaction the live sim uses and returns the live effect's kind + count.
+  debugProductionReaction(name) {
+    const before = this.effects.length;
+    this._spawnReaction({ name: String(name), casterId: 0, targetId: 1, center: 0 });
+    if (this.effects.length <= before) return null;
+    return this.effects[this.effects.length - 1].handle.kind;
   }
 
   _updateDebug(dtMs) {

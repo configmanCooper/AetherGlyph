@@ -200,6 +200,80 @@ export const SPELL_VFX = Object.freeze({
 
 export const VFX_IDS = Object.freeze(Object.keys(SPELL_VFX).map(Number).sort((a, b) => a - b));
 
+// ==========================================================================
+//  ENVIRONMENTAL REACTION VFX — one distinct, disposable visual signifier per
+//  reaction emitted by shared/src/sim/reactions.js. PURE DATA (no Three.js) so
+//  Node tests can validate full coverage; the renderer (spellVfx.js) implements
+//  one builder per `vfx` key and asserts coverage at load.
+//
+//  Each profile carries:
+//    kind        UNIQUE readable identity (dev gallery + tests).
+//    vfx         which reaction builder draws it (spellVfx.js REACTION_BUILDERS).
+//    school      palette family (readability; matches the element in play).
+//    anchor      where the arena places it: 'center' (on the reacting ground
+//                zone), 'target' (at the affected wizard) or 'link' (an arc
+//                between caster and target — used by ConductiveArc lightning).
+//    colors      { core, glow, trail } pulled from the school palette.
+//    silhouette  short shape word; motion short motion descriptor.
+//    budget      worst-case { meshes, particles, trail } (capped like spells).
+//    reducedSafe every reaction must degrade to a static, readable form.
+export const REACTION_VFX = Object.freeze({
+  Doused: { kind: 'reaction:doused', vfx: 'splash', school: 'Tide', anchor: 'center',
+    colors: pal('Tide'), silhouette: 'splash-ring', motion: 'water splash ring with rising droplets dousing the flames',
+    budget: { meshes: 5, particles: 18, trail: 0 }, reducedSafe: true },
+  WashedGround: { kind: 'reaction:washedGround', vfx: 'wash', school: 'Tide', anchor: 'center',
+    colors: pal('Tide', { glow: 0x3f93d6 }), silhouette: 'wash-sheet', motion: 'flat sheet of water washing the ground outward',
+    budget: { meshes: 4, particles: 12, trail: 0 }, reducedSafe: true },
+  Grounded: { kind: 'reaction:grounded', vfx: 'grounding', school: 'Storm', anchor: 'target',
+    colors: pal('Storm'), silhouette: 'ground-bolt', motion: 'lightning driven into the ground with radial grounding lines',
+    budget: { meshes: 8, particles: 6, trail: 0 }, reducedSafe: true },
+  FrozenGround: { kind: 'reaction:frozenGround', vfx: 'frost', school: 'Tide', anchor: 'center',
+    colors: pal('Tide', { core: 0xe6f7ff }), silhouette: 'ice-crystals', motion: 'ice crystals and frost spreading across the ground',
+    budget: { meshes: 10, particles: 6, trail: 0 }, reducedSafe: true },
+  SteamVeil: { kind: 'reaction:steamVeil', vfx: 'steam', school: 'Gale', anchor: 'center',
+    colors: pal('Gale', { core: 0xeef2f6, glow: 0xc2ccd6, trail: 0x8a97a4 }), silhouette: 'steam-puff', motion: 'billowing steam puffs rising and fading',
+    budget: { meshes: 7, particles: 16, trail: 0 }, reducedSafe: true },
+  ConductiveArc: { kind: 'reaction:conductiveArc', vfx: 'arc', school: 'Storm', anchor: 'link',
+    colors: pal('Storm'), silhouette: 'branching-arc', motion: 'animated jagged branching lightning arc linking caster and target',
+    budget: { meshes: 6, particles: 6, trail: 0 }, reducedSafe: true },
+  FlashFire: { kind: 'reaction:flashFire', vfx: 'flame', school: 'Ember', anchor: 'center',
+    colors: pal('Ember'), silhouette: 'flame-eruption', motion: 'flame eruption bursting upward off the ignited oil',
+    budget: { meshes: 8, particles: 24, trail: 0 }, reducedSafe: true },
+  SpreadingFlame: { kind: 'reaction:spreadingFlame', vfx: 'flameSweep', school: 'Ember', anchor: 'center',
+    colors: pal('Ember', { glow: 0xff8a3d }), silhouette: 'flame-sweep', motion: 'a curved wall of fire sweeping wider',
+    budget: { meshes: 9, particles: 18, trail: 0 }, reducedSafe: true },
+  ClearedAir: { kind: 'reaction:clearedAir', vfx: 'wind', school: 'Gale', anchor: 'center',
+    colors: pal('Gale'), silhouette: 'gust-rings', motion: 'expanding gust rings and streaks clearing the air',
+    budget: { meshes: 6, particles: 14, trail: 0 }, reducedSafe: true },
+  BacklitFog: { kind: 'reaction:backlitFog', vfx: 'backlight', school: 'Gale', anchor: 'center',
+    colors: pal('Gale', { core: 0xfff3d0, glow: 0xffd98a, trail: 0x8a7f6a }), silhouette: 'backlit-halo', motion: 'warm light blooming through drifting fog',
+    budget: { meshes: 7, particles: 10, trail: 0 }, reducedSafe: true },
+  DriftingOil: { kind: 'reaction:driftingOil', vfx: 'oildrift', school: 'Ember', anchor: 'center',
+    colors: pal('Ember', { core: 0x2a2418, glow: 0x6a5a3a, trail: 0x120f08 }), silhouette: 'oil-slick', motion: 'a dark oil slick sliding sideways under an iridescent sheen',
+    budget: { meshes: 5, particles: 6, trail: 0 }, reducedSafe: true },
+  Rubble: { kind: 'reaction:rubble', vfx: 'rubble', school: 'Stone', anchor: 'center',
+    colors: pal('Stone'), silhouette: 'rock-burst', motion: 'stone fragments bursting out of collapsing cover',
+    budget: { meshes: 12, particles: 14, trail: 0 }, reducedSafe: true },
+  FracturedCover: { kind: 'reaction:fracturedCover', vfx: 'fracture', school: 'Stone', anchor: 'center',
+    colors: pal('Stone', { glow: 0xd85a2a }), silhouette: 'crack-burst', motion: 'a cracked fracture splitting the cover open',
+    budget: { meshes: 7, particles: 12, trail: 0 }, reducedSafe: true },
+  Spectrum: { kind: 'reaction:spectrum', vfx: 'spectrum', school: 'Prismatic', anchor: 'center',
+    colors: pal('Prismatic'), silhouette: 'spectral-burst', motion: 'concentric multicolor spectral rings',
+    budget: { meshes: 8, particles: 18, trail: 0 }, reducedSafe: true },
+});
+
+// Reaction names in canonical (matrix) order — MUST equal reactions.js REACTIONS.
+export const REACTION_VFX_NAMES = Object.freeze(Object.keys(REACTION_VFX));
+
+// Distinct reaction builder keys the renderer must implement (coverage check).
+export const REACTION_VFX_BUILDERS = Object.freeze(
+  [...new Set(REACTION_VFX_NAMES.map((n) => REACTION_VFX[n].vfx))],
+);
+
+export function getReactionVfx(name) { return REACTION_VFX[name] || null; }
+export function allReactionVfxKinds() { return REACTION_VFX_NAMES.map((n) => REACTION_VFX[n].kind); }
+
+
 export function getSpellVfx(id) { return SPELL_VFX[id] || null; }
 export function hasVfxProfile(id) { return !!SPELL_VFX[id]; }
 export function everySpellHasVfx(ids) { return ids.every((id) => !!SPELL_VFX[id]); }
@@ -236,5 +310,43 @@ export function validateAllProfiles() {
   for (const id of VFX_IDS) errs.push(...validateProfile(id));
   const kinds = allVfxKinds();
   if (new Set(kinds).size !== kinds.length) errs.push('duplicate kind across profiles');
+  return errs;
+}
+
+const REACTION_ANCHORS = new Set(['center', 'target', 'link']);
+
+// Structural validation of a single reaction VFX profile.
+export function validateReactionVfx(name) {
+  const p = REACTION_VFX[name];
+  const errs = [];
+  if (!p) return [`reaction ${name}: missing VFX profile`];
+  if (!p.kind) errs.push(`reaction ${name}: missing kind`);
+  if (!p.vfx) errs.push(`reaction ${name}: missing vfx builder key`);
+  if (!VFX_SCHOOL_PALETTE[p.school]) errs.push(`reaction ${name}: unknown school "${p.school}"`);
+  if (!REACTION_ANCHORS.has(p.anchor)) errs.push(`reaction ${name}: invalid anchor "${p.anchor}"`);
+  if (!p.silhouette) errs.push(`reaction ${name}: missing silhouette`);
+  if (!p.motion) errs.push(`reaction ${name}: missing motion`);
+  for (const key of ['core', 'glow', 'trail']) {
+    if (!isValidColor(p.colors?.[key])) errs.push(`reaction ${name}: invalid color ${key}=${p.colors?.[key]}`);
+  }
+  const b = p.budget || {};
+  if (!(b.meshes >= 0 && b.meshes <= VFX_BUDGET_CAP.meshes)) errs.push(`reaction ${name}: mesh budget ${b.meshes} over cap`);
+  if (!(b.particles >= 0 && b.particles <= VFX_BUDGET_CAP.particles)) errs.push(`reaction ${name}: particle budget ${b.particles} over cap`);
+  if (!(b.trail >= 0 && b.trail <= VFX_BUDGET_CAP.trail)) errs.push(`reaction ${name}: trail budget ${b.trail} over cap`);
+  if (p.reducedSafe !== true) errs.push(`reaction ${name}: not marked reducedSafe`);
+  return errs;
+}
+
+// Validate every reaction profile; `names` is the canonical reaction name list
+// (shared/src/sim/reactions.js) so coverage is checked against the real sim.
+export function validateAllReactionVfx(names) {
+  const errs = [];
+  for (const name of REACTION_VFX_NAMES) errs.push(...validateReactionVfx(name));
+  const kinds = allReactionVfxKinds();
+  if (new Set(kinds).size !== kinds.length) errs.push('duplicate kind across reaction profiles');
+  if (Array.isArray(names)) {
+    for (const n of names) if (!REACTION_VFX[n]) errs.push(`reaction ${n}: has no VFX profile`);
+    for (const n of REACTION_VFX_NAMES) if (!names.includes(n)) errs.push(`reaction ${n}: not a real sim reaction`);
+  }
   return errs;
 }

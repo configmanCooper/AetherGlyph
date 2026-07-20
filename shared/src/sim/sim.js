@@ -620,7 +620,13 @@ export class Sim {
     const chosen = sortByPriority(candidates)[0];
     this.applyReaction(chosen, ctx);
     this.reactionCooldowns[chosen.name] = sToTicks(REACTION.cooldownS);
-    this.emit('reaction', { name: chosen.name, category: chosen.category, casterId: ctx.casterId });
+    // Additive spatial fields (targetId/center) let the renderer anchor the
+    // reaction VFX in the world without changing deterministic sim behaviour.
+    // Both are already computed for the trigger and are backward compatible.
+    this.emit('reaction', {
+      name: chosen.name, category: chosen.category,
+      casterId: ctx.casterId, targetId: ctx.targetId, center: ctx.center,
+    });
     return chosen;
   }
 
@@ -939,12 +945,19 @@ export class Sim {
 
     // --- Cast (edge-triggered) ---
     if (intent.cast != null && canAct) {
+      const cooldownTicks = Math.max(0, w.cooldowns[intent.cast] || 0);
       const ok = this.beginCast(w, intent.cast, intent.castQuality);
       if (!ok && intent.castWasGesture) {
         // A rejected deliberate trace incurs recovery but no Aether cost.
         w.recoveryTicks = Math.max(w.recoveryTicks, sToTicks(CAST.rejectRecoveryS));
         w.castsRejected += 1;
-        this.emit('castRejected', { caster: w.id, spellId: intent.cast });
+        this.emit('castRejected', {
+          caster: w.id,
+          spellId: intent.cast,
+          reason: cooldownTicks > 0 ? 'cooldown' : 'unavailable',
+          cooldownTicks,
+          cooldownSeconds: cooldownTicks / TICK_HZ,
+        });
       }
     } else if (intent.castReject != null && canAct && !w.casting && !w.channel && w.recoveryTicks <= 0) {
       // A modelled failed gesture (Practice AI whose sampled gesture score fell
