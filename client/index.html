@@ -123,8 +123,17 @@
       <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
       <p class="links">
         <a href="/MASTERPLAN.md">Master plan</a> ·
-        <a href="/design/spells.csv">Spell roster</a>
+        <button class="link-button" data-action="spell-roster">Spell roster</button>
       </p>
+    </div>
+
+    <div class="panel hidden wide spell-reference-panel" id="panel-spell-roster">
+      <h2>Public Spell Roster</h2>
+      <p class="offline-note">All 36 public spells, their drawing patterns, requirements, effects, uses, and counters. Secret spells are intentionally omitted.</p>
+      <div id="spell-reference-list" class="spell-reference-grid"></div>
+      <div class="menu-list">
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
     </div>
 
     <div class="panel hidden" id="panel-practice">

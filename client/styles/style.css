@@ -142,6 +142,10 @@ body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right));
 .offline-note { color: var(--accent2); font-size: 12px; margin-top: 16px; }
 .links { font-size: 12px; margin-top: 8px; }
 .links a { color: var(--muted); }
+.link-button {
+  appearance: none; border: 0; padding: 0; background: none;
+  color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer;
+}
 .field, .toggle { display: block; margin: 12px 0; color: var(--muted); font-size: 14px; }
 .field select { display: block; width: 100%; margin-top: 6px; padding: 8px; border-radius: 8px; background: #1a1230; color: var(--ink); border: 1px solid rgba(255,255,255,0.2); }
 .toggle input { margin-right: 8px; transform: scale(1.2); }
@@ -292,6 +296,37 @@ body.mode-lab .action-buttons {
 .spell-chip.picked { border-color: var(--accent2); background: rgba(79,214,201,0.18); }
 .spell-chip.secret { border-style: dashed; }
 .menu-btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+/* Public spell reference */
+.spell-reference-panel { max-width: min(96vw, 1040px) !important; }
+.spell-reference-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px; text-align: left;
+}
+.spell-ref-card {
+  padding: 12px; border-radius: 12px;
+  background: rgba(15,10,28,0.78); border: 1px solid rgba(139,107,255,0.3);
+}
+.spell-ref-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.spell-ref-header h3 { margin: 0; font-size: 17px; color: var(--ink); }
+.spell-ref-type { margin: 3px 0 8px; color: var(--accent2); font-size: 12px; }
+.spell-ref-glyph {
+  width: 112px; height: 112px; flex: 0 0 112px;
+  border-radius: 10px; background: rgba(79,214,201,0.05);
+  border: 1px solid rgba(79,214,201,0.2);
+}
+.spell-ref-line {
+  fill: none; stroke: var(--accent2); stroke-width: 4;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.spell-ref-arrow { fill: var(--accent2); }
+.spell-ref-start { fill: var(--accent); stroke: #fff; stroke-width: 1.2; }
+.spell-ref-detail { margin: 5px 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.spell-ref-detail strong { color: var(--ink); }
+@media (max-width: 720px) {
+  .spell-reference-grid { grid-template-columns: 1fr; }
+  .spell-ref-glyph { width: 96px; height: 96px; flex-basis: 96px; }
+}
 
 body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
 

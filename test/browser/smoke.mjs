@@ -93,6 +93,54 @@ try {
     fail('#panel-main missing. errors=' + JSON.stringify(errors.slice(0, 6)) + ' body=' + body);
   }
 
+  // Public spell roster is an in-game reference, not a raw CSV. It contains all
+  // 36 public spells with directional glyph diagrams and detailed usage fields.
+  await activate(page, '[data-action="spell-roster"]');
+  await page.waitForSelector('#panel-spell-roster:not(.hidden) .spell-ref-card', { timeout: 5000 });
+  const spellReference = await page.evaluate(() => {
+    const panel = document.querySelector('#panel-spell-roster');
+    const text = panel?.textContent || '';
+    const first = panel?.querySelector('.spell-ref-card');
+    return {
+      cards: panel?.querySelectorAll('.spell-ref-card').length || 0,
+      glyphs: panel?.querySelectorAll('.spell-ref-glyph .spell-ref-line').length || 0,
+      starts: panel?.querySelectorAll('.spell-ref-glyph .spell-ref-start').length || 0,
+      hasSecrets: /Mirror Twin|Hourglass Field|Phoenix Covenant|Prismatic Beam/.test(text),
+      firstText: first?.textContent || '',
+      firstPoints: first?.querySelector('.spell-ref-line')?.getAttribute('points') || '',
+      stoneShardCounters: panel?.querySelector('[data-spell-id="4"] [data-field="counters"]')?.textContent || '',
+      stoneShardDetails: panel?.querySelector('[data-spell-id="4"] [data-field="what-it-does"]')?.textContent || '',
+      hasteCounters: panel?.querySelector('[data-spell-id="16"] [data-field="counters"]')?.textContent || '',
+      hasteDetails: panel?.querySelector('[data-spell-id="16"] [data-field="what-it-does"]')?.textContent || '',
+      leechCounters: panel?.querySelector('[data-spell-id="24"] [data-field="counters"]')?.textContent || '',
+      chainDetails: panel?.querySelector('[data-spell-id="7"] [data-field="what-it-does"]')?.textContent || '',
+      thunderDetails: panel?.querySelector('[data-spell-id="30"] [data-field="what-it-does"]')?.textContent || '',
+      rainDetails: panel?.querySelector('[data-spell-id="32"] [data-field="what-it-does"]')?.textContent || '',
+      rainCounters: panel?.querySelector('[data-spell-id="32"] [data-field="counters"]')?.textContent || '',
+      clippedGlyphs: Array.from(panel?.querySelectorAll('.spell-ref-glyph') || []).filter((svg) => {
+        const box = svg.viewBox.baseVal;
+        const raw = svg.querySelector('.spell-ref-line')?.getAttribute('points') || '';
+        const points = raw.trim().split(/\s+/).filter(Boolean).map((pair) => pair.split(',').map(Number));
+        return points.some(([x, y]) => x < box.x || x > box.x + box.width || y < box.y || y > box.y + box.height);
+      }).length,
+    };
+  });
+  if (spellReference.cards !== 36 || spellReference.glyphs !== 36 || spellReference.starts !== 36
+      || spellReference.hasSecrets || !/Damage \/ protection:/.test(spellReference.firstText)
+      || !/What it does:/.test(spellReference.firstText) || !/Best used for:/.test(spellReference.firstText)
+      || !/Counters:/.test(spellReference.firstText) || !spellReference.firstPoints.includes(',')
+      || /Stone Wall/.test(spellReference.stoneShardCounters) || /Dispel/.test(spellReference.hasteCounters)
+      || /recovery speed/i.test(spellReference.hasteDetails)
+      || /Ward/.test(spellReference.leechCounters) || !/Soaked/.test(spellReference.chainDetails)
+      || !/protected wizard, not the cover/i.test(spellReference.stoneShardDetails)
+      || !/globally enables Conductive Arc/i.test(spellReference.rainDetails)
+      || /prevents lightning payoff/i.test(spellReference.rainCounters)
+      || !/leaves Soaked active/i.test(spellReference.thunderDetails) || spellReference.clippedGlyphs !== 0) {
+    fail('public spell roster is incomplete or reveals secrets: ' + JSON.stringify(spellReference));
+  }
+  await activate(page, '#panel-spell-roster [data-action="back"]');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
   // Online menu smoke: open it, create a private room end-to-end (real socket
   // to the authoritative server), confirm a share code appears, then cancel.
   await activate(page, '[data-action="online"]');
@@ -493,6 +541,10 @@ try {
   await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
   await page.click('#btn-resume-game');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+  await page.evaluate(() => window.__aegTest.nativeBack());
+  await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
+  await activate(page, '#panel-main [data-action="spell-roster"]');
+  await page.waitForSelector('#panel-spell-roster:not(.hidden)', { timeout: 5000 });
   await page.evaluate(() => window.__aegTest.nativeBack());
   await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
 

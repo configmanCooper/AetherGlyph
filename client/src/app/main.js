@@ -32,6 +32,7 @@ import { SPELL_CATALOG, SPELLS_BY_ID } from '@shared/balance/spellData.generated
 import { chooseOpponentLoadout, PRACTICE_PROFILES } from '@shared/bot/practiceBot.js';
 import { coachReport } from '@shared/analytics/coach.js';
 import { renderCoachReport } from '../ui/coach.js';
+import { renderSpellReference } from '../ui/spellReference.js';
 import { versionTag } from '@shared/protocol/version.js';
 import { SPELL_VFX, VFX_IDS, REACTION_VFX, REACTION_VFX_NAMES } from '../render/spellVfxProfiles.js';
 import { vfxFamilyCoverage, reactionVfxCoverage } from '../render/spellVfx.js';
@@ -1346,6 +1347,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-copy') copyRoomCode();
     else if (a === 'loadout') openLoadoutBuilder();
     else if (a === 'settings') openSettings();
+    else if (a === 'spell-roster') openSpellRoster();
     else if (a === 'resume-game') resumeActiveGame();
     else if (a === 'recalibrate') startSettingsCalibration();
     else if (a === 'install-app') installWebApp();
@@ -1361,7 +1363,8 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
     else if (a === 'next-round') { if (mode === 'tutorial') continueTutorial(); }
-    else if (a === 'back' || a === 'menu') returnToMainMenu();
+    else if (a === 'back') backFromSubpanel();
+    else if (a === 'menu') returnToMainMenu();
     else if (a === 'rematch') {
       $('#coach-report').classList.add('hidden');
       if (mode === 'tutorial') { if (tutorialLesson) startTutorialLesson(tutorialLesson.id); }
@@ -1382,9 +1385,26 @@ function continueTutorial() {
     startTutorialLesson(nextId);
     return;
   }
+
   const avail = firstAvailableLessonId(p);
   if (avail) startTutorialLesson(avail);
   else openTutorialHub();
+}
+
+function openSpellRoster() {
+  renderSpellReference($('#spell-reference-list'));
+  showPanel('panel-spell-roster');
+  showOverlay(true);
+}
+
+function backFromSubpanel() {
+  if (gameMenuPaused) {
+    updateResumeGameButton();
+    showPanel('panel-main');
+    showOverlay(true);
+  } else {
+    returnToMainMenu();
+  }
 }
 
 // The Continue button stays on a playable, unlocked lesson: the saved position if
@@ -1635,7 +1655,8 @@ function nativeBack() {
       exitApp();
       return;
     }
-    returnToMainMenu(); // any other subpanel -> back to the main menu
+    if (gameMenuPaused) backFromSubpanel();
+    else returnToMainMenu();
     return;
   }
   // A live mode is on screen: open the same resumable menu as the corner button.
