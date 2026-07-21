@@ -38,7 +38,34 @@ export function run() {
   eq(ZONE.durations.Fire, 12, 'Fire lasts three times the original duration');
   eq(ZONE.durations.Gust, 1.8, 'Gust lasts three times the original duration');
   eq(ZONE.durations.Grounded, 3, 'Grounded strip lasts three times the original duration');
+  eq(ZONE.snareRootS, 2, 'Rune Snare roots for 2 seconds');
   eq(REACTION.frozenGroundSlowS, 9, 'Frozen Ground reaction lasts three times as long');
+
+  const snareSim = mk([36]);
+  snareSim.wizards[0].arcPos = -0.7;
+  snareSim.wizards[1].arcPos = 0.62;
+  let snareZone = null, snareTriggered = false, snareRootTicks = 0;
+  snareSim.step({ 0: { cast: 36, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 120 && !snareZone; t++) {
+    const events = snareSim.step({ 0: {}, 1: {} });
+    snareZone ||= events.find((event) => event.type === 'zone' && event.kind === 'Snare') || null;
+    if (events.some((event) => event.type === 'snare' && event.target === 1)) snareTriggered = true;
+  }
+  ok(snareZone && Math.abs(snareZone.center - (-0.06)) < 0.02,
+    'Rune Snare is placed just ahead of the opponent instead of under its caster');
+  ok(!snareTriggered && !snareSim.hasStatus(snareSim.wizards[1], 'Rooted'),
+    'a stationary opponent is not rooted before stepping into Rune Snare');
+  const stepDirection = Math.sign(snareZone.center - snareSim.wizards[1].arcPos);
+  for (let t = 0; t < 30 && !snareTriggered; t++) {
+    const events = snareSim.step({ 0: {}, 1: { move: stepDirection } });
+    if (events.some((event) => event.type === 'snare' && event.target === 1)) {
+      snareTriggered = true;
+      snareRootTicks = snareSim.wizards[1].statuses.Rooted?.ticks || 0;
+    }
+  }
+  ok(snareTriggered, 'the opponent triggers Rune Snare after stepping into it');
+  ok(snareRootTicks >= 118 && snareRootTicks <= 120,
+    `Rune Snare applies about 2 seconds of Root (${snareRootTicks} ticks)`);
 
   // Priority table is data-versioned and covers every reaction category.
   eq(REACTION_PRIORITY.join(','), 'douse,ground,freeze,conduct,ignite,spread,cover',
@@ -131,13 +158,22 @@ export function run() {
   ok(rubble.includes('Rubble'), 'Stone Wall + Quake -> Rubble');
   eq(sim.zones.filter((z) => z.kind === 'Cover').length, 0, 'Quake destroys cover');
 
-  // Chilled + Frost Bind -> Freeze (hard control) + Tenacity afterwards.
+  // Chilled + Frost Bind -> earned 3s Freeze, then Tenacity.
   sim = mk([27], [1]);
   sim.applyStatus(sim.wizards[1], 'Chilled', 1);
-  fire(sim, 27);
-  // The freeze is 1s then Tenacity engages; run long enough for both.
-  ok(sim.wizards[1].tenacityTicks > 0 || sim.hasStatus(sim.wizards[1], 'Frozen'),
-    'Frost Bind freezes a Chilled target and grants Tenacity');
+  sim.step({ 0: { cast: 27, castQuality: 1 }, 1: {} });
+  let frostTicks = 0;
+  for (let t = 0; t < 120 && frostTicks === 0; t++) {
+    sim.step({ 0: {}, 1: {} });
+    frostTicks = sim.wizards[1].statuses.Frozen?.ticks || 0;
+  }
+  ok(frostTicks >= 178 && frostTicks <= 180, `Frost Bind grants about 3 seconds of Freeze (${frostTicks} ticks)`);
+  const frozenPos = sim.wizards[1].arcPos;
+  sim.step({ 0: {}, 1: { move: 1, cast: 1, castQuality: 1 } });
+  eq(sim.wizards[1].arcPos, frozenPos, 'Frost Bind target cannot move');
+  ok(!sim.wizards[1].casting, 'Frost Bind target cannot cast');
+  for (let t = 0; t < 185 && sim.hasStatus(sim.wizards[1], 'Frozen'); t++) sim.step({ 0: {}, 1: {} });
+  ok(sim.wizards[1].tenacityTicks > 0, 'Frost Bind grants Tenacity after the 3s Freeze');
 
   // Soaked + Thunderclap -> Stun (hard control) + Tenacity.
   sim = mk([30], [1]);

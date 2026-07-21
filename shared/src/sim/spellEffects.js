@@ -112,8 +112,8 @@ export const SPELL_EFFECTS = {
   // === Control (5) =========================================================
   26: { type: HEX, status: { name: 'Rooted', stacks: 1 }, school: 'Stone' }, // Entangle
   27: { // Frost Bind — freeze only if Chilled; consumes Chilled, grants Tenacity
-    type: HEX, conditionalControl: { needs: 'chilled', status: 'Frozen', durationS: 1.0,
-      consume: 'Chilled', grantsTenacity: true }, school: 'Tide',
+    type: HEX, conditionalControl: { needs: 'chilled', status: 'Frozen', durationS: 3,
+      consume: 'Chilled', grantsTenacity: true, ignoreHardCap: true }, school: 'Tide',
   },
   28: { // Concussive Blast
     type: PROJECTILE, damage: 6, knockback: true, interrupt: true, status: null,

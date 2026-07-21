@@ -251,6 +251,7 @@ body.reduced * { animation: none !important; transition: none !important; }
 .spell-btn.spell-next { border-style: dashed; background: rgba(30,22,52,0.96); }
 .spell-btn.spell-blank { border-style: dotted; background: rgba(12,10,22,0.96); }
 .spell-btn.spell-cooldown-toggle { background: rgba(38,24,55,0.96); }
+.spell-btn.spell-enemy-toggle { background: rgba(70,24,42,0.96); border-color: rgba(255,93,115,0.55); }
 .spell-btn:active { transform: translateY(1px); }
 
 /* Glyph Laboratory keeps its expanded controls below the drawing surface. */

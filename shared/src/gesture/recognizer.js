@@ -128,7 +128,7 @@ function simplifyClosed(points, tolerance = 0.08) {
   const closed = Math.hypot(
     points[0].x - points[points.length - 1].x,
     points[0].y - points[points.length - 1].y,
-  ) < 0.08;
+  ) < 0.16;
   if (!closed) return simplifyOpen(points, tolerance);
   let farthest = 1, farthestDistance = 0;
   for (let i = 1; i < points.length - 1; i++) {
@@ -159,11 +159,12 @@ function closedShapeClass(points) {
   const closed = Math.hypot(
     points[0].x - points[points.length - 1].x,
     points[0].y - points[points.length - 1].y,
-  ) < 0.08;
+  ) < 0.16;
   if (!closed) return null;
   const simplified = simplifyClosed(points);
   const concentration = turnConcentration(simplified);
-  if (simplified.length <= 7 && concentration >= 0.27) return 'angular';
+  if (simplified.length <= 4 && concentration >= 0.27) return 'triangle';
+  if (simplified.length <= 7 && concentration >= 0.27) return 'diamond';
   if (simplified.length >= 7 && concentration <= 0.24) return 'round';
   return null;
 }
@@ -194,7 +195,7 @@ export class Recognizer {
   }
 
   recognize(points) {
-    const diag = { accepted: false, reason: null, scores: [], best: null, second: null, margin: 0 };
+    const diag = { accepted: false, reason: null, scores: [], best: null, second: null, margin: 0, requiredMargin: this.marginThreshold };
     const raw = (points || []).filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y));
     if (raw.length < this.minPoints) { diag.reason = 'too-few-points'; return diag; }
     if (this.templates.length === 0) { diag.reason = 'no-templates'; return diag; }
@@ -202,15 +203,21 @@ export class Recognizer {
     const q = preprocess(raw, this.n);
     const shapePoints = normalize(dedupe(raw));
     const shapeClass = closedShapeClass(shapePoints);
+    diag.shapeClass = shapeClass;
     const scores = this.templates.map((t) => {
       let score = Math.max(0, distanceToScore(meanDistance(q, t.pts))
         - (1 - startAxisFit(q, t.startAxis)) * 0.22);
       if (shapeClass === 'round') {
         if (t.spellId === 11 || t.spellId === 13) score += 0.12;
         else if (t.spellId === 20) score -= 0.16;
-      } else if (shapeClass === 'angular') {
+      } else if (shapeClass === 'diamond') {
         if (t.spellId === 20) score += 0.16;
         else if (t.spellId === 11 || t.spellId === 13) score -= 0.12;
+        else if (t.spellId === 8) score -= 0.08;
+      } else if (shapeClass === 'triangle') {
+        if (t.spellId === 8) score += 0.16;
+        else if (t.spellId === 20) score -= 0.14;
+        else if (t.spellId === 11 || t.spellId === 13) score -= 0.10;
       }
       return {
       spellId: t.spellId, name: t.name, gestureKey: t.gestureKey,
@@ -225,14 +232,21 @@ export class Recognizer {
     const rival = scores.find((s) => s.spellId !== scores[0].spellId) || null;
     diag.second = rival;
     diag.margin = scores[0].score - (rival ? rival.score : 0);
+    if (shapeClass === 'round' && (scores[0].spellId === 11 || scores[0].spellId === 13)
+        && scores[0].score >= 0.78) {
+      diag.requiredMargin = 0.005;
+    }
+    if (scores[0].spellId === 15 && scores[0].score >= 0.78) {
+      diag.requiredMargin = Math.min(diag.requiredMargin, 0.015);
+    }
 
-    const closed = Math.hypot(q[0].x - q[q.length - 1].x, q[0].y - q[q.length - 1].y) < 0.12;
+    const closed = Math.hypot(q[0].x - q[q.length - 1].x, q[0].y - q[q.length - 1].y) < 0.16;
     if (raw.length < 6 && closed && (scores[0].spellId === 11 || scores[0].spellId === 13 || scores[0].spellId === 20)) {
       diag.reason = 'ambiguous';
       return diag;
     }
     if (scores[0].score < this.acceptThreshold) { diag.reason = 'below-threshold'; return diag; }
-    if (rival && diag.margin < this.marginThreshold) { diag.reason = 'ambiguous'; return diag; }
+    if (rival && diag.margin < diag.requiredMargin) { diag.reason = 'ambiguous'; return diag; }
 
     diag.accepted = true;
     diag.spellId = scores[0].spellId;

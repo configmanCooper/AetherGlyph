@@ -185,7 +185,10 @@ export class Sim {
       hp: kind === 'Cover' ? ZONE.coverHp : 0,
     };
     this.zones.push(zone);
-    this.emit('zone', { owner: ownerId, kind, id: zone.id, durationTicks: zone.ticks });
+    this.emit('zone', {
+      owner: ownerId, kind, id: zone.id, durationTicks: zone.ticks,
+      center: zone.center, radius: zone.radius,
+    });
     return zone;
   }
 
@@ -223,7 +226,7 @@ export class Sim {
     }
     const durS = Math.min(
       opts.durationS ?? def.durationS,
-      def.hard ? CONTROL.maxHardControlS : (opts.durationS ?? def.durationS),
+      def.hard && !opts.ignoreHardCap ? CONTROL.maxHardControlS : (opts.durationS ?? def.durationS),
     );
     const cur = target.statuses[name];
     const maxStacks = def.maxStacks || 1;
@@ -493,7 +496,10 @@ export class Sim {
           delete opp.statuses[cc.consume];
           this.emit('statusEnd', { target: opp.id, status: cc.consume });
         }
-        this.applyStatus(opp, cc.status, 1, { durationS: cc.durationS });
+        this.applyStatus(opp, cc.status, 1, {
+          durationS: cc.durationS,
+          ignoreHardCap: !!cc.ignoreHardCap,
+        });
       } else {
         this.emit('hexFizzle', { caster: w.id, spellId, reason: 'setup-missing' });
       }
@@ -518,7 +524,15 @@ export class Sim {
   }
 
   resolveZone(w, eff) {
-    const zone = this.addZone(w.id, eff.zoneKind, {});
+    const opponent = this.opponentOf(w.id);
+    let zoneOpts = {};
+    if (eff.zoneKind === 'Snare') {
+      const direction = opponent.arcPos > 0 ? -1 : opponent.arcPos < 0 ? 1 : (w.arcPos <= 0 ? 1 : -1);
+      zoneOpts = {
+        center: Math.max(-1, Math.min(1, opponent.arcPos + direction * (ZONE.radius + 0.13))),
+      };
+    }
+    const zone = this.addZone(w.id, eff.zoneKind, zoneOpts);
     // Incoming water (Rain Glyph) immediately douses Burning + fire zones.
     let incoming = null;
     if (eff.zoneKind === 'Wet') incoming = 'water';
@@ -887,7 +901,7 @@ export class Sim {
           const inside = this.wizardInZone(w, z);
           if (inside && !w.snaredZones.has(z.id)) {
             w.snaredZones.add(z.id);
-            this.applyStatus(w, 'Rooted', 1, { durationS: 1 });
+            this.applyStatus(w, 'Rooted', 1, { durationS: ZONE.snareRootS });
             this.emit('snare', { target: w.id, zone: z.id });
             z.ticks = 0; // trap consumed
           }

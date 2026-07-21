@@ -37,6 +37,7 @@ export class GestureInput {
     // Start (start dot + short direction mark), 3 None (blank pad). Online play
     // uses no guide (stage None), so the default keeps online behaviour intact.
     this.guide = null;
+    this.guideCues = [];
     this.guideStage = 3;
     this.guideScale = 1;       // set from calibration; scales guide size only
     this.onDiag = opts.onDiag || (() => {});
@@ -65,6 +66,11 @@ export class GestureInput {
   // unless reduced motion is on. Passing null clears the guide (online default).
   setGuide(points, opts = {}) {
     this.guide = points && points.length > 1 ? points.map((p) => ({ x: p.x, y: p.y })) : null;
+    this.guideCues = this.guide && Array.isArray(opts.cues) ? opts.cues.map((cue) => ({
+      ...cue,
+      from: { ...cue.from },
+      to: { ...cue.to },
+    })) : [];
     this.guideStage = opts.stage != null ? opts.stage : (this.guide ? 0 : 3);
     this._stopGhost();
     if (this.guide && this.guideStage === 0 && opts.showGhost !== false && !this.reduced) this.playGhost();
@@ -248,6 +254,7 @@ export class GestureInput {
     const g = this.guide;
     if (!g || g.length < 2 || this.guideStage >= 3) {
       this.canvas.dataset.guideArrows = '0';
+      this.canvas.dataset.guideCueLabels = '';
       return; // None => blank pad
     }
     const { sx, sy } = this._guideXY(r);
@@ -270,11 +277,16 @@ export class GestureInput {
     // Direction cues: Full/Start use a prominent first arrow. Dotted templates
     // add occasional arrowheads along the path so loops and figure-eights clearly
     // communicate which way to travel.
-    if (stage === 0 || stage === 2) {
+    if (this.guideCues.length) {
+      this.canvas.dataset.guideArrows = String(this._drawGuideCues(ctx, sx, sy));
+      this.canvas.dataset.guideCueLabels = this.guideCues.map((cue) => cue.label || '').filter(Boolean).join(',');
+    } else if (stage === 0 || stage === 2) {
       this._drawStartArrow(ctx, sx, sy, g);
       this.canvas.dataset.guideArrows = '1';
+      this.canvas.dataset.guideCueLabels = '';
     } else if (stage === 1) {
       this.canvas.dataset.guideArrows = String(this._drawPathArrows(ctx, sx, sy, g));
+      this.canvas.dataset.guideCueLabels = '';
     }
 
     // Start dot (all visible stages).
@@ -315,6 +327,7 @@ export class GestureInput {
       lengths.push(len);
       total += len;
     }
+
     if (total <= 0) return 0;
     const fractions = total >= 180 ? [0.08, 0.4, 0.72] : total >= 100 ? [0.12, 0.6] : [0.18];
     ctx.fillStyle = 'rgba(79,214,201,0.95)';
@@ -343,6 +356,50 @@ export class GestureInput {
       }
     }
     return count;
+  }
+
+  _drawGuideCues(ctx, sx, sy) {
+    ctx.fillStyle = 'rgba(79,214,201,0.98)';
+    ctx.strokeStyle = 'rgba(79,214,201,0.98)';
+    let count = 0;
+    for (const cue of this.guideCues) {
+      const from = { x: sx(cue.from.x), y: sy(cue.from.y) };
+      const to = { x: sx(cue.to.x), y: sy(cue.to.y) };
+      this._drawArrowHead(ctx, from, to, cue.bidirectional ? 0.72 : 1);
+      count++;
+      if (cue.bidirectional) {
+        this._drawArrowHead(ctx, to, from, 0.72);
+        count++;
+      }
+      if (cue.label) {
+        const mx = (from.x + to.x) / 2 + (cue.labelDx || 0);
+        const my = (from.y + to.y) / 2 + (cue.labelDy || 0);
+        ctx.font = 'bold 12px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(8,6,16,0.95)';
+        ctx.strokeText(String(cue.label), mx, my);
+        ctx.fillStyle = 'rgba(255,255,255,0.98)';
+        ctx.fillText(String(cue.label), mx, my);
+        ctx.fillStyle = 'rgba(79,214,201,0.98)';
+        ctx.strokeStyle = 'rgba(79,214,201,0.98)';
+      }
+    }
+    return count;
+  }
+
+  _drawArrowHead(ctx, from, to, fraction = 1) {
+    const x = from.x + (to.x - from.x) * fraction;
+    const y = from.y + (to.y - from.y) * fraction;
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const size = 9, spread = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
+    ctx.lineTo(x - Math.cos(angle - spread) * size, y - Math.sin(angle - spread) * size);
+    ctx.lineTo(x - Math.cos(angle + spread) * size, y - Math.sin(angle + spread) * size);
+    ctx.closePath();
+    ctx.fill();
   }
 
   _drawGhostMarker(ctx, sx, sy, g) {

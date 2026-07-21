@@ -34,6 +34,7 @@ import { coachReport } from '@shared/analytics/coach.js';
 import { renderCoachReport } from '../ui/coach.js';
 import { renderSpellReference } from '../ui/spellReference.js';
 import { versionTag } from '@shared/protocol/version.js';
+import { TICK_HZ } from '@shared/sim/constants.js';
 import { SPELL_VFX, VFX_IDS, REACTION_VFX, REACTION_VFX_NAMES } from '../render/spellVfxProfiles.js';
 import { vfxFamilyCoverage, reactionVfxCoverage } from '../render/spellVfx.js';
 
@@ -69,9 +70,16 @@ const LAB_PUBLIC_IDS = [
   ...STARTER_SPELL_IDS,
   ...SPELL_CATALOG.filter((s) => !s.secret && !STARTER_SPELL_IDS.includes(s.id)).map((s) => s.id),
 ];
+const LAB_ENEMY_IDS = SPELL_CATALOG
+  .filter((spell) => !spell.secret && ['Offensive', 'Debuff', 'Control', 'Environmental'].includes(spell.category))
+  .map((spell) => spell.id);
 let labPage = 0;
 let labSelectedId = LAB_PUBLIC_IDS[0];
 let labCooldowns = false;
+let labEnemy = {
+  enabled: false, spellId: 1, cadence: 'once', nextTick: 0, casts: 0,
+  movement: false, moveDirection: 1,
+};
 let activeGuideLoadout = [];
 let selectedGuideId = null;
 
@@ -99,6 +107,21 @@ function guideTemplateFor(spellId) {
   return variants ? variants[0] : null;
 }
 
+const GUIDE_CUES = Object.freeze({
+  27: [
+    { from: { x: 43, y: 66 }, to: { x: 57, y: 66 } },
+  ],
+  33: [
+    { from: { x: 50, y: 86 }, to: { x: 24, y: 26 }, bidirectional: true, label: '1', labelDx: -9 },
+    { from: { x: 50, y: 86 }, to: { x: 50, y: 20 }, bidirectional: true, label: '2', labelDx: 10 },
+    { from: { x: 50, y: 86 }, to: { x: 76, y: 26 }, bidirectional: true, label: '3', labelDx: 9 },
+  ],
+});
+
+function setSpellGuide(spellId, opts = {}) {
+  gesture.setGuide(guideTemplateFor(spellId), { ...opts, cues: GUIDE_CUES[spellId] || [] });
+}
+
 function setDrawHint(text) {
   const hint = document.querySelector('#draw-pad .pad-hint');
   if (hint) hint.textContent = text || 'draw spell';
@@ -121,7 +144,7 @@ function showLastCast(spellId) {
 
 function selectEquippedGuide(id) {
   selectedGuideId = id;
-  gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
+  setSpellGuide(id, { stage: 1, showGhost: false });
   const canvas = $('#draw-canvas');
   if (canvas) { canvas.dataset.guideSpell = String(id); canvas.dataset.guideStage = 'dotted'; }
   setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
@@ -267,7 +290,7 @@ function selectLabSpell(id) {
   // A guide is visual help only. Recognition always compares against the full
   // public laboratory catalog, exactly like Blank mode.
   gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(LAB_PUBLIC_IDS));
-  gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
+  setSpellGuide(id, { stage: 1, showGhost: false });
   setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
   const canvas = $('#draw-canvas');
   if (canvas) {
@@ -297,6 +320,78 @@ function toggleLabCooldowns() {
   renderLabSpellbar();
 }
 
+function labEnemyLabel() {
+  if (!labEnemy.enabled && !labEnemy.movement) return 'Off';
+  const cast = labEnemy.enabled ? (labEnemy.cadence === 'once' ? 'Once' : `${labEnemy.cadence}s`) : '';
+  return labEnemy.movement ? `${cast ? `${cast}+` : ''}Move` : cast;
+}
+
+function openLabEnemyPanel() {
+  if (mode !== 'lab' || !match) return;
+  const spell = $('#lab-enemy-spell');
+  spell.replaceChildren();
+  for (const id of LAB_ENEMY_IDS) {
+    const option = document.createElement('option');
+    option.value = String(id);
+    option.textContent = `${SPELLS_BY_ID[id].name} — ${SPELLS_BY_ID[id].category}`;
+    spell.appendChild(option);
+  }
+  spell.value = String(labEnemy.spellId);
+  $('#lab-enemy-cadence').value = String(labEnemy.cadence);
+  $('#lab-enemy-move').checked = !!labEnemy.movement;
+  running = false;
+  showPanel('panel-lab-enemy');
+  showOverlay(true);
+}
+
+function closeLabEnemyPanel() {
+  showOverlay(false);
+  $('#hud').classList.remove('hidden');
+  running = true;
+}
+
+function applyLabEnemyPanel() {
+  const spellId = Number($('#lab-enemy-spell').value);
+  const cadence = $('#lab-enemy-cadence').value;
+  const movement = $('#lab-enemy-move').checked;
+  if (!LAB_ENEMY_IDS.includes(spellId) || !['once', '5', '15', '30'].includes(cadence)) return;
+  labEnemy = {
+    enabled: true, spellId, cadence, nextTick: match.sim.tick + 1, casts: labEnemy.casts,
+    movement, moveDirection: labEnemy.moveDirection || 1,
+  };
+  renderLabSpellbar();
+  closeLabEnemyPanel();
+  toast(`Enemy will cast ${SPELLS_BY_ID[spellId].name} ${cadence === 'once' ? 'once' : `every ${cadence} seconds`}.`);
+}
+
+function disableLabEnemy() {
+  labEnemy.enabled = false;
+  labEnemy.movement = false;
+  match?.setEnemyMove?.(0);
+  renderLabSpellbar();
+  closeLabEnemyPanel();
+  toast('Glyph Laboratory enemy casting disabled.');
+}
+
+function updateLabEnemySchedule() {
+  if (mode !== 'lab' || !match?.sim) return;
+  const enemy = match.sim.wizards[1];
+  if (labEnemy.movement) {
+    if (enemy.arcPos >= 0.95) labEnemy.moveDirection = -1;
+    else if (enemy.arcPos <= -0.95) labEnemy.moveDirection = 1;
+    match.setEnemyMove(labEnemy.moveDirection);
+  } else {
+    match.setEnemyMove(0);
+  }
+  if (!labEnemy.enabled || match.sim.tick < labEnemy.nextTick) return;
+  enemy.cooldowns[labEnemy.spellId] = 0;
+  if (!match.queueEnemyCast(labEnemy.spellId)) return;
+  labEnemy.casts++;
+  if (labEnemy.cadence === 'once') labEnemy.enabled = false;
+  else labEnemy.nextTick = match.sim.tick + Number(labEnemy.cadence) * TICK_HZ;
+  renderLabSpellbar();
+}
+
 function renderLabSpellbar() {
   const pageIds = labPageIds();
   const pages = Math.ceil(LAB_PUBLIC_IDS.length / LAB_PAGE_SIZE);
@@ -307,6 +402,9 @@ function renderLabSpellbar() {
     blankSelected: labSelectedId == null,
     onCooldownToggle: () => toggleLabCooldowns(),
     cooldownsEnabled: labCooldowns,
+    onEnemyControl: () => openLabEnemyPanel(),
+    enemyEnabled: labEnemy.enabled || labEnemy.movement,
+    enemyLabel: labEnemyLabel(),
     onNext: () => {
       labPage = (labPage + 1) % pages;
       labSelectedId = labPageIds()[0];
@@ -326,6 +424,10 @@ function startLab() {
   labPage = 0;
   labSelectedId = LAB_PUBLIC_IDS[0];
   labCooldowns = false;
+  labEnemy = {
+    enabled: false, spellId: LAB_ENEMY_IDS[0], cadence: 'once', nextTick: 0, casts: 0,
+    movement: false, moveDirection: 1,
+  };
   const labLoadout = makeLoadout(LAB_PUBLIC_IDS);
   match = new LocalMatch({
     mode: 'lab',
@@ -413,10 +515,8 @@ function startPractice() {
   $('#spellbar').classList.remove('hidden');
   $('#devcast').classList.toggle('hidden', !settings.devcast);
   // Templates on = per-spell assistance (a guide) and an assisted coaching flag.
-  gesture.setGuide(practice.templates ? guideTemplateFor(pLoadout[0].id) : null, {
-    stage: practice.templates ? 1 : 3,
-    showGhost: false,
-  });
+  if (practice.templates) setSpellGuide(pLoadout[0].id, { stage: 1, showGhost: false });
+  else gesture.setGuide(null);
   setDrawHint('draw spell');
   toast(`Practice vs ${PRACTICE_PROFILES[practice.difficulty].label} AI — draw to cast.`);
 }
@@ -826,7 +926,7 @@ function onTutorialGuide(g) {
   } else {
     // Every instructional spell keeps a visible dotted template. Exam gauntlets
     // remain guide-free because they intentionally provide no focus spell.
-    gesture.setGuide(guideTemplateFor(g.spellId), { stage: 1, showGhost: false });
+    setSpellGuide(g.spellId, { stage: 1, showGhost: false });
     const spell = SPELLS_BY_ID[g.spellId];
     setDrawHint(`draw ${spell ? spell.name : 'spell'} — follow the dotted line`);
     if (canvas) {
@@ -920,6 +1020,7 @@ function frame(now) {
   if (match && running) {
     idleRenderAcc = 0;
     applyInputBridge();
+    updateLabEnemySchedule();
     match.update(dt);
     const evs = match.drainEvents();
     if (evs.length) handleEvents(evs);
@@ -1351,6 +1452,9 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'resume-game') resumeActiveGame();
     else if (a === 'recalibrate') startSettingsCalibration();
     else if (a === 'install-app') installWebApp();
+    else if (a === 'lab-enemy-apply') applyLabEnemyPanel();
+    else if (a === 'lab-enemy-disable') disableLabEnemy();
+    else if (a === 'lab-enemy-back') closeLabEnemyPanel();
     else if (a === 'server-save') saveServerUrl();
     else if (a === 'server-reset') resetServerUrl();
     else if (a === 'privacy') openPrivacy();
@@ -1656,6 +1760,7 @@ function nativeBack() {
     const active = document.querySelector('#overlay .panel:not(.hidden)');
     const id = active && active.id;
     if (id === 'panel-online-wait') { cancelOnline(); return; }
+    if (id === 'panel-lab-enemy') { closeLabEnemyPanel(); return; }
     if (!id || id === 'panel-main') {
       if (gameMenuPaused) { resumeActiveGame(); return; }
       if (mode === 'online' && online && online.inMatch
@@ -1749,6 +1854,9 @@ if (typeof window !== 'undefined') {
       movementActive: movement.active,
       moveInput: dummyInput.move,
       labCooldowns,
+      labEnemy: { ...labEnemy },
+      enemyCastsResolved: match?.sim?.wizards?.[1]?.castsResolved ?? 0,
+      enemyArcPos: match?.sim?.wizards?.[1]?.arcPos ?? 0,
     }),
     recognize: (points) => {
       try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }
@@ -1772,11 +1880,18 @@ if (typeof window !== 'undefined') {
     profiles: () => VFX_IDS.map((id) => ({ id, kind: SPELL_VFX[id].kind, family: SPELL_VFX[id].family, school: SPELL_VFX[id].school })),
     spawn: (id) => { try { return arena.debugSpawn(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnZone: (kind) => { try { return arena.debugSpawnZone(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    zoneBounds: (kind) => { try { return arena.debugZoneBounds(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnGuard: (kind) => { try { return arena.debugSpawnGuard(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     wizardState: (playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks) => {
       try { return arena.debugWizardState(playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks); }
       catch (e) { return { error: String(e && e.message || e) }; }
     },
+    fogVeil: (strength) => { try { return arena.debugFogVeil(strength); } catch (e) { return { error: String(e && e.message || e) }; } },
+    fogForPosition: (playerArc, zoneCenter, radius) => {
+      try { return arena.debugFogForPosition(playerArc, zoneCenter, radius); }
+      catch (e) { return { error: String(e && e.message || e) }; }
+    },
+    blindVeil: (enabled) => { try { return arena.debugBlindVeil(enabled); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnReaction: (name) => { try { return arena.debugSpawnReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
     productionReaction: (name) => { try { return arena.debugProductionReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
     reactionProfiles: () => REACTION_VFX_NAMES.map((n) => ({ name: n, kind: REACTION_VFX[n].kind, vfx: REACTION_VFX[n].vfx, anchor: REACTION_VFX[n].anchor })),

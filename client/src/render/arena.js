@@ -66,6 +66,8 @@ export class Arena {
 
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 200);
     this.camera.position.set(0, 1.7, PLAYER_Z);
+    this._buildFogVeil();
+    this._buildBlindVeil();
 
     this._buildLights();
     this._buildSky();
@@ -109,6 +111,113 @@ export class Arena {
     this.camera.updateProjectionMatrix();
   }
 
+  _buildFogVeil() {
+    const material = new THREE.ShaderMaterial({
+      transparent: true, depthTest: false, depthWrite: false,
+      uniforms: {
+        time: { value: 0 },
+        strength: { value: 0 },
+        reduced: { value: 0 },
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position,1.0); }',
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float time;
+        uniform float strength;
+        uniform float reduced;
+        void main() {
+          float t = time * (1.0 - reduced);
+          float a = sin(vUv.x * 18.0 + t * 0.7 + sin(vUv.y * 9.0 - t * 0.35));
+          float b = sin(vUv.y * 23.0 - t * 0.5 + cos(vUv.x * 11.0 + t * 0.25));
+          float haze = 0.5 + 0.25 * a + 0.25 * b;
+          float edge = smoothstep(0.0, 0.16, vUv.y) * (1.0 - smoothstep(0.78, 1.0, vUv.y));
+          float alpha = strength * (0.30 + haze * 0.22) * edge;
+          vec3 color = mix(vec3(0.34,0.38,0.46), vec3(0.58,0.63,0.70), haze);
+          gl_FragColor = vec4(color, alpha);
+        }`,
+    });
+    const veil = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+    veil.frustumCulled = false;
+    veil.renderOrder = 1000;
+    veil.visible = false;
+    this.camera.add(veil);
+    this.fogVeil = veil;
+  }
+
+  _updateFogVeil(strength) {
+    if (!this.fogVeil) return;
+    const value = Math.max(0, Math.min(1, Number(strength) || 0));
+    this.fogVeil.visible = value > 0.001;
+    this.fogVeil.material.uniforms.time.value = this._t;
+    this.fogVeil.material.uniforms.strength.value = value;
+    this.fogVeil.material.uniforms.reduced.value = this.reduced ? 1 : 0;
+  }
+
+  _buildBlindVeil() {
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: false, opacity: 1,
+      depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+    });
+    const veil = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 4.4), material);
+    veil.visible = false;
+    veil.renderOrder = 20;
+    veil.layers.set(2);
+    this.scene.add(veil);
+    this.blindVeil = veil;
+  }
+
+  _syncBlindness(player, enemy) {
+    if (!this.blindVeil) return;
+    const blinded = !!player?.statuses?.Blinded && player.statuses.Blinded.ticks > 0;
+    this.blindVeil.visible = blinded;
+    if (!blinded) return;
+    this.blindVeil.position.set(wizardX(enemy), 1.65, ENEMY_Z + 0.72);
+    this.blindVeil.lookAt(this.camera.position);
+    this.blindVeil.material.opacity = 1;
+  }
+
+  _renderScene() {
+    const oldMask = this.camera.layers.mask;
+    const background = this.scene.background;
+    this.renderer.autoClear = false;
+    this.renderer.clear(true, true, true);
+
+    this.camera.layers.set(0);
+    this.renderer.render(this.scene, this.camera);
+    this.scene.background = null;
+
+    if (this.blindVeil?.visible) {
+      this.renderer.clearDepth();
+      this.camera.layers.set(2);
+      this.renderer.render(this.scene, this.camera);
+    }
+
+    this.renderer.clearDepth();
+    this.camera.layers.set(1);
+    const restoredBlendings = this.blindVeil?.visible ? this._prepareBlindSpellBlending() : [];
+    this.renderer.render(this.scene, this.camera);
+    for (const [material, blending] of restoredBlendings) material.blending = blending;
+
+    this.camera.layers.mask = oldMask;
+    this.scene.background = background;
+    this.renderer.autoClear = true;
+  }
+
+  _prepareBlindSpellBlending() {
+    const restored = [];
+    this.scene.traverse((object) => {
+      if ((object.layers.mask & 2) === 0 || !object.material) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        if (material.transparent && material.blending === THREE.AdditiveBlending) {
+          restored.push([material, material.blending]);
+          material.blending = THREE.NormalBlending;
+        }
+      }
+    });
+    return restored;
+  }
+
   _buildLights() {
     // Night ambience on a small, fixed light budget for phone GPUs: cool moon
     // key + warm brazier accents (added in _buildAcademy) + one reactive combat
@@ -120,6 +229,9 @@ export class Arena {
     this.keyLight = new THREE.PointLight(0x8b6bff, 0.55, 30);
     this.keyLight.position.set(0, 5, 0);
     this.scene.add(this.keyLight);
+    this.scene.traverse((object) => {
+      if (object.isLight) object.layers.enable(1);
+    });
   }
 
   // Moonlit night sky: a gradient dome (unlit, fog-excluded), a haloed moon, and
@@ -749,6 +861,8 @@ export class Arena {
     this.castCues.clear();
     for (const [, b] of this.beams) { this.scene.remove(b.handle.object3D); b.handle.dispose(); }
     this.beams.clear();
+    this._updateFogVeil(0);
+    if (this.blindVeil) this.blindVeil.visible = false;
     this.shake = 0;
   }
 
@@ -766,11 +880,13 @@ export class Arena {
     this._t += dtMs * 0.001;
     this._syncWizardVisibility({ invisibleTicks: 0 }, { invisibleTicks: 0 });
     this._syncStatusIndicators({ statuses: {} }, { statuses: {}, arcPos: 0 });
+    this._updateFogVeil(0);
+    this._syncBlindness({ statuses: {} }, { arcPos: 0 });
     this._animateEnemy(dtMs, null);
     this._updateAcademy(dtMs);
     this._updateEffects(dtMs);
     this._updateDebug(dtMs);
-    this.renderer.render(this.scene, this.camera);
+    this._renderScene();
   }
 
   // Animate the living academy: brazier flame flicker + light pulse and gently
@@ -899,6 +1015,7 @@ export class Arena {
     this.camera.position.x = camBaseX + shakeX;
     this.camera.position.y = 1.7 + shakeY;
     this.camera.lookAt(this.enemy.position.x, 1.5 + shakeY * 0.5, ENEMY_Z);
+    this._syncBlindness(player, enemy);
 
     // Enemy idle breathing + casting tell (arm extension, aura + staff glow).
     this._animateEnemy(dtMs, enemy);
@@ -940,7 +1057,7 @@ export class Arena {
     // Reactive light: brighter with recent combat intensity.
     this.keyLight.intensity += (0.6 - this.keyLight.intensity) * 0.05;
 
-    this.renderer.render(this.scene, this.camera);
+    this._renderScene();
   }
 
   _syncGuards(w, z) {
@@ -1063,6 +1180,7 @@ export class Arena {
   // Distinct environmental visuals per zone kind.
   _syncZones(sim) {
     const seen = new Set();
+    let fogStrength = 0;
     for (const z of sim.zones) {
       seen.add(z.id);
       let handle = this.zoneMeshes.get(z.id);
@@ -1075,11 +1193,23 @@ export class Arena {
       const centered = z.kind === 'Cover' || z.kind === 'Snare' || z.kind === 'Grounded';
       handle.object3D.position.x = centered ? (z.center || 0) * ARC_W : 0;
       const fade = Math.min(1, z.ticks / Math.max(1, z.totalTicks || 1));
+      if (z.kind === 'Fog' && sim.wizardInZone(sim.wizards[0], z)) {
+        fogStrength = Math.max(fogStrength, fade);
+      }
       handle.update({ dtMs: 16, fade, time: this._t, reduced: this.reduced });
     }
     for (const [id, handle] of this.zoneMeshes) {
       if (!seen.has(id)) { this.scene.remove(handle.object3D); handle.dispose(); this.zoneMeshes.delete(id); }
     }
+    this._updateFogVeil(fogStrength);
+  }
+
+  debugFogForPosition(playerArc, zoneCenter, radius = 0.55) {
+    const inside = Math.abs(Number(playerArc) - Number(zoneCenter)) <= Number(radius);
+    this._updateFogVeil(inside ? 1 : 0);
+    const result = { inside, visible: !!this.fogVeil?.visible };
+    this._updateFogVeil(0);
+    return result;
   }
 
   // ---- event-driven effects ----
@@ -1334,6 +1464,15 @@ export class Arena {
     return entry.kind;
   }
 
+  debugZoneBounds(kind) {
+    const handle = makeZoneVfx(kind, this.reduced, 2.6);
+    const box = new THREE.Box3().setFromObject(handle.object3D);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    handle.dispose();
+    return { width: size.x, height: size.y, depth: size.z };
+  }
+
   // Spawn any of the three persistent guard visuals (Ward / Barrier Dome /
   // Reflect) into the dev gallery so the smoke test can confirm they draw
   // DISTINCT objects, animate WebGL frames, and dispose cleanly. Never wired to
@@ -1376,6 +1515,57 @@ export class Arena {
     };
     this._syncWizardVisibility({ invisibleTicks: 0 }, { invisibleTicks: 0 });
     this._syncStatusIndicators({ statuses: {} }, { statuses: {}, arcPos: 0 });
+    return result;
+  }
+
+  debugFogVeil(strength = 1) {
+    this._updateFogVeil(strength);
+    const result = {
+      visible: !!this.fogVeil?.visible,
+      strength: this.fogVeil?.material?.uniforms?.strength?.value || 0,
+    };
+    this._updateFogVeil(0);
+    return result;
+  }
+
+  debugBlindVeil(enabled = true) {
+    this._syncBlindness(
+      { statuses: enabled ? { Blinded: { ticks: 240 } } : {} },
+      { arcPos: 0 },
+    );
+    const projectile = makeProjectileVfx(4, this.reduced);
+    let spellRenderOrder = 0;
+    projectile.object3D.traverse((object) => {
+      if (object.material && object.material.transparent === false) {
+        spellRenderOrder = Math.max(spellRenderOrder, object.renderOrder || 0);
+      }
+    });
+    projectile.dispose();
+    const additiveProjectile = makeProjectileVfx(8, this.reduced);
+    this.scene.add(additiveProjectile.object3D);
+    const blendings = this._prepareBlindSpellBlending();
+    const normalBlendCount = blendings.filter(([material]) => material.blending === THREE.NormalBlending).length;
+    for (const [material, blending] of blendings) material.blending = blending;
+    this.scene.remove(additiveProjectile.object3D);
+    additiveProjectile.dispose();
+    let spellLights = 0;
+    this.scene.traverse((object) => {
+      if (object.isLight && (object.layers.mask & 2) !== 0) spellLights++;
+    });
+    const result = {
+      visible: !!this.blindVeil?.visible,
+      opacity: this.blindVeil?.material?.opacity || 0,
+      depthWrite: !!this.blindVeil?.material?.depthWrite,
+      renderOrder: this.blindVeil?.renderOrder || 0,
+      layer: this.blindVeil?.layers?.mask || 0,
+      spellRenderOrder,
+      spellLayer: projectile.object3D.layers.mask,
+      normalBlendCount,
+      spellLights,
+      width: this.blindVeil?.geometry?.parameters?.width || 0,
+      height: this.blindVeil?.geometry?.parameters?.height || 0,
+    };
+    this._syncBlindness({ statuses: {} }, { arcPos: 0 });
     return result;
   }
 

@@ -84,6 +84,14 @@ function disposeTree(root) {
   });
 }
 
+function markSpellVfx(root) {
+  root.traverse((object) => {
+    object.renderOrder = Math.max(object.renderOrder || 0, 40);
+    object.layers.set(1);
+  });
+  return root;
+}
+
 // School -> impact element so a projectile's burst matches its element.
 const ELEMENT_BY_SCHOOL = {
   Ember: 'fire', Tide: 'ice', Storm: 'electric', Stone: 'rock',
@@ -409,8 +417,9 @@ const PROJECTILE_BUILDERS = {
 export function makeProjectileVfx(spellId, reduced) {
   const profile = getSpellVfx(spellId);
   const build = profile && PROJECTILE_BUILDERS[profile.family];
-  if (!build) return makeProjectileVfx.fallback(profile, reduced);
-  return build(profile, reduced);
+  const handle = build ? build(profile, reduced) : makeProjectileVfx.fallback(profile, reduced);
+  markSpellVfx(handle.object3D);
+  return handle;
 }
 makeProjectileVfx.fallback = (profile, reduced) => {
   const p = profile || { kind: 'unknown', family: 'orb', colors: { core: 0xffffff, glow: 0xffffff, trail: 0xffffff }, budget: { trail: 8 } };
@@ -424,6 +433,7 @@ makeProjectileVfx.fallback = (profile, reduced) => {
 // Self-timed transient handle. update(ctx) returns false once expired.
 function transient(kind, family, object3D, lifeMs, onUpdate, opts = {}) {
   let age = 0;
+  markSpellVfx(object3D);
   return {
     object3D, kind, family, billboard: !!opts.billboard,
     update(ctx) {
@@ -531,6 +541,7 @@ export function makeImpactVfx(spellId, reduced, opts = {}) {
 // ==========================================================================
 
 function zoneHandle(kind, group, onUpdate) {
+  markSpellVfx(group);
   return {
     object3D: group, kind: 'zone:' + kind, family: 'zone',
     update(ctx) { if (onUpdate) onUpdate(ctx); },
@@ -594,27 +605,27 @@ const ZONE_BUILDERS = {
       }
     });
   },
-  // Fog: a dense, drifting grey bank of overlapping puffs — capped so the enemy
-  // silhouette and threat outlines always stay legible through it.
+  // Fog: a dense, drifting grey bank of overlapping puffs. The arena adds a
+  // screen-space haze while this world-space bank supplies depth and motion.
   Fog(reduced, r, c) {
     const g = new THREE.Group();
     const grey = 0x9aa3b2, greyHi = 0xc4ccd8;
     const ground = mesh(G.disc(), matBasic(grey, 0.16, false)); ground.rotation.x = -Math.PI / 2; ground.scale.setScalar(r); ground.position.y = 0.05; g.add(ground);
     const layers = [];
-    const n = reduced ? 3 : 6;
+    const n = reduced ? 4 : 10;
     for (let i = 0; i < n; i++) {
       const puff = mesh(G.ballHi(), matBasic(i % 2 ? greyHi : grey, 0.16, false));
       const sx = r * (0.72 + (i % 3) * 0.16);
-      puff.scale.set(sx, 0.46 + (i % 2) * 0.18, sx);
+      puff.scale.set(sx, 0.7 + (i % 3) * 0.25, sx);
       const bx = (i / Math.max(1, n - 1) - 0.5) * 1.7 * r;
       const bz = (((i * 37) % 100) / 100 - 0.5) * 0.9 * r;
-      puff.position.set(bx, 0.5 + (i % 3) * 0.22, bz);
+      puff.position.set(bx, 0.65 + (i % 4) * 0.34, bz);
       puff.userData = { bx, bz, ph: i };
       g.add(puff); layers.push(puff);
     }
     return zoneHandle('Fog', g, (ctx) => {
-      const dense = 0.12 + ctx.fade * 0.08;   // hard cap keeps the duel readable
-      ground.material.opacity = dense * 0.85;
+      const dense = 0.24 + ctx.fade * 0.18;
+      ground.material.opacity = dense * 0.9;
       const s = ctx.time || 0;
       for (let i = 0; i < layers.length; i++) {
         layers[i].material.opacity = dense;
@@ -656,13 +667,16 @@ const ZONE_BUILDERS = {
   },
   Cover(reduced, r, c) {
     const g = new THREE.Group();
-    const cols = [-0.55, 0, 0.55];
+    const cols = [-0.82, 0, 0.82];
+    let maxHeight = 0;
     for (let i = 0; i < cols.length; i++) {
-      const h = 1.0 + (i === 1 ? 0.25 : 0);
+      const h = 1.9 + (i === 1 ? 0.45 : 0);
+      maxHeight = Math.max(maxHeight, h + 0.2);
       const col = mesh(G.box(), matSolid(c.glow, { roughness: 1, flat: true }));
-      col.scale.set(0.5, h, 0.5); col.position.set(cols[i], h / 2, (i - 1) * 0.08); col.rotation.y = (i - 1) * 0.2; g.add(col);
-      const cap = mesh(G.tetra(), matSolid(c.core, { roughness: 1, flat: true })); cap.scale.set(0.3, 0.3, 0.3); cap.position.set(cols[i], h + 0.05, 0); cap.rotation.y = i; g.add(cap);
+      col.scale.set(0.72, h, 0.58); col.position.set(cols[i], h / 2, (i - 1) * 0.08); col.rotation.y = (i - 1) * 0.14; g.add(col);
+      const cap = mesh(G.tetra(), matSolid(c.core, { roughness: 1, flat: true })); cap.scale.set(0.38, 0.38, 0.38); cap.position.set(cols[i], h + 0.08, 0); cap.rotation.y = i; g.add(cap);
     }
+    g.userData.coverVisual = { width: 3.08, height: maxHeight };
     return zoneHandle('Cover', g, () => {});
   },
   Hourglass(reduced, r, c) {
@@ -797,6 +811,7 @@ export function makeWardVfx(reduced) {
   const runes = new THREE.Group();
   for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const r = mesh(G.plane(), matBasic(c.core, 0.6)); r.scale.set(0.08, 0.28, 1); r.position.set(Math.cos(a) * 0.92, Math.sin(a) * 0.92, 0.01); r.rotation.z = a; runes.add(r); }
   g.add(runes);
+  markSpellVfx(g);
   return {
     object3D: g, kind: 'ward', family: 'ward',
     update(ctx) {
@@ -816,6 +831,7 @@ export function makeDomeVfx(reduced) {
   const inner = mesh(G.ballHi(), matBasic(c.core, 0.08, true)); inner.scale.setScalar(1.2); g.add(inner);
   const rings = [];
   for (let i = 0; i < 3; i++) { const r = mesh(G.torus(), matBasic(c.core, 0.5)); r.scale.setScalar(1.5); r.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0); g.add(r); rings.push(r); }
+  markSpellVfx(g);
   return {
     object3D: g, kind: 'barrierDome', family: 'dome',
     update(ctx) {
@@ -867,6 +883,7 @@ export function makeReflectGuardVfx(reduced) {
   }
   g.add(chevron);
 
+  markSpellVfx(g);
   return {
     object3D: g, kind: 'reflectGuard', family: 'reflectGuard',
     update(ctx) {
@@ -890,6 +907,7 @@ export function makeBeamVfx(spellId, reduced) {
   const endGlow = glow(0.35, c.core, 0.8); g.add(endGlow);
   const rings = [];
   if (!reduced) for (let i = 0; i < 4; i++) { const r = mesh(G.torus(), matBasic(c.glow, 0.7)); r.scale.setScalar(0.24); g.add(r); rings.push(r); }
+  markSpellVfx(g);
   return {
     object3D: g, kind: 'prismaticBeam', family: 'beam',
     update(ctx) {
@@ -927,6 +945,7 @@ export function makeCastCueVfx(spellId, reduced, opts = {}) {
   if (opts.heavy) { ground = mesh(G.ring(), matBasic(c.glow, 0.5)); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.2; ground.scale.setScalar(0.6); g.add(ground); }
   if (opts.control && !reduced) { ctrl = paramLine(3, (u) => { const a = u * Math.PI * 2; return [Math.cos(a) * 0.35, Math.sin(a) * 0.35, 0]; }, c.core, 0.7, true); g.add(ctrl.line); }
   const rise = profile.school === 'Ember' ? 1 : profile.school === 'Umbra' ? -1 : 0;
+  markSpellVfx(g);
   return {
     object3D: g, kind: 'cue:' + profile.kind, family: 'castcue',
     update(ctx) {

@@ -138,6 +138,34 @@ export function run() {
       `${count}-sample diamond remains Grounding Mantle`);
   }
 
+  const forgivingBarrier = full.recognize(jitter(GESTURE_TEMPLATES.circle[0], 10, 188));
+  ok(forgivingBarrier.accepted && forgivingBarrier.spellId === 11,
+    `high-scoring round Barrier accepts a narrow margin (${forgivingBarrier.margin.toFixed(3)})`);
+  eq(forgivingBarrier.requiredMargin, 0.005, 'round Barrier uses the reduced ambiguity margin');
+
+  let fireballCorrect = 0, groundingVsFireball = 0, stoneWallCorrect = 0, veilCorrect = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const fireball = full.recognize(denseNoisyPath(GESTURE_TEMPLATES.triangleCW[0], 4, 5, seed * 233));
+    const grounding = full.recognize(denseNoisyPath(GESTURE_TEMPLATES.diamond[0], 4, 5, seed * 233));
+    const wall = full.recognize(jitter(GESTURE_TEMPLATES.lowSquare[0], 12, seed * 229));
+    const veil = full.recognize(jitter(GESTURE_TEMPLATES.knot[0], 10, seed * 229));
+    if (fireball.accepted && fireball.spellId === 8) fireballCorrect++;
+    if ((fireball.accepted && fireball.spellId === 20) || (grounding.accepted && grounding.spellId === 8)) groundingVsFireball++;
+    if (wall.accepted && wall.spellId === 15) stoneWallCorrect++;
+    if (veil.accepted && veil.spellId === 25) veilCorrect++;
+  }
+  ok(fireballCorrect >= 195, `rough Fireball triangles remain Fireball (${fireballCorrect}/200)`);
+  eq(groundingVsFireball, 0, 'Fireball triangles and Grounding diamonds never cross-cast');
+  ok(stoneWallCorrect >= 195, `rough Stone Wall U-shapes meet confidence (${stoneWallCorrect}/200)`);
+  ok(veilCorrect >= 195, `wider Veil ribbon remains recognizable (${veilCorrect}/200)`);
+  const concussiveXs = GESTURE_TEMPLATES.arc.flat().map((point) => point.x);
+  ok(Math.min(...concussiveXs) >= 0 && Math.max(...concussiveXs) <= 100,
+    'Concussive Blast guide stays fully inside the draw pad');
+  const veilXs = GESTURE_TEMPLATES.knot[0].map((point) => point.x);
+  const veilYs = GESTURE_TEMPLATES.knot[0].map((point) => point.y);
+  ok(Math.max(...veilXs) - Math.min(...veilXs) >= 60 && Math.max(...veilYs) - Math.min(...veilYs) >= 55,
+    'Veil Hex guide is spread out for readability');
+
   // Each starter gesture's own template classifies to its spell, even jittered.
   const keyToId = {};
   for (const [id, key] of Object.entries(STARTER_GESTURE_KEYS)) keyToId[key] = Number(id);

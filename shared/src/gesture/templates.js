@@ -54,6 +54,9 @@ const DIAMOND_WIDE = [
 const DIAMOND_NARROW = [
   { x: 52, y: 14 }, { x: 84, y: 50 }, { x: 48, y: 88 }, { x: 18, y: 48 }, { x: 52, y: 14 },
 ];
+const TRIANGLE_PRIMARY = [
+  { x: 50, y: 12 }, { x: 86, y: 82 }, { x: 14, y: 82 }, { x: 50, y: 12 },
+];
 
 // A planar spiral: radius sweeps r0 -> r1 while the angle sweeps startDeg by
 // sweepDeg (positive = clockwise in y-down space).
@@ -101,8 +104,8 @@ export const GESTURE_TEMPLATES = {
     [{ x: 8, y: 25 }, { x: 30, y: 80 }, { x: 55, y: 25 }, { x: 80, y: 82 }, { x: 95, y: 40 }],
   ],
   arc: [ // 28 Concussive Blast — pushing arc (bulges left, top -> bottom)
-    arc(78, 50, 42, -70, 70, 18),
-    arc(80, 50, 38, -60, 60, 14),
+    arc(60, 50, 35, -70, 70, 18),
+    arc(62, 50, 32, -60, 60, 14),
   ],
   bracket: [ // 10 Ward — open right bracket "["
     [{ x: 90, y: 8 }, { x: 20, y: 8 }, { x: 20, y: 50 }, { x: 20, y: 92 }, { x: 90, y: 92 }],
@@ -132,7 +135,8 @@ export const GESTURE_TEMPLATES = {
     [{ x: 5, y: 18 }, { x: 23, y: 84 }, { x: 41, y: 18 }, { x: 59, y: 84 }, { x: 77, y: 18 }, { x: 95, y: 72 }],
   ],
   triangleCW: [ // 8 Fireball — closed triangle, apex up, clockwise
-    [{ x: 50, y: 12 }, { x: 86, y: 82 }, { x: 14, y: 82 }, { x: 50, y: 12 }],
+    densifyPolyline(TRIANGLE_PRIMARY),
+    densifyPolyline([{ x: 50, y: 8 }, { x: 90, y: 84 }, { x: 12, y: 80 }, { x: 50, y: 8 }]),
   ],
   spiralIn: [ // 9 Ice Comet — inward clockwise spiral (outer -> center)
     spiral(50, 50, 45, 7, -90, 720, 28),
@@ -150,6 +154,8 @@ export const GESTURE_TEMPLATES = {
   ],
   lowSquare: [ // 15 Stone Wall — squared U (down, across, up)
     [{ x: 16, y: 20 }, { x: 16, y: 80 }, { x: 84, y: 80 }, { x: 84, y: 20 }],
+    [{ x: 20, y: 16 }, { x: 18, y: 78 }, { x: 82, y: 82 }, { x: 80, y: 18 }],
+    [{ x: 12, y: 24 }, { x: 14, y: 84 }, { x: 88, y: 84 }, { x: 86, y: 24 }],
   ],
 
   // === Buffs ==============================================================
@@ -187,9 +193,11 @@ export const GESTURE_TEMPLATES = {
     [{ x: 46, y: 12 }, { x: 50, y: 44 }, { x: 52, y: 70 }, { x: 44, y: 83 },
      { x: 30, y: 80 }, { x: 26, y: 66 }],
   ],
-  knot: [ // 25 Veil Hex — crossing knot (multiple self-intersections)
-    [{ x: 26, y: 66 }, { x: 54, y: 30 }, { x: 74, y: 60 }, { x: 42, y: 62 },
-     { x: 60, y: 30 }, { x: 30, y: 52 }, { x: 58, y: 74 }],
+  knot: [ // 25 Veil Hex — wide crossing ribbon
+    [{ x: 18, y: 72 }, { x: 55, y: 23 }, { x: 82, y: 64 }, { x: 39, y: 66 },
+     { x: 64, y: 23 }, { x: 23, y: 53 }, { x: 61, y: 82 }],
+    [{ x: 14, y: 68 }, { x: 48, y: 18 }, { x: 86, y: 62 }, { x: 36, y: 70 },
+     { x: 68, y: 20 }, { x: 20, y: 48 }, { x: 66, y: 86 }],
   ],
 
   // === Control ============================================================

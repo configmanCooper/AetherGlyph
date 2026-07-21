@@ -47,7 +47,7 @@ export class HUD {
     };
     this.showDiag = false;
     this.spellButtons = new Map(); // spellId -> button element
-    this.lastTouchPressAt = -Infinity;
+    this.lastTouchPress = { at: -Infinity, key: '' };
   }
 
   _pips(container, charges) {
@@ -106,6 +106,17 @@ export class HUD {
       bindPress(cooldown, opts.onCooldownToggle, this);
       this.el.spellbar.appendChild(cooldown);
     }
+    if (typeof opts.onEnemyControl === 'function') {
+      const enemy = document.createElement('button');
+      enemy.className = 'spell-btn spell-enemy-toggle' + (opts.enemyEnabled ? ' selected' : '');
+      enemy.type = 'button';
+      enemy.innerHTML = '<span class="sb-key">EN</span><span class="sb-name">Enemy</span>' +
+        `<span class="sb-cost">${opts.enemyLabel || 'Off'}</span>`;
+      enemy.title = 'Choose a spell and schedule for the Glyph Laboratory enemy';
+      enemy.setAttribute('aria-pressed', opts.enemyEnabled ? 'true' : 'false');
+      bindPress(enemy, opts.onEnemyControl, this);
+      this.el.spellbar.appendChild(enemy);
+    }
     loadout.forEach((s, i) => {
       const btn = document.createElement('button');
       btn.className = 'spell-btn';
@@ -135,6 +146,9 @@ export class HUD {
 
     function bindPress(button, action, owner) {
       let touch = null;
+      const key = button.dataset.spell
+        ? `spell:${button.dataset.spell}`
+        : [...button.classList].filter((name) => name.startsWith('spell-')).sort().join(':');
       button.addEventListener('pointerdown', (event) => {
         if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
         touch = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
@@ -149,13 +163,13 @@ export class HUD {
         touch = null;
         if (!activate) return;
         event.preventDefault();
-        owner.lastTouchPressAt = performance.now();
+        owner.lastTouchPress = { at: performance.now(), key };
         action();
       });
       button.addEventListener('pointercancel', () => { touch = null; });
       button.addEventListener('click', (event) => {
         event.preventDefault();
-        if (performance.now() - owner.lastTouchPressAt < 700) return;
+        if (owner.lastTouchPress.key === key && performance.now() - owner.lastTouchPress.at < 700) return;
         action();
       });
     }

@@ -136,6 +136,28 @@
       </div>
     </div>
 
+    <div class="panel hidden" id="panel-lab-enemy">
+      <h2>Glyph Lab Enemy</h2>
+      <p class="offline-note">Choose what the training enemy casts at you and how often. Scheduled casts use the real simulation and can be changed or disabled at any time.</p>
+      <label class="field">Enemy spell
+        <select id="lab-enemy-spell"></select>
+      </label>
+      <label class="field">Schedule
+        <select id="lab-enemy-cadence">
+          <option value="once">Cast once</option>
+          <option value="5">Every 5 seconds</option>
+          <option value="15">Every 15 seconds</option>
+          <option value="30">Every 30 seconds</option>
+        </select>
+      </label>
+      <label class="toggle"><input type="checkbox" id="lab-enemy-move" /> Continuously move all the way left and right</label>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="lab-enemy-apply">Apply and return</button>
+        <button class="menu-btn ghost" data-action="lab-enemy-disable">Disable enemy casting</button>
+        <button class="menu-btn ghost" data-action="lab-enemy-back">Back to laboratory</button>
+      </div>
+    </div>
+
     <div class="panel hidden" id="panel-practice">
       <h2>Practice vs AI</h2>
       <p class="offline-note">Fully offline &amp; single-player. One round against a fair AI. Both sides use the same spell requirements, resources, cooldowns, and drawn-glyph execution; your selected eight spells are guide shortcuts, not casting limits.</p>

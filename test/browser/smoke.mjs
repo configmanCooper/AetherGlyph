@@ -407,6 +407,26 @@ try {
       Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)));
     labPages.push(ids);
     ids.forEach((id) => labSeen.add(id));
+    if (ids.includes(27)) {
+      await page.click('#spellbar .spell-btn[data-spell="27"]');
+      const frostCues = await page.evaluate(() => ({
+        arrows: Number(document.querySelector('#draw-canvas')?.dataset.guideArrows || 0),
+        labels: document.querySelector('#draw-canvas')?.dataset.guideCueLabels || '',
+      }));
+      if (frostCues.arrows !== 1 || frostCues.labels !== '') {
+        fail('Frost Bind should show one clear right-pointing bottom connector arrow: ' + JSON.stringify(frostCues));
+      }
+    }
+    if (ids.includes(33)) {
+      await page.click('#spellbar .spell-btn[data-spell="33"]');
+      const gustCues = await page.evaluate(() => ({
+        arrows: Number(document.querySelector('#draw-canvas')?.dataset.guideArrows || 0),
+        labels: document.querySelector('#draw-canvas')?.dataset.guideCueLabels || '',
+      }));
+      if (gustCues.arrows !== 6 || gustCues.labels !== '1,2,3') {
+        fail('Gust Wall should show three numbered bidirectional blades: ' + JSON.stringify(gustCues));
+      }
+    }
     if (i === 1) {
       const surge = await page.$('#spellbar .spell-btn[data-spell="17"]');
       if (!surge) fail('Aether Surge missing from expected lab page: ' + JSON.stringify(labPages));
@@ -505,6 +525,41 @@ try {
   if (cooldownOn.text !== 'On' || cooldownOn.state !== true) {
     fail('Glyph Laboratory cooldown toggle did not turn On: ' + JSON.stringify(cooldownOn));
   }
+  const enemyControl = await page.$('#spellbar .spell-enemy-toggle');
+  if (!enemyControl) fail('Glyph Laboratory is missing the Enemy control');
+  await activate(page, '#spellbar .spell-enemy-toggle');
+  await page.waitForSelector('#panel-lab-enemy:not(.hidden)', { timeout: 5000 });
+  const enemyOptions = await page.evaluate(() => ({
+    spells: document.querySelectorAll('#lab-enemy-spell option').length,
+    cadences: Array.from(document.querySelectorAll('#lab-enemy-cadence option')).map((option) => option.value),
+  }));
+  if (enemyOptions.spells < 20 || enemyOptions.cadences.join(',') !== 'once,5,15,30') {
+    fail('Glyph Lab enemy controls are incomplete: ' + JSON.stringify(enemyOptions));
+  }
+  await page.select('#lab-enemy-spell', '1');
+  await page.select('#lab-enemy-cadence', 'once');
+  await page.click('[data-action="lab-enemy-apply"]');
+  await page.waitForFunction(() => window.__aegTest.info().enemyCastsResolved > 0, { timeout: 5000 });
+  await activate(page, '#spellbar .spell-enemy-toggle');
+  await page.waitForSelector('#panel-lab-enemy:not(.hidden)', { timeout: 5000 });
+  await page.select('#lab-enemy-spell', '3');
+  await page.select('#lab-enemy-cadence', '5');
+  await page.click('#lab-enemy-move');
+  await page.click('[data-action="lab-enemy-apply"]');
+  const repeatingEnemy = await page.evaluate(() => ({ config: window.__aegTest.info().labEnemy }));
+  const enemyStartPos = await page.evaluate(() => window.__aegTest.info().enemyArcPos);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const enemyMovedPos = await page.evaluate(() => window.__aegTest.info().enemyArcPos);
+  if (!repeatingEnemy.config.enabled || repeatingEnemy.config.spellId !== 3
+      || repeatingEnemy.config.cadence !== '5' || !repeatingEnemy.config.movement
+      || Math.abs(enemyMovedPos - enemyStartPos) < 0.05) {
+    fail('Glyph Lab enemy repeating schedule was not applied: ' + JSON.stringify(repeatingEnemy));
+  }
+  await activate(page, '#spellbar .spell-enemy-toggle');
+  await page.waitForSelector('#panel-lab-enemy:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="lab-enemy-disable"]');
+  const disabledEnemy = await page.evaluate(() => window.__aegTest.info().labEnemy);
+  if (disabledEnemy.enabled) fail('Glyph Lab enemy schedule did not disable');
   const blankBefore = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
   await gflick();
   await new Promise((r) => setTimeout(r, 800));
@@ -972,6 +1027,30 @@ try {
   }
   if (!(academy.firstPerson && academy.firstPerson.gloveParts >= 4 && academy.firstPerson.hasWand)) {
     fail('first-person gloves/wand metadata missing: ' + JSON.stringify(academy.firstPerson));
+  }
+  const perceptionVfx = await page.evaluate(() => ({
+    fog: window.__aegVfx.fogVeil(1),
+    fogInside: window.__aegVfx.fogForPosition(0.1, 0, 0.55),
+    fogOutside: window.__aegVfx.fogForPosition(0.9, 0, 0.55),
+    blind: window.__aegVfx.blindVeil(true),
+    cover: window.__aegVfx.zoneBounds('Cover'),
+  }));
+  if (!perceptionVfx.fog.visible || perceptionVfx.fog.strength < 0.99) {
+    fail('Fog Cloud screen-space haze is not intense: ' + JSON.stringify(perceptionVfx.fog));
+  }
+  if (!perceptionVfx.fogInside.visible || perceptionVfx.fogOutside.visible) {
+    fail('Fog screen haze does not clear after leaving the zone: ' + JSON.stringify(perceptionVfx));
+  }
+  if (!perceptionVfx.blind.visible || perceptionVfx.blind.opacity < 0.85
+      || perceptionVfx.blind.width < 6 || perceptionVfx.blind.height < 4
+      || perceptionVfx.blind.depthWrite
+      || perceptionVfx.blind.spellRenderOrder <= perceptionVfx.blind.renderOrder
+      || perceptionVfx.blind.layer === perceptionVfx.blind.spellLayer
+      || perceptionVfx.blind.normalBlendCount < 1 || perceptionVfx.blind.spellLights < 1) {
+    fail('Eclipse Glare does not white out the opponent area: ' + JSON.stringify(perceptionVfx.blind));
+  }
+  if (perceptionVfx.cover.height < 2.2 || perceptionVfx.cover.width < 2.4) {
+    fail('Stone Wall visual is not substantially taller and wider: ' + JSON.stringify(perceptionVfx.cover));
   }
   const statusNames = ['Burning', 'Chilled', 'Sloth', 'Soaked', 'Static', 'Sundered', 'Weakened',
     'Marked', 'Blinded', 'Veiled', 'Rooted', 'Frozen', 'Stunned', 'Haste', 'Grounded',

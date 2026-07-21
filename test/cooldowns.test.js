@@ -26,7 +26,7 @@ const TARGET_COOLDOWNS = {
   10: 26, 11: 18, 12: 8, 13: 10, 14: 9, 15: 48,
   16: 36, 17: 36, 18: 30, 19: 36, 20: 30,
   21: 24, 22: 24, 23: 24, 24: 14, 25: 20,
-  26: 12, 27: 14, 28: 6, 29: 16, 30: 20,
+  26: 15, 27: 20, 28: 6, 29: 40, 30: 20,
   31: 42, 32: 42, 33: 8, 34: 24, 35: 36, 36: 48,
   37: 32, 38: 45, 39: 60, 40: 50,
 };
@@ -121,7 +121,7 @@ export function run() {
   // Spot-check the headline reviewed windows explicitly (belt-and-braces on top
   // of the generic rule): active window seconds -> minimum required cooldown.
   const REVIEWED = { 10: 12.6, 11: 9, 12: 3.6, 14: 3, 15: 24, 16: 18, 17: 18, 18: 15, 19: 18, 20: 15,
-    21: 12, 22: 12, 23: 12, 25: 6, 26: 4.5, 29: 6, 31: 21, 32: 21, 35: 18, 36: 24, 37: 12, 38: 18, 39: 15 };
+    21: 12, 22: 12, 23: 12, 25: 6, 26: 3, 29: 4, 31: 21, 32: 21, 35: 18, 36: 24, 37: 12, 38: 18, 39: 15 };
   let reviewedOk = true;
   for (const [id, dur] of Object.entries(REVIEWED)) {
     if (!(cd(Number(id)) >= 2 * dur)) reviewedOk = false;

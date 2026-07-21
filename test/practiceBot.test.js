@@ -66,6 +66,20 @@ export function run() {
   ok(per('hard') > 0 && per('medium') > per('hard') && per('easy') > per('medium'),
     'perception delay is non-zero and strictly Easy>Medium>Hard');
 
+  {
+    const sim = createMatch({ seed: 19 });
+    const bot = new PracticeBot(1, { difficulty: 'hard', seed: 19 });
+    sim.applyStatus(sim.wizards[1], 'Blinded', 1);
+    sim.projectiles.push({ id: 919, owner: 0, ticks: 2, eff: effectFor(1), spellId: 1, targetPos: 0.35 });
+    sim.wizards[0].casting = { spellId: 8, ticks: 30, totalTicks: 60 };
+    const intent = bot.act(sim);
+    eq(bot.seenProjectiles.size, 0, 'a blinded AI does not perceive incoming projectiles');
+    ok(bot.castTell === null, 'a blinded AI does not perceive opponent cast tells');
+    ok(intent.cast == null && !intent.focus && !intent.brace && !intent.sidestep,
+      'a blinded AI makes no opponent-aware combat decision');
+    ok(intent.move === -1 || intent.move === 1, 'a blinded AI may still move without opponent awareness');
+  }
+
   // --- perception isolation: cannot react before the notice tick ---------
   {
     const sim = createMatch({ seed: 1 });

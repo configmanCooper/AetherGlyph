@@ -207,6 +207,13 @@ export class PracticeBot {
 
   // -------------------------------------------------------------- perception
   observe(sim) {
+    const self = sim.wizards[this.id];
+    if (sim.hasStatus(self, 'Blinded')) {
+      this.seenProjectiles.clear();
+      this.castTell = null;
+      this._prevOppCasting = null;
+      return;
+    }
     const opp = sim.opponentOf(this.id);
     for (const p of sim.projectiles) {
       if (p.owner === this.id) continue;
@@ -471,6 +478,7 @@ export class PracticeBot {
       this.nextStrafeFlip = sim.tick + this.rng.int(18, 42);
     }
     intent.move = this.moveDir;
+    if (sim.hasStatus(w, 'Blinded')) return intent;
 
     const b = this.categorize(sim);
     const threat = this.noticedThreat(sim);

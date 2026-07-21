@@ -82,9 +82,9 @@ export const STATUSES = {
   Sundered: { durationS: 12, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
   Weakened: { durationS: 12, maxStacks: 1, damageDealt: 0.22, kind: 'amp', harmful: true },
   Marked:   { durationS: 15, maxStacks: 1, markBonus: 0.35, kind: 'flag', harmful: true },
-  Blinded:  { durationS: 6, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
+  Blinded:  { durationS: 4, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
   Veiled:   { durationS: 6, maxStacks: 1, kind: 'flag', harmful: true },   // Veil Hex (visual)
-  Rooted:   { durationS: 4.5, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
+  Rooted:   { durationS: 3, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
   Frozen:   { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   // Self buffs -------------------------------------------------------------
@@ -114,6 +114,7 @@ export const ZONE = {
   frozenSlow: 0.22,       // Frozen Ground slows movement while standing on it
   coverReduction: 0.5,    // Stone Wall cover reduces incoming projectile dmg
   coverHp: 26,
+  snareRootS: 2,
   durations: {
     Oil: 21, Wet: 21, Fog: 18, Frozen: 9, Snare: 24, Cover: 24,
     Hourglass: 18, Fire: 12, Gust: 1.8, Grounded: 3,

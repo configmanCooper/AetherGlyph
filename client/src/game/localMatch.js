@@ -61,6 +61,8 @@ export class LocalMatch {
     this._blockedDamage = 0;
     this._prevGuard = null; // { shield, barrier } absorb slice for blocked-damage deltas
     this.input = { move: 0, sidestep: 0, focus: false, brace: false, pendingCast: null, pendingQuality: 1 };
+    this.enemyPendingCast = null;
+    this.enemyMove = 0;
     this.onEnd = opts.onEnd || null;
     this._ended = false;
   }
@@ -77,8 +79,21 @@ export class LocalMatch {
       intent.castWasGesture = true;
       i.pendingCast = null;
     }
+
     i.sidestep = 0; // one-shot
     return intent;
+  }
+
+  queueEnemyCast(spellId) {
+    if (this.mode !== 'lab' || this.enemyPendingCast != null) return false;
+    const enemy = this.sim.wizards[1];
+    if (!enemy || !this.sim.canAct(enemy) || enemy.casting || enemy.channel || enemy.recoveryTicks > 0) return false;
+    this.enemyPendingCast = Number(spellId);
+    return Number.isInteger(this.enemyPendingCast);
+  }
+
+  setEnemyMove(direction) {
+    this.enemyMove = Math.sign(Number(direction) || 0);
   }
 
   // Accumulate shield/barrier damage soaked by the player this tick (for coaching).
@@ -105,7 +120,11 @@ export class LocalMatch {
     let steps = 0;
     while (this.acc >= TICK_MS && steps < MAX_CATCHUP && !this.sim.ended) {
       const playerIntent = this.buildPlayerIntent();
-      const botIntent = (this.botActive && this.bot) ? this.bot.act(this.sim) : {};
+      let botIntent = (this.botActive && this.bot) ? this.bot.act(this.sim) : { move: this.enemyMove };
+      if (this.enemyPendingCast != null) {
+        botIntent = { cast: this.enemyPendingCast, castQuality: 1 };
+        this.enemyPendingCast = null;
+      }
       const evs = this.sim.step({ 0: playerIntent, 1: botIntent });
       for (const e of evs) { this.events.push(e); this.history.push(e); }
       this._trackBlocked();
