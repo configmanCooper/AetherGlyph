@@ -66,12 +66,33 @@ export class Calibration {
   _bind() {
     const c = this.canvas;
     c.style.touchAction = 'none';
-    c.addEventListener('pointerdown', (e) => this._down(e));
-    c.addEventListener('pointermove', (e) => this._move(e));
-    c.addEventListener('pointerup', (e) => this._up(e));
-    c.addEventListener('pointercancel', () => { this.drawing = false; this.points = []; this._redraw(); });
-    c.addEventListener('pointerleave', (e) => { if (this.drawing) this._up(e); });
-    if (typeof window !== 'undefined') window.addEventListener('resize', () => this.resize());
+    this._handlers = {
+      down: (e) => this._down(e),
+      move: (e) => this._move(e),
+      up: (e) => this._up(e),
+      cancel: () => { this.drawing = false; this.points = []; this._redraw(); },
+      leave: (e) => { if (this.drawing) this._up(e); },
+      resize: () => this.resize(),
+    };
+    c.addEventListener('pointerdown', this._handlers.down);
+    c.addEventListener('pointermove', this._handlers.move);
+    c.addEventListener('pointerup', this._handlers.up);
+    c.addEventListener('pointercancel', this._handlers.cancel);
+    c.addEventListener('pointerleave', this._handlers.leave);
+    if (typeof window !== 'undefined') window.addEventListener('resize', this._handlers.resize);
+  }
+
+  destroy() {
+    if (!this._handlers) return;
+    const c = this.canvas;
+    c.removeEventListener('pointerdown', this._handlers.down);
+    c.removeEventListener('pointermove', this._handlers.move);
+    c.removeEventListener('pointerup', this._handlers.up);
+    c.removeEventListener('pointercancel', this._handlers.cancel);
+    c.removeEventListener('pointerleave', this._handlers.leave);
+    if (typeof window !== 'undefined') window.removeEventListener('resize', this._handlers.resize);
+    this._handlers = null;
+    this.drawing = false;
   }
 
   _pos(e) { const r = this.canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }

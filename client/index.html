@@ -95,9 +95,9 @@
 
     <!-- Center + side action buttons -->
     <div class="action-buttons">
-      <button id="btn-focus" class="act-btn">Focus (F)</button>
-      <button id="btn-brace" class="act-btn">Brace (B)</button>
-      <button id="btn-sidestep" class="act-btn">Dodge (Space)</button>
+      <button id="btn-focus" class="act-btn"><span class="desktop-label">Focus (F)</span><span class="touch-label">Focus</span></button>
+      <button id="btn-brace" class="act-btn"><span class="desktop-label">Brace (B)</span><span class="touch-label">Brace</span></button>
+      <button id="btn-sidestep" class="act-btn"><span class="desktop-label">Dodge (Space)</span><span class="touch-label">Dodge</span></button>
     </div>
 
     <!-- Dev accessibility fallback: quick-cast the selected guide shortcuts -->
@@ -112,6 +112,7 @@
       <h1>Aetherglyph</h1>
       <p class="tagline">Arcane Duels — draw glyphs, cast spells, win the duel.</p>
       <div class="menu-list">
+        <button id="btn-resume-game" class="menu-btn hidden" data-action="resume-game">Go back to current game</button>
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
         <button class="menu-btn" data-action="practice-ai">Practice vs AI</button>
         <button class="menu-btn" data-action="lab">Glyph Laboratory</button>
@@ -229,6 +230,28 @@
       <label class="toggle"><input type="checkbox" id="set-audio" checked /> Audio</label>
       <label class="toggle"><input type="checkbox" id="set-haptics" checked /> Haptics</label>
       <label class="toggle"><input type="checkbox" id="set-devcast" /> Show dev quick-cast buttons</label>
+      <label class="field">Orientation
+        <select id="set-orientation">
+          <option value="auto">Auto rotate</option>
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </label>
+      <p id="set-orientation-status" class="settings-note"></p>
+
+      <div class="settings-section">
+        <p id="set-calibration-status" class="settings-note"></p>
+        <div class="menu-list compact">
+          <button class="menu-btn ghost" data-action="recalibrate">Redo baseline calibration</button>
+        </div>
+      </div>
+
+      <div id="install-app-section" class="settings-section hidden">
+        <p id="install-app-status" class="settings-note">Install Aetherglyph for fullscreen play and offline loading.</p>
+        <div class="menu-list compact">
+          <button id="btn-install-app" class="menu-btn ghost" data-action="install-app" disabled>Install web app</button>
+        </div>
+      </div>
 
       <div class="settings-section">
         <label class="field">Online service URL
@@ -278,15 +301,15 @@
     </div>
 
     <div class="panel hidden" id="panel-calibrate">
-      <h2>Quick calibration</h2>
-      <p class="offline-note">One-time comfort setup. Draw each shape naturally at a comfortable size — this only tunes guide sizing and your comfortable pace. It never changes how glyphs are recognized.</p>
+      <h2 id="calib-title">Quick calibration</h2>
+      <p id="calib-note" class="offline-note">One-time comfort setup. Draw each shape naturally at a comfortable size — this only tunes guide sizing and your comfortable pace. It never changes how glyphs are recognized.</p>
       <p id="calib-step" class="calib-step">Draw a horizontal line, left to right.</p>
       <div class="calib-pad">
         <canvas id="calib-canvas"></canvas>
         <div id="calib-progress" class="calib-progress">1 / 3</div>
       </div>
       <div class="menu-list">
-        <button class="menu-btn ghost" data-action="calib-skip">Skip &amp; use defaults</button>
+        <button id="calib-skip" class="menu-btn ghost" data-action="calib-skip">Skip &amp; use defaults</button>
       </div>
     </div>
 

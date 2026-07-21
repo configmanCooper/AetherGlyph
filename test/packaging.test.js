@@ -37,6 +37,11 @@ stageWeb();
 
 const pkg = readJson('package.json');
 const version = pkg.version;
+ok(!!pkg.dependencies['@capacitor/screen-orientation'], 'screen orientation plugin is packaged');
+ok(read('android/capacitor.settings.gradle').includes("include ':capacitor-screen-orientation'"),
+  'Android settings include the ScreenOrientation plugin project');
+ok(read('android/app/capacitor.build.gradle').includes("implementation project(':capacitor-screen-orientation')"),
+  'Android app depends on the ScreenOrientation plugin');
 
 // --- 1. staged web completeness -------------------------------------------
 const requiredStaged = [
@@ -123,13 +128,13 @@ ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.inclu
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 10301'), 'gradle versionCode 10301');
+ok(appGradle.includes('versionCode 10400'), 'gradle versionCode 10400');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');
 eq(readJson('package-lock.json').version, version, 'package-lock version matches package.json');
 const publishingGuide = read('PUBLISHING-ANDROID.md');
-ok(publishingGuide.includes('| Version code | `10301` |'), 'publishing guide versionCode 10301');
+ok(publishingGuide.includes('| Version code | `10400` |'), 'publishing guide versionCode 10400');
 ok(publishingGuide.includes(`| Version name | \`${version}\` |`), `publishing guide versionName ${version}`);
 
 const vars = read('android/variables.gradle');
@@ -141,7 +146,7 @@ const strings = read('android/app/src/main/res/values/strings.xml');
 ok(strings.includes('Aetherglyph: Arcane Duels'), 'android app_name is the full title');
 
 const manifestXml = read('android/app/src/main/AndroidManifest.xml');
-ok(manifestXml.includes('android:screenOrientation="landscape"'), 'activity locked to landscape');
+ok(!manifestXml.includes('android:screenOrientation="landscape"'), 'Android activity allows portrait and landscape');
 ok(manifestXml.includes('android:usesCleartextTraffic="false"'), 'no cleartext traffic in production');
 ok(manifestXml.includes('android:networkSecurityConfig="@xml/network_security_config"'), 'network security config referenced');
 ok(manifestXml.includes('android.permission.INTERNET'), 'INTERNET permission declared');
@@ -153,7 +158,7 @@ ok(!existsSync(join(ROOT, 'android/app/src/debug/AndroidManifest.xml')), 'no ine
 // web manifest values (source + staged copy)
 const wm = readJson('client/manifest.webmanifest');
 eq(wm.name, 'Aetherglyph: Arcane Duels', 'web manifest name');
-eq(wm.orientation, 'landscape', 'web manifest landscape');
+eq(wm.orientation, 'any', 'installable web app supports portrait and landscape');
 ok(['fullscreen', 'standalone'].includes(wm.display), 'web manifest display is app-like');
 ok(typeof wm.start_url === 'string' && wm.start_url.length > 0, 'web manifest has start_url');
 eq(wm.theme_color, '#0a0713', 'web manifest theme color matches app');
@@ -189,6 +194,14 @@ const main = read('client/src/app/main.js');
 ok(main.includes("navigator.serviceWorker.register('./sw.js')"), 'main.js registers ./sw.js (scope /client/)');
 ok(main.includes('isNativeApp') && /loc\.protocol\s*!==\s*'https:'/.test(main),
   'SW registration is gated to production web (never native / never non-https dev)');
+ok(read('client/index.html').includes('data-action="install-app"'), 'Settings exposes an install web app action');
+ok(main.includes('beforeinstallprompt') && main.includes("endsWith('.onrender.com')") && main.includes('/Android/i'),
+  'Android Render install prompt is captured and gated to onrender.com');
+ok(main.includes('(display-mode: standalone)') && main.includes('(display-mode: fullscreen)'),
+  'installed PWA detection covers standalone and fullscreen modes');
+const nativeBridge = read('client/src/app/native.js');
+ok(nativeBridge.includes("plugin('ScreenOrientation')") && nativeBridge.includes('setNativeOrientation'),
+  'native bridge applies the Settings orientation through Capacitor');
 
 // --- 7. solo progress + Delete My Data disclosure --------------------------
 // The tutorial ships as a real, offline, single-player campaign and its local

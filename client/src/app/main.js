@@ -11,13 +11,13 @@ import { LocalMatch } from '../game/localMatch.js';
 import { OnlineMatch } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
-import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact } from './native.js';
+import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact, setNativeOrientation } from './native.js';
 import { TutorialRunner, STATES } from '../tutorial/runner.js';
 import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters,
   lessonUnlocked, lockReason, groupProgress, firstAvailableLessonId, EXAM_GROUPS } from '../tutorial/campaign.js';
 import {
   loadProfile, saveProfile, deleteProfile, completionPercent,
-  setPractice, recordPracticeResult,
+  setPractice, recordPracticeResult, setCalibration,
 } from '../tutorial/progress.js';
 import { SECRETS } from '../tutorial/secrets.js';
 import { Calibration } from '../tutorial/calibration.js';
@@ -43,7 +43,20 @@ const arena = new Arena($('#scene'));
 const hud = new HUD($('#hud'));
 const audio = new Audio();
 
-const settings = { lefthand: false, reduced: false, audio: true, haptics: true, devcast: false };
+const ORIENTATION_KEY = 'aeth-orientation';
+const ORIENTATIONS = new Set(['auto', 'portrait', 'landscape']);
+function storedOrientation() {
+  try {
+    const value = localStorage.getItem(ORIENTATION_KEY);
+    return ORIENTATIONS.has(value) ? value : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+const settings = {
+  lefthand: false, reduced: false, audio: true, haptics: true, devcast: false,
+  orientation: storedOrientation(),
+};
 
 // Guide-set + practice state. These eight spells control the visible guide
 // shortcuts only; duel recognition always covers the full 40-spell roster.
@@ -68,6 +81,10 @@ let mode = null;
 let tutorial = null;        // active TutorialRunner (mode === 'tutorial')
 let tutorialLesson = null;  // its lesson definition
 let calibrator = null;      // active Calibration capture (first-run)
+let calibrationReturn = 'tutorial';
+let deferredInstallPrompt = null;
+let webAppInstalled = false;
+let gameMenuPaused = false;
 
 // Practice vs AI configuration (persisted in aeg.solo.v1 under `practice`).
 let practice = null;        // loaded from the solo profile on boot
@@ -104,6 +121,8 @@ function showLastCast(spellId) {
 function selectEquippedGuide(id) {
   selectedGuideId = id;
   gesture.setGuide(guideTemplateFor(id), { stage: 1, showGhost: false });
+  const canvas = $('#draw-canvas');
+  if (canvas) { canvas.dataset.guideSpell = String(id); canvas.dataset.guideStage = 'dotted'; }
   setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
   if (mode === 'practice' && match) match.assisted = true;
   renderEquippedGuideBar();
@@ -297,6 +316,7 @@ function renderLabSpellbar() {
 }
 
 function startLab() {
+  abandonPausedGameForNewMode();
   mode = 'lab';
   document.body.classList.add('mode-lab');
   document.body.classList.remove('mode-tutorial');
@@ -353,6 +373,7 @@ function resolveOpponentPracticeIds(playerPracticeIds, seed) {
 }
 
 function startPractice() {
+  abandonPausedGameForNewMode();
   mode = 'practice';
   document.body.classList.remove('mode-lab', 'mode-tutorial');
   series = null;
@@ -540,6 +561,7 @@ function chapterLabel(chapter) {
 
 // Build the scoped production recognizer + runner for a lesson and show its intro.
 function startTutorialLesson(lessonId) {
+  abandonPausedGameForNewMode();
   const lesson = CAMPAIGN_BY_ID[lessonId];
   if (!lesson) return;
   const profile = soloProfile();
@@ -621,7 +643,15 @@ function beginTutorialLesson() {
 
 // Interactive first-run calibration: draw a line, a circle, and a V. The result
 // tunes guide sizing + comfort only (recognition thresholds are unchanged).
-function runCalibration() {
+function runCalibration(returnTo = 'tutorial') {
+  calibrationReturn = returnTo;
+  if (calibrator) calibrator.destroy();
+  const fromSettings = returnTo === 'settings';
+  $('#calib-title').textContent = fromSettings ? 'Redo baseline calibration' : 'Quick calibration';
+  $('#calib-note').textContent = fromSettings
+    ? 'Draw the baseline shapes again to update guide sizing and comfortable pace. Recognition accuracy and thresholds are unchanged.'
+    : 'One-time comfort setup. Draw each shape naturally at a comfortable size — this only tunes guide sizing and your comfortable pace. It never changes how glyphs are recognized.';
+  $('#calib-skip').textContent = fromSettings ? 'Cancel' : 'Skip & use defaults';
   showPanel('panel-calibrate');
   showOverlay(true);
   const canvas = $('#calib-canvas');
@@ -639,19 +669,41 @@ function runCalibration() {
 
 function finishCalibration(result) {
   const hand = settings.lefthand ? 'left' : 'right';
-  if (tutorial) tutorial.calibrate({ ...result, hand });
+  const calibration = { ...result, hand };
+  if (calibrationReturn === 'tutorial' && tutorial) tutorial.calibrate(calibration);
+  else {
+    const profile = soloProfile();
+    setCalibration(profile, calibration);
+    saveProfile(profile, localStorage);
+  }
   applyCalibration(result);
+  if (calibrator) calibrator.destroy();
   calibrator = null;
-  armTutorialLesson();
+  if (calibrationReturn === 'tutorial') armTutorialLesson();
+  else {
+    openSettings();
+    toast('Baseline calibration updated.');
+  }
 }
 
 function skipCalibration() {
+  if (calibrationReturn === 'settings') {
+    if (calibrator) calibrator.destroy();
+    calibrator = null;
+    openSettings();
+    return;
+  }
   const hand = settings.lefthand ? 'left' : 'right';
   const cal = tutorial ? (tutorial.profile.calibration || {}) : {};
   if (tutorial) tutorial.calibrate({ guideScale: cal.guideScale, comfortableDurationMs: cal.comfortableDurationMs, hand, done: true });
   applyCalibration(cal);
+  if (calibrator) calibrator.destroy();
   calibrator = null;
   armTutorialLesson();
+}
+
+function startSettingsCalibration() {
+  runCalibration('settings');
 }
 
 function applyCalibration(cal) {
@@ -1123,6 +1175,7 @@ function wireOnlineCallbacks(o) {
 }
 
 async function startOnlineAction(kind, code) {
+  abandonPausedGameForNewMode();
   const nm = $('#online-name').value.trim();
   if (nm) setDisplayName(nm);
   rebuildForLoadout(); // refresh full-roster recognition + selected guide shortcuts
@@ -1183,9 +1236,18 @@ function onOnlineMatchStart() {
   arena.reset();
   showOverlay(false);
   $('#hud').classList.remove('hidden');
-  $('#spellbar').classList.add('hidden');  // online: draw to cast
+  activeGuideLoadout = playerLoadout;
+  if (!activeGuideLoadout.some((spell) => spell.id === selectedGuideId)) selectedGuideId = null;
+  renderEquippedGuideBar();
+  $('#spellbar').classList.remove('hidden');
   $('#devcast').classList.add('hidden');
-  gesture.setGuide(null);
+  if (selectedGuideId) selectEquippedGuide(selectedGuideId);
+  else {
+    gesture.setGuide(null);
+    const canvas = $('#draw-canvas');
+    if (canvas) { delete canvas.dataset.guideSpell; canvas.dataset.guideStage = 'none'; }
+    setDrawHint('draw spell — select a guide below for the dotted shape');
+  }
   setNetStatus('connected');
   toast('Duel found! Draw glyphs to cast.');
 }
@@ -1284,6 +1346,9 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-copy') copyRoomCode();
     else if (a === 'loadout') openLoadoutBuilder();
     else if (a === 'settings') openSettings();
+    else if (a === 'resume-game') resumeActiveGame();
+    else if (a === 'recalibrate') startSettingsCalibration();
+    else if (a === 'install-app') installWebApp();
     else if (a === 'server-save') saveServerUrl();
     else if (a === 'server-reset') resetServerUrl();
     else if (a === 'privacy') openPrivacy();
@@ -1331,7 +1396,49 @@ function resolveContinueLesson() {
   return firstAvailableLessonId(p) || p.currentLessonId;
 }
 
-$('#btn-menu').addEventListener('click', () => { running = false; if (mode === 'online' && online) online.setActive(false); if (mode === 'tutorial' && tutorial) tutorial.pause(); showPanel('panel-main'); showOverlay(true); });
+function pauseToGameMenu() {
+  gameMenuPaused = !!mode && (!!match || !!tutorial || mode === 'online');
+  running = false;
+  if (mode === 'online' && online) online.setActive(false);
+  if (mode === 'tutorial' && tutorial) tutorial.pause();
+  updateResumeGameButton();
+  showPanel('panel-main');
+  showOverlay(true);
+}
+
+$('#btn-menu').addEventListener('click', () => pauseToGameMenu());
+
+function updateResumeGameButton() {
+  const button = $('#btn-resume-game');
+  if (button) button.classList.toggle('hidden', !gameMenuPaused);
+}
+
+function resumeActiveGame() {
+  if (!gameMenuPaused) return;
+  showOverlay(false);
+  $('#hud').classList.remove('hidden');
+  running = true;
+  if (mode === 'online' && online) online.setActive(true);
+  if (mode === 'tutorial' && tutorial) tutorial.resume();
+  gameMenuPaused = false;
+  updateResumeGameButton();
+}
+
+function abandonPausedGameForNewMode() {
+  if (!gameMenuPaused) return;
+  if (mode === 'online' && online) {
+    try { online.leave(); } catch { /* connection cleanup continues below */ }
+    disposeOnline();
+  }
+  running = false;
+  match = null;
+  series = null;
+  tutorial = null;
+  tutorialLesson = null;
+  mode = null;
+  gameMenuPaused = false;
+  updateResumeGameButton();
+}
 
 // ------------------------------------------------------------------ settings
 function applySettings() {
@@ -1348,13 +1455,113 @@ $('#set-reduced').addEventListener('change', (e) => { settings.reduced = e.targe
 $('#set-audio').addEventListener('change', (e) => { settings.audio = e.target.checked; applySettings(); });
 $('#set-haptics').addEventListener('change', (e) => { settings.haptics = e.target.checked; });
 $('#set-devcast').addEventListener('change', (e) => { settings.devcast = e.target.checked; applySettings(); });
+$('#set-orientation').addEventListener('change', (e) => {
+  const value = ORIENTATIONS.has(e.target.value) ? e.target.value : 'auto';
+  settings.orientation = value;
+  try { localStorage.setItem(ORIENTATION_KEY, value); } catch { /* status below still reports the active choice */ }
+  applyOrientationPreference(true);
+});
 
 // ----------------------------------------------------- server URL + local data
 function openSettings() {
   const input = $('#set-server-url');
   if (input) input.value = getStoredServerUrl();
+  const orientation = $('#set-orientation');
+  if (orientation) orientation.value = settings.orientation;
+  updateOrientationStatus();
   setServerStatus(describeServerTarget(), '');
+  const cal = soloProfile().calibration || {};
+  const status = $('#set-calibration-status');
+  if (status) {
+    status.textContent = cal.done
+      ? `Baseline: guide size ${Math.round((cal.guideScale || 1) * 100)}% · comfortable pace ${Math.round(cal.comfortableDurationMs || 720)} ms.`
+      : 'Baseline calibration has not been completed yet.';
+  }
+  updateInstallAppUi();
   showPanel('panel-settings');
+}
+
+function updateOrientationStatus(message = '') {
+  const status = $('#set-orientation-status');
+  if (!status) return;
+  if (message) { status.textContent = message; return; }
+  status.textContent = settings.orientation === 'auto'
+    ? 'Auto rotate follows the device.'
+    : `${settings.orientation[0].toUpperCase()}${settings.orientation.slice(1)} is selected.`;
+}
+
+async function applyOrientationPreference(notify = false) {
+  let applied = false;
+  if (isNativeApp) {
+    applied = await setNativeOrientation(settings.orientation);
+  } else {
+    const orientation = window.screen?.orientation;
+    try {
+      if (settings.orientation === 'auto' && typeof orientation?.unlock === 'function') {
+        orientation.unlock();
+        applied = true;
+      } else if (settings.orientation !== 'auto' && typeof orientation?.lock === 'function') {
+        await orientation.lock(settings.orientation);
+        applied = true;
+      }
+    } catch {
+      applied = false;
+    }
+  }
+
+  if (applied) {
+    updateOrientationStatus(settings.orientation === 'auto'
+      ? 'Auto rotate is active.'
+      : `${settings.orientation[0].toUpperCase()}${settings.orientation.slice(1)} lock is active.`);
+    if (notify) toast('Orientation updated.');
+  } else {
+    updateOrientationStatus('Preference saved. Browser orientation locking may require the installed fullscreen web app.');
+    if (notify) toast('Orientation preference saved.');
+  }
+}
+
+function isAndroidRenderInstallContext() {
+  if (isNativeApp || typeof navigator === 'undefined') return false;
+  const android = /Android/i.test(navigator.userAgent || '');
+  const renderHost = window.location.hostname.endsWith('.onrender.com');
+  const installed = window.matchMedia?.('(display-mode: standalone)').matches === true
+    || window.matchMedia?.('(display-mode: fullscreen)').matches === true;
+  return android && renderHost && !installed && !webAppInstalled;
+}
+
+function updateInstallAppUi() {
+  const section = $('#install-app-section');
+  const button = $('#btn-install-app');
+  const status = $('#install-app-status');
+  if (!section || !button || !status) return;
+  const eligible = isAndroidRenderInstallContext();
+  section.classList.toggle('hidden', !eligible);
+  if (!eligible) return;
+  button.disabled = !deferredInstallPrompt;
+  status.textContent = deferredInstallPrompt
+    ? 'Install Aetherglyph for fullscreen play and offline loading.'
+    : 'Android is preparing the install option. If unavailable, use Chrome menu → Install app.';
+}
+
+async function installWebApp() {
+  if (!isAndroidRenderInstallContext() || !deferredInstallPrompt) {
+    updateInstallAppUi();
+    toast('Install is not ready yet. Try Chrome menu → Install app.');
+    return;
+  }
+  const prompt = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  try {
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice?.outcome === 'accepted') toast('Installing Aetherglyph…');
+    else toast('Installation cancelled.');
+  } catch (err) {
+    const status = $('#install-app-status');
+    if (status) status.textContent = `Install failed: ${err?.message || String(err)}`;
+    toast('Unable to start installation.');
+  }
+  updateInstallAppUi();
 }
 function setServerStatus(msg, cls) {
   const el = $('#server-url-status');
@@ -1384,8 +1591,11 @@ function deleteMyData() {
   if (!window.confirm('Delete all local data? This erases your device identity, name, settings, and your solo progress — tutorial completion, calibration, medals, secret-clue and secret-spell discoveries, Practice vs AI settings and results, and local coaching statistics. This cannot be undone.')) return;
   if (online) { try { online.leave(); } catch { /* ignore */ } disposeOnline(); }
   try {
-    ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-server-url'].forEach((k) => localStorage.removeItem(k));
+    ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-server-url', ORIENTATION_KEY].forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
+  settings.orientation = 'auto';
+  const orientation = $('#set-orientation'); if (orientation) orientation.value = 'auto';
+  applyOrientationPreference(false);
   try { deleteProfile(localStorage); } catch { /* ignore */ } // solo progress / calibration / medals / clues / secrets / practice settings + results / coaching stats
   tutorial = null; tutorialLesson = null;
   initPractice();
@@ -1398,7 +1608,10 @@ function deleteMyData() {
 // Full teardown back to the main menu (shared by the Back/Menu buttons and the
 // Android hardware back button).
 function returnToMainMenu() {
+  if (calibrator) calibrator.destroy();
   running = false; match = null; series = null; tutorial = null; tutorialLesson = null; calibrator = null;
+  gameMenuPaused = false;
+  updateResumeGameButton();
   if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
   mode = null; setNetStatus(null); hud.setSeries(null);
   gesture.setGuide(null);
@@ -1416,6 +1629,7 @@ function nativeBack() {
     const id = active && active.id;
     if (id === 'panel-online-wait') { cancelOnline(); return; }
     if (!id || id === 'panel-main') {
+      if (gameMenuPaused) { resumeActiveGame(); return; }
       if (mode === 'online' && online && online.inMatch
         && !window.confirm('Leave Aetherglyph? Your online duel will be forfeited.')) return;
       exitApp();
@@ -1424,15 +1638,8 @@ function nativeBack() {
     returnToMainMenu(); // any other subpanel -> back to the main menu
     return;
   }
-  // A live match is on screen (overlay hidden).
-  if (mode === 'online' && online && online.inMatch) {
-    running = false; online.setActive(false);
-    if (window.confirm('Abandon this online duel? You will forfeit the match.')) returnToMainMenu();
-    else if (!document.hidden) { online.setActive(true); running = true; }
-    return;
-  }
-  // Offline match -> open the pause menu (mirrors the corner menu button).
-  running = false; showPanel('panel-main'); showOverlay(true);
+  // A live mode is on screen: open the same resumable menu as the corner button.
+  pauseToGameMenu();
 }
 
 // ------------------------------------------------------------------ misc
@@ -1457,6 +1664,11 @@ function onBackgroundChange(hidden) {
     if (mode === 'online' && online) online.setActive(false); // stop issuing inputs while backgrounded
     if (mode === 'tutorial' && tutorial) tutorial.pause();
   } else {
+    if (gameMenuPaused) {
+      if (mode === 'online' && online) online.setActive(false);
+      pausedForVisibility = false;
+      return;
+    }
     if (mode === 'online' && online) {
       online.setActive(true);
       if (online.inMatch) { running = true; setNetStatus(online.connected ? 'connected' : 'reconnecting'); }
@@ -1495,6 +1707,8 @@ if (typeof window !== 'undefined') {
   window.__aegTest = {
     info: () => ({
       mode,
+      running,
+      gameMenuPaused,
       difficulty: match && match.difficulty,
       botActive: !!(match && match.botActive),
       hasBot: !!(match && match.bot),
@@ -1509,6 +1723,10 @@ if (typeof window !== 'undefined') {
       try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }
       catch (e) { return { accepted: false, error: String(e && e.message || e) }; }
     },
+    simulateOnlineStart: () => { try { onOnlineMatchStart(); return true; } catch { return false; } },
+    returnMenu: () => { try { returnToMainMenu(); return true; } catch { return false; } },
+    nativeBack: () => { try { nativeBack(); return true; } catch { return false; } },
+    backgroundChange: (hidden) => { try { onBackgroundChange(!!hidden); return true; } catch { return false; } },
     forceEnd: (winner = 0) => {
       try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }
     },
@@ -1555,15 +1773,28 @@ if (storedResume && storedResume.token) {
 }
 
 // ------------------------------------------------------- native shell + PWA
-// All no-ops in a plain browser; only active in the Capacitor Android app.
 if (isNativeApp) {
   onBackButton(() => nativeBack());
   onAppStateChange((isActive) => onBackgroundChange(!isActive));
 }
+applyOrientationPreference(false);
 
 // Optional production offline fallback for the SAME-ORIGIN web build only. Never
 // in the native shell (assets ship natively) and never on localhost/LAN dev, so
 // dev cache iteration is unaffected. Registered from /client/ => scope /client/.
+window.addEventListener('beforeinstallprompt', (event) => {
+  if (!isAndroidRenderInstallContext()) return;
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  updateInstallAppUi();
+});
+window.addEventListener('appinstalled', () => {
+  webAppInstalled = true;
+  deferredInstallPrompt = null;
+  updateInstallAppUi();
+  toast('Aetherglyph installed.');
+});
+
 function registerServiceWorker() {
   if (isNativeApp || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   const loc = window.location;

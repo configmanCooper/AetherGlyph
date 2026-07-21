@@ -5,8 +5,8 @@
 // (window.Capacitor.Plugins.*). Every function here is a safe no-op in a plain
 // browser (window.Capacitor is undefined), so nothing changes for the web build.
 //
-// Plugins used (declared in package.json / synced into android/): @capacitor/app
-// (backButton, appStateChange, exitApp) and @capacitor/haptics (impact).
+// Plugins used (declared in package.json / synced into android/): @capacitor/app,
+// @capacitor/haptics, and @capacitor/screen-orientation.
 
 function bridge() {
   return (typeof window !== 'undefined' && window.Capacitor) || null;
@@ -85,4 +85,21 @@ export function nativeImpact(style = 'LIGHT') {
     try { Haptics.impact({ style }); return true; } catch { /* fall through */ }
   }
   return false;
+}
+
+export async function setNativeOrientation(mode = 'auto') {
+  const ScreenOrientation = plugin('ScreenOrientation');
+  if (!ScreenOrientation) return false;
+  try {
+    if (mode === 'auto') {
+      if (typeof ScreenOrientation.unlock !== 'function') return false;
+      await ScreenOrientation.unlock();
+    } else {
+      if (typeof ScreenOrientation.lock !== 'function') return false;
+      await ScreenOrientation.lock({ orientation: mode });
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }

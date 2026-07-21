@@ -52,7 +52,7 @@ and the Render origin, so no server change is needed for the app to connect.
 
 ## Manifest + service worker
 
-- `client/manifest.webmanifest` — landscape, fullscreen, `#0a0713` theme, 192/512
+- `client/manifest.webmanifest` — portrait/landscape capable, fullscreen, `#0a0713` theme, 192/512
   + maskable icons.
 - `client/sw.js` — an **optional production offline fallback** for the same-origin
   **web** build only. `main.js` registers it **only** on a production HTTPS web
@@ -73,13 +73,16 @@ imports, so every call is a safe no-op in a plain browser:
   when backgrounded and resumes on foreground (shared with the Page Visibility
   handler; captured once so duplicate events don’t break resume).
 - **Haptics** (`@capacitor/haptics`): native impact with a Web Vibration fallback.
+- **Orientation** (`@capacitor/screen-orientation`): Settings can unlock rotation
+  or lock the native activity to portrait or landscape.
 
 ## Android project (`android/`, checked in)
 
 - `variables.gradle`: `minSdk 24`, `compileSdk 36`, `targetSdk 36`.
-- `app/build.gradle`: `versionCode 10301`, `versionName "1.3.1"`; release signing
+- `app/build.gradle`: `versionCode 10400`, `versionName "1.4.0"`; release signing
   read from an ignored `keystore.properties` (unsigned when absent).
-- `AndroidManifest.xml`: `singleTask`, `screenOrientation="landscape"`,
+- `AndroidManifest.xml`: `singleTask`, orientation unlocked for the in-app
+  Auto/Portrait/Landscape selector,
   `usesCleartextTraffic="false"` + `@xml/network_security_config`, `INTERNET` +
   `ACCESS_NETWORK_STATE`.
 - `res/xml/network_security_config.xml`: HTTPS-only, with loopback entries kept

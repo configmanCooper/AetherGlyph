@@ -107,6 +107,7 @@ body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right));
   background: var(--panel); color: var(--ink); border: 1px solid rgba(255,255,255,0.18);
   border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600; min-width: 78px;
 }
+.touch-label { display: none; }
 .act-btn:active, .act-btn.active { background: var(--accent); border-color: var(--accent); }
 
 .corner-btn {
@@ -156,10 +157,47 @@ body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right));
 
 body.reduced * { animation: none !important; transition: none !important; }
 
-/* portrait nudge */
+/* Mobile controls stay grouped around the touch joystick. */
 #rotate-note { display: none; }
-@media (orientation: portrait) {
+@media (hover: none) and (pointer: coarse) {
+  .desktop-label { display: none; }
+  .touch-label { display: inline; }
+  .act-btn {
+    min-width: 0; padding: 7px 6px; border-radius: 10px;
+    font-size: 11px; line-height: 1; flex: 1 1 0;
+  }
+}
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
   .hud .control-zone { bottom: calc(10px + var(--safe-bottom)); }
+  .move-pad { width: 34vw; height: 34vw; max-width: 210px; max-height: 210px; }
+  .action-buttons {
+    left: calc(14px + var(--safe-left)); transform: none;
+    width: min(34vw, 210px); gap: 4px;
+    bottom: calc(18px + var(--safe-bottom) + min(34vw, 210px));
+  }
+  body.lefthand .action-buttons {
+    left: auto; right: calc(14px + var(--safe-right));
+  }
+}
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  .move-pad {
+    width: min(17vw, 120px); height: min(17vw, 120px);
+    max-width: 120px; max-height: 120px;
+  }
+  .move-pad .stick { width: 42%; height: 42%; }
+  .action-buttons {
+    left: calc(14px + var(--safe-left)); transform: none;
+    width: min(17vw, 120px); gap: 3px;
+    bottom: calc(22px + var(--safe-bottom) + min(17vw, 120px));
+  }
+  body.lefthand .action-buttons {
+    left: auto; right: calc(14px + var(--safe-right));
+  }
+  .act-btn { padding: 6px 2px; font-size: 10px; }
+  .diag {
+    left: auto; right: calc(12px + var(--safe-right));
+    text-align: right;
+  }
 }
 
 /* ===================== Phase 2 additions ===================== */
@@ -419,3 +457,38 @@ body.mode-tutorial #round-timer { display: none; }
 .calib-pad { position: relative; width: 100%; max-width: 420px; margin: 8px auto; aspect-ratio: 3 / 2; background: rgba(10,7,19,0.6); border: 1px dashed rgba(139,107,255,0.5); border-radius: 12px; overflow: hidden; }
 #calib-canvas { width: 100%; height: 100%; touch-action: none; display: block; }
 .calib-progress { position: absolute; top: 6px; right: 10px; font-size: 12px; color: var(--muted); }
+
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  .hud .spellbar {
+    top: calc(142px + var(--safe-top)); bottom: auto;
+    left: calc(8px + var(--safe-left)); right: calc(8px + var(--safe-right));
+    width: auto; max-width: none; transform: none;
+    flex-wrap: nowrap; justify-content: flex-start;
+    overflow-x: auto; overflow-y: hidden; padding: 2px 3px 5px;
+  }
+  .hud .spell-btn { flex: 0 0 auto; min-width: 54px; padding: 4px 5px; }
+  body.mode-lab .action-buttons {
+    bottom: calc(84px + var(--safe-bottom) + min(34vw, 210px));
+  }
+}
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  .hud .spellbar {
+    top: auto; bottom: calc(8px + var(--safe-bottom));
+    left: calc(24px + var(--safe-left) + min(17vw, 120px));
+    right: calc(24px + var(--safe-right) + min(46vw, 420px));
+    width: auto; max-width: none; transform: none;
+    flex-wrap: nowrap; justify-content: flex-start;
+    overflow-x: auto; overflow-y: hidden; padding: 2px 3px 4px;
+  }
+  body.lefthand .hud .spellbar {
+    left: calc(24px + var(--safe-left) + min(46vw, 420px));
+    right: calc(24px + var(--safe-right) + min(17vw, 120px));
+  }
+  .hud .spell-btn { flex: 0 0 auto; min-width: 54px; padding: 4px 5px; }
+  body.mode-lab .hud .spellbar {
+    left: calc(8px + var(--safe-left)); right: calc(8px + var(--safe-right));
+  }
+  body.mode-lab .action-buttons {
+    bottom: calc(88px + var(--safe-bottom) + min(17vw, 120px));
+  }
+}

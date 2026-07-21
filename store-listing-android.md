@@ -26,6 +26,9 @@ raise stone cover, and chain elemental reactions your rival can exploit too.
   your foe, and each of the 40 spells has its own silhouette and motion — all
   drawn in real time with no downloaded art. A reduced-motion setting keeps every
   spell readable without flashes or shake.
+- **Built for either orientation.** Choose Auto rotate, Portrait, or Landscape in
+  Settings. Android visitors to the Render web version can install Aetherglyph as
+  a fullscreen web app directly from Settings when Chrome offers installation.
 - **Duel in a grand arcane academy.** An original, moonlit hall of arched stone
   arcades, tall windows lit with abstract sigils, hanging banners, floating
   lanterns, animated braziers, and distant towers frames every match — with your
@@ -46,8 +49,9 @@ raise stone cover, and chain elemental reactions your rival can exploit too.
 - **Authoritative online duels.** Best-of-three matches against another device —
   Quick Match (ranked), Create Private Duel, or Join Code. The server owns every
   simulation and validates every drawn cast, so results are fair.
-- **Phone-first, landscape.** Two-thumb controls, readable status icons (shape +
-  motion + text, never color alone), and reconnect after a brief disconnect.
+- **Phone-first controls.** Portrait and landscape layouts keep Focus, Brace, and
+  Dodge immediately above the joystick, with readable status indicators and
+  reconnect after a brief disconnect.
 
 One-time purchase. **No ads. No in-app purchases. No pay-to-win.** No accounts and
 no free-text chat — your identity is a random, device-local id.

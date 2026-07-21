@@ -49,6 +49,20 @@ async function drawEmberFlick(page) {
   return box;
 }
 
+async function drawCalibrationBaseline(page, span = 0.6) {
+  const pad = await page.$('#calib-canvas');
+  const box = await pad.boundingBox();
+  for (let stroke = 0; stroke < 3; stroke++) {
+    const cy = box.y + box.height / 2;
+    const start = box.x + box.width * ((1 - span) / 2);
+    await page.mouse.move(start, cy);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(start + box.width * span * (i / 8), cy);
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 180));
+  }
+}
+
 const browser = await puppeteer.launch({
   executablePath: edge,
   headless: 'new',
@@ -90,7 +104,39 @@ try {
   if (!/^[A-Z0-9]{5}$/.test(roomCode || '')) fail('online create did not yield a room code: ' + roomCode);
   await activate(page, '[data-action="online-cancel"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
-  await activate(page, '#panel-online [data-action="back"]');
+  const simulatedOnline = await page.evaluate(() => window.__aegTest?.simulateOnlineStart());
+  if (!simulatedOnline) fail('could not exercise online match-start UI');
+  await page.waitForSelector('#hud:not(.hidden) #spellbar .spell-btn[data-spell]', { timeout: 5000 });
+  const onlineGuideCount = await page.evaluate(() => document.querySelectorAll('#spellbar .spell-btn[data-spell]').length);
+  if (onlineGuideCount !== 8) fail('online duel did not show all eight guide shortcuts: ' + onlineGuideCount);
+  await page.click('#spellbar .spell-btn[data-spell]');
+  const onlineGuide = await page.evaluate(() => ({
+    selected: document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell,
+    canvasGuide: document.querySelector('#draw-canvas')?.dataset.guideSpell,
+  }));
+  if (!onlineGuide.selected || onlineGuide.canvasGuide !== onlineGuide.selected) {
+    fail('online guide button did not show its dotted template: ' + JSON.stringify(onlineGuide));
+  }
+  await page.click('#btn-menu');
+  await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
+  const pausedForeground = await page.evaluate(() => {
+    window.__aegTest.backgroundChange(true);
+    window.__aegTest.backgroundChange(false);
+    return window.__aegTest.info();
+  });
+  if (!pausedForeground.gameMenuPaused || pausedForeground.running) {
+    fail('foregrounding resumed the online game behind its pause menu: ' + JSON.stringify(pausedForeground));
+  }
+  await page.click('#btn-resume-game');
+  await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+  const resumedOnlineGuide = await page.evaluate(() => ({
+    selected: document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell,
+    canvasGuide: document.querySelector('#draw-canvas')?.dataset.guideSpell,
+  }));
+  if (resumedOnlineGuide.selected !== onlineGuide.selected || resumedOnlineGuide.canvasGuide !== onlineGuide.canvasGuide) {
+    fail('Go back to current game did not preserve online guide state: ' + JSON.stringify(resumedOnlineGuide));
+  }
+  await page.evaluate(() => window.__aegTest.returnMenu());
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
   // Tutorial smoke: open the hub, begin the Prologue, complete the first-run
@@ -105,17 +151,7 @@ try {
 
   // First-run calibration: draw the three requested shapes on the calib pad.
   await page.waitForSelector('#panel-calibrate:not(.hidden)', { timeout: 5000 });
-  const cpad = await page.$('#calib-canvas');
-  const cbox = await cpad.boundingBox();
-  async function calibStroke() {
-    const cy = cbox.y + cbox.height / 2;
-    await page.mouse.move(cbox.x + cbox.width * 0.2, cy);
-    await page.mouse.down();
-    for (let i = 1; i <= 8; i++) await page.mouse.move(cbox.x + cbox.width * 0.2 + (cbox.width * 0.6) * (i / 8), cy);
-    await page.mouse.up();
-    await new Promise((r) => setTimeout(r, 180));
-  }
-  await calibStroke(); await calibStroke(); await calibStroke();
+  await drawCalibrationBaseline(page);
 
   await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
   const calibDone = await page.evaluate(() => {
@@ -454,10 +490,14 @@ try {
   await page.keyboard.up('b');
   if (labBraceInfo.playerBraceTicks <= 0) fail('Brace (B) keyboard binding did not activate in Glyph Laboratory');
   await page.click('#btn-menu');
-  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
+  await page.click('#btn-resume-game');
+  await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+  await page.evaluate(() => window.__aegTest.nativeBack());
+  await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
 
   // Non-starter loadout path: open the builder, apply an archetype preset, save.
-  await page.click('[data-action="loadout"]');
+  await activate(page, '#panel-main [data-action="loadout"]');
   await page.waitForSelector('#panel-loadout:not(.hidden)', { timeout: 5000 });
   await page.waitForSelector('.preset-btn', { timeout: 5000 });
   await page.click('.preset-btn'); // apply the first curated preset (Ember Rush)
@@ -480,6 +520,38 @@ try {
       fail(`Practice AI not active for ${diff}: ` + JSON.stringify(info));
     }
     if (diff === 'easy') {
+      const replacementLifecycle = await page.evaluate(() => {
+        window.__aegTest.backgroundChange(true);
+        window.__aegTest.backgroundChange(false);
+        return window.__aegTest.info();
+      });
+      if (replacementLifecycle.gameMenuPaused || !replacementLifecycle.running) {
+        fail('new Practice game inherited stale paused state: ' + JSON.stringify(replacementLifecycle));
+      }
+      const landscapeControls = await page.evaluate(() => {
+        const rect = (sel) => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return r ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } : null;
+        };
+        const touch = document.querySelector('#btn-focus .touch-label');
+        const desktop = document.querySelector('#btn-focus .desktop-label');
+        return {
+          move: rect('#move-pad'), actions: rect('.action-buttons'),
+          draw: rect('#draw-pad'), spellbar: rect('#spellbar'),
+          touchVisible: getComputedStyle(touch).display !== 'none',
+          desktopHidden: getComputedStyle(desktop).display === 'none',
+        };
+      });
+      const landscapeOverlap = (a, b) => a && b
+        && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      if (!(landscapeControls.move?.width <= 125)
+          || !(landscapeControls.actions?.bottom < landscapeControls.move?.top)
+          || landscapeOverlap(landscapeControls.spellbar, landscapeControls.move)
+          || landscapeOverlap(landscapeControls.spellbar, landscapeControls.actions)
+          || landscapeOverlap(landscapeControls.spellbar, landscapeControls.draw)
+          || !landscapeControls.touchVisible || !landscapeControls.desktopHidden) {
+        fail('landscape mobile controls are not compact/above joystick: ' + JSON.stringify(landscapeControls));
+      }
       const visibleGuideIds = await page.evaluate(() =>
         Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)));
       const outsideId = Number(Object.keys(GESTURE_KEYS).find((id) => !visibleGuideIds.includes(Number(id))));
@@ -503,6 +575,14 @@ try {
     await drawEmberFlick(page);
     await new Promise((r) => setTimeout(r, 300));
     if (diff === 'easy') {
+      const diagPosition = await page.evaluate(() => {
+        const el = document.querySelector('#diag');
+        const r = el?.getBoundingClientRect();
+        return r ? { left: r.left, right: r.right, width: innerWidth, hidden: el.classList.contains('hidden') } : null;
+      });
+      if (!diagPosition || diagPosition.hidden || diagPosition.left < diagPosition.width / 2) {
+        fail('landscape draw diagnostics are not in the upper-right: ' + JSON.stringify(diagPosition));
+      }
       await page.waitForFunction(() => window.__aegTest.info().playerCastsResolved > 0, { timeout: 5000 });
       const guideCooldown = await page.evaluate((id) => {
         const b = document.querySelector(`#spellbar .spell-btn[data-spell="${id}"]`);
@@ -522,6 +602,28 @@ try {
       if (!/Ember Bolt is on cooldown/i.test(cooldownToast) || !/seconds remaining/i.test(cooldownToast)) {
         fail('cooldown attempt did not explain the remaining time: ' + cooldownToast);
       }
+      await page.setViewport({ width: 520, height: 900, isMobile: true, hasTouch: true });
+      await new Promise((r) => setTimeout(r, 180));
+      const portraitControls = await page.evaluate(() => {
+        const rect = (sel) => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return r ? { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } : null;
+        };
+        return {
+          move: rect('#move-pad'), actions: rect('.action-buttons'),
+          draw: rect('#draw-pad'), spellbar: rect('#spellbar'),
+        };
+      });
+      const overlaps = (a, b) => a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      if (!(portraitControls.move?.width <= 215)
+          || !(portraitControls.actions?.bottom < portraitControls.move?.top)
+          || overlaps(portraitControls.spellbar, portraitControls.move)
+          || overlaps(portraitControls.spellbar, portraitControls.actions)
+          || overlaps(portraitControls.spellbar, portraitControls.draw)) {
+        fail('portrait controls/spellbar overlap or are misplaced: ' + JSON.stringify(portraitControls));
+      }
+      await page.setViewport({ width: 900, height: 520, isMobile: true, hasTouch: true });
+      await new Promise((r) => setTimeout(r, 180));
     }
     await page.evaluate(() => window.__aegTest.forceEnd(0));
     await page.waitForSelector('#panel-result:not(.hidden)', { timeout: 5000 });
@@ -535,6 +637,38 @@ try {
       await page.waitForSelector('#panel-practice:not(.hidden)', { timeout: 5000 });
     }
   }
+
+  // Settings can rerun the same baseline and persist replacement comfort values.
+  await page.click('[data-action="settings"]');
+  await page.waitForSelector('#panel-settings:not(.hidden)', { timeout: 5000 });
+  const localInstallHidden = await page.evaluate(() => document.querySelector('#install-app-section')?.classList.contains('hidden'));
+  if (!localInstallHidden) fail('Android Render install action should stay hidden on localhost');
+  await page.select('#set-orientation', 'portrait');
+  await new Promise((r) => setTimeout(r, 100));
+  const orientationSaved = await page.evaluate(() => ({
+    value: localStorage.getItem('aeth-orientation'),
+    status: document.querySelector('#set-orientation-status')?.textContent || '',
+  }));
+  if (orientationSaved.value !== 'portrait' || !orientationSaved.status) {
+    fail('orientation preference was not saved from Settings: ' + JSON.stringify(orientationSaved));
+  }
+  await page.select('#set-orientation', 'auto');
+  const baselineStatus = await page.evaluate(() => document.querySelector('#set-calibration-status')?.textContent || '');
+  if (!/Baseline: guide size/i.test(baselineStatus)) fail('settings does not report saved calibration: ' + baselineStatus);
+  await page.click('[data-action="recalibrate"]');
+  await page.waitForSelector('#panel-calibrate:not(.hidden)', { timeout: 5000 });
+  const recalTitle = await page.evaluate(() => document.querySelector('#calib-title')?.textContent || '');
+  if (!/Redo baseline/i.test(recalTitle)) fail('settings calibration did not reuse the baseline flow: ' + recalTitle);
+  await drawCalibrationBaseline(page, 0.3);
+  await page.waitForSelector('#panel-settings:not(.hidden)', { timeout: 5000 });
+  const recalibrated = await page.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}').calibration; } catch { return null; }
+  });
+  if (!recalibrated?.done || !(recalibrated.guideScale < calibDone.guideScale - 0.1)) {
+    fail('settings calibration did not replace persisted baseline values: ' + JSON.stringify(recalibrated));
+  }
+  await page.click('#panel-settings [data-action="back"]');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
   const state = await page.evaluate(() => ({
     hudHidden: document.querySelector('#hud')?.classList.contains('hidden'),
@@ -780,5 +914,5 @@ try {
   cleanup(0);
 } catch (err) {
   try { await browser.close(); } catch {}
-  fail(err.message || String(err));
+  fail(err.stack || err.message || String(err));
 }
