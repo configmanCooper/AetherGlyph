@@ -21,6 +21,40 @@ function arc(cx, cy, r, startDeg, endDeg, steps = 16) {
   return pts;
 }
 
+function ellipse(cx, cy, rx, ry, startDeg, endDeg, steps = 20) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = (startDeg + (endDeg - startDeg) * (i / steps)) * Math.PI / 180;
+    pts.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+  }
+  return pts;
+}
+
+function densifyPolyline(points, samplesPerEdge = 5) {
+  const out = [];
+  for (let edge = 0; edge < points.length - 1; edge++) {
+    for (let i = 0; i < samplesPerEdge; i++) {
+      const t = i / samplesPerEdge;
+      out.push({
+        x: points[edge].x + (points[edge + 1].x - points[edge].x) * t,
+        y: points[edge].y + (points[edge + 1].y - points[edge].y) * t,
+      });
+    }
+  }
+  out.push({ ...points[points.length - 1] });
+  return out;
+}
+
+const DIAMOND_PRIMARY = [
+  { x: 50, y: 10 }, { x: 86, y: 50 }, { x: 50, y: 90 }, { x: 14, y: 50 }, { x: 50, y: 10 },
+];
+const DIAMOND_WIDE = [
+  { x: 48, y: 8 }, { x: 90, y: 48 }, { x: 52, y: 92 }, { x: 12, y: 52 }, { x: 48, y: 8 },
+];
+const DIAMOND_NARROW = [
+  { x: 52, y: 14 }, { x: 84, y: 50 }, { x: 48, y: 88 }, { x: 18, y: 48 }, { x: 52, y: 14 },
+];
+
 // A planar spiral: radius sweeps r0 -> r1 while the angle sweeps startDeg by
 // sweepDeg (positive = clockwise in y-down space).
 function spiral(cx, cy, r0, r1, startDeg, sweepDeg, steps = 26) {
@@ -77,6 +111,10 @@ export const GESTURE_TEMPLATES = {
   circle: [ // 11 Barrier Dome — clockwise circle (start top)
     arc(50, 50, 40, -90, 270, 24),
     arc(50, 50, 36, -90, 268, 20),
+    ellipse(50, 50, 40, 35, -90, 270, 22),
+    ellipse(50, 50, 35, 41, -90, 270, 22),
+    arc(50, 50, 40, -90, 270, 6),
+    ellipse(50, 50, 38, 34, -90, 270, 6),
   ],
   checkmark: [ // 12 Reflect — check mark
     [{ x: 8, y: 52 }, { x: 30, y: 78 }, { x: 45, y: 95 }, { x: 95, y: 12 }],
@@ -103,6 +141,8 @@ export const GESTURE_TEMPLATES = {
   // === Defensive (remaining) ==============================================
   circleCCW: [ // 13 Dispel — counterclockwise circle (start top, go left)
     arc(50, 50, 40, -90, -450, 24),
+    ellipse(50, 50, 39, 35, -90, -450, 22),
+    arc(50, 50, 40, -90, -450, 6),
   ],
   doubleStroke: [ // 14 Blink — wide Z: right, diagonal down-left, right
     [{ x: 10, y: 20 }, { x: 90, y: 20 }, { x: 10, y: 80 }, { x: 90, y: 80 }],
@@ -128,7 +168,9 @@ export const GESTURE_TEMPLATES = {
      { x: 52, y: 34 }, { x: 58, y: 18 }, { x: 66, y: 42 }, { x: 72, y: 64 }, { x: 50, y: 92 }],
   ],
   diamond: [ // 20 Grounding Mantle — closed diamond (top -> right -> bottom -> left)
-    [{ x: 50, y: 10 }, { x: 86, y: 50 }, { x: 50, y: 90 }, { x: 14, y: 50 }, { x: 50, y: 10 }],
+    densifyPolyline(DIAMOND_PRIMARY),
+    densifyPolyline(DIAMOND_WIDE),
+    densifyPolyline(DIAMOND_NARROW),
   ],
 
   // === Debuffs ============================================================
@@ -214,7 +256,8 @@ export const GESTURE_TEMPLATES = {
 };
 
 // Structural hints for pairs whose overall silhouettes can otherwise converge
-// under rough input. Blink must begin horizontally; Quake must begin vertically.
+// under rough input. Circles stay smooth, diamonds keep concentrated corners,
+// Blink begins horizontally, and Quake begins vertically.
 export const GESTURE_TRAITS = {
   doubleStroke: { startAxis: 'horizontal' },
   quakeSlash: { startAxis: 'vertical' },

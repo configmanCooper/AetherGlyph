@@ -47,6 +47,7 @@ export class HUD {
     };
     this.showDiag = false;
     this.spellButtons = new Map(); // spellId -> button element
+    this.lastTouchPressAt = -Infinity;
   }
 
   _pips(container, charges) {
@@ -91,7 +92,7 @@ export class HUD {
         '<span class="sb-cost">Any spell</span>';
       blank.title = 'Clear the guide and draw any public spell from memory';
       blank.setAttribute('aria-pressed', opts.blankSelected ? 'true' : 'false');
-      blank.addEventListener('click', (e) => { e.preventDefault(); opts.onBlank(); });
+      bindPress(blank, opts.onBlank, this);
       this.el.spellbar.appendChild(blank);
     }
     if (typeof opts.onCooldownToggle === 'function') {
@@ -102,7 +103,7 @@ export class HUD {
         `<span class="sb-cost">${opts.cooldownsEnabled ? 'On' : 'Off'}</span>`;
       cooldown.title = 'Toggle live-game spell cooldowns in Glyph Laboratory';
       cooldown.setAttribute('aria-pressed', opts.cooldownsEnabled ? 'true' : 'false');
-      cooldown.addEventListener('click', (e) => { e.preventDefault(); opts.onCooldownToggle(); });
+      bindPress(cooldown, opts.onCooldownToggle, this);
       this.el.spellbar.appendChild(cooldown);
     }
     loadout.forEach((s, i) => {
@@ -117,7 +118,7 @@ export class HUD {
         btn.classList.add('selected');
         btn.setAttribute('aria-pressed', 'true');
       }
-      btn.addEventListener('click', (e) => { e.preventDefault(); onCast(s.id); });
+      bindPress(btn, () => onCast(s.id), this);
       this.el.spellbar.appendChild(btn);
       this.spellButtons.set(s.id, btn);
     });
@@ -128,8 +129,35 @@ export class HUD {
       next.innerHTML = `<span class="sb-key">→</span><span class="sb-name">Next</span>` +
         `<span class="sb-cost">${opts.pageLabel || ''}</span>`;
       next.title = 'Show more public spells';
-      next.addEventListener('click', (e) => { e.preventDefault(); opts.onNext(); });
+      bindPress(next, opts.onNext, this);
       this.el.spellbar.appendChild(next);
+    }
+
+    function bindPress(button, action, owner) {
+      let touch = null;
+      button.addEventListener('pointerdown', (event) => {
+        if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+        touch = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+      });
+      button.addEventListener('pointermove', (event) => {
+        if (!touch || event.pointerId !== touch.id) return;
+        if (Math.hypot(event.clientX - touch.x, event.clientY - touch.y) > 8) touch.moved = true;
+      });
+      button.addEventListener('pointerup', (event) => {
+        if (!touch || event.pointerId !== touch.id) return;
+        const activate = !touch.moved;
+        touch = null;
+        if (!activate) return;
+        event.preventDefault();
+        owner.lastTouchPressAt = performance.now();
+        action();
+      });
+      button.addEventListener('pointercancel', () => { touch = null; });
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (performance.now() - owner.lastTouchPressAt < 700) return;
+        action();
+      });
     }
   }
 

@@ -1632,7 +1632,15 @@ function returnToMainMenu() {
   running = false; match = null; series = null; tutorial = null; tutorialLesson = null; calibrator = null;
   gameMenuPaused = false;
   updateResumeGameButton();
-  if (online) { if (mode === 'online' || mode === 'online-wait') online.leave(); disposeOnline(); }
+  if (online) {
+    try {
+      if (mode === 'online' || mode === 'online-wait') online.leave();
+    } catch (err) {
+      console.warn('[online] leave during menu cleanup failed:', err);
+    } finally {
+      disposeOnline();
+    }
+  }
   mode = null; setNetStatus(null); hud.setSeries(null);
   gesture.setGuide(null);
   document.body.classList.remove('mode-tutorial', 'mode-lab');
@@ -1738,6 +1746,8 @@ if (typeof window !== 'undefined') {
       playerCasting: match?.sim?.wizards?.[0]?.casting?.spellId ?? null,
       playerCastsResolved: match?.sim?.wizards?.[0]?.castsResolved ?? 0,
       playerBraceTicks: match?.sim?.wizards?.[0]?.braceTicks ?? 0,
+      movementActive: movement.active,
+      moveInput: dummyInput.move,
       labCooldowns,
     }),
     recognize: (points) => {

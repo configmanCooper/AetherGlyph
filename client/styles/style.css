@@ -240,6 +240,7 @@ body.reduced * { animation: none !important; transition: none !important; }
   min-width: 62px; padding: 5px 6px; border-radius: 9px; cursor: pointer;
   background: linear-gradient(180deg, rgba(139,107,255,0.28), rgba(30,22,52,0.9));
   border: 1px solid rgba(139,107,255,0.55); color: var(--ink);
+  touch-action: manipulation;
 }
 .spell-btn .sb-key { font-size: 10px; color: var(--accent2); }
 .spell-btn .sb-name { font-size: 11px; font-weight: 600; line-height: 1.1; text-align: center; }

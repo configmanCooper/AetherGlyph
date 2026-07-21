@@ -100,6 +100,74 @@ function startAxisFit(points, axis) {
   return axis === 'horizontal' ? dx / total : dy / total;
 }
 
+function segmentDistance(point, start, end) {
+  const dx = end.x - start.x, dy = end.y - start.y;
+  const denom = dx * dx + dy * dy;
+  if (denom < 1e-12) return Math.hypot(point.x - start.x, point.y - start.y);
+  const t = Math.max(0, Math.min(1,
+    ((point.x - start.x) * dx + (point.y - start.y) * dy) / denom));
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
+
+function simplifyOpen(points, tolerance) {
+  if (points.length <= 2) return points;
+  let maxDistance = 0, split = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const distance = segmentDistance(points[i], points[0], points[points.length - 1]);
+    if (distance > maxDistance) { maxDistance = distance; split = i; }
+  }
+  if (maxDistance <= tolerance) return [points[0], points[points.length - 1]];
+  return [
+    ...simplifyOpen(points.slice(0, split + 1), tolerance).slice(0, -1),
+    ...simplifyOpen(points.slice(split), tolerance),
+  ];
+}
+
+function simplifyClosed(points, tolerance = 0.08) {
+  if (points.length < 4) return points;
+  const closed = Math.hypot(
+    points[0].x - points[points.length - 1].x,
+    points[0].y - points[points.length - 1].y,
+  ) < 0.08;
+  if (!closed) return simplifyOpen(points, tolerance);
+  let farthest = 1, farthestDistance = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const distance = Math.hypot(points[i].x - points[0].x, points[i].y - points[0].y);
+    if (distance > farthestDistance) { farthestDistance = distance; farthest = i; }
+  }
+  return [
+    ...simplifyOpen(points.slice(0, farthest + 1), tolerance).slice(0, -1),
+    ...simplifyOpen(points.slice(farthest), tolerance),
+  ];
+}
+
+function turnConcentration(points) {
+  const turns = [];
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = Math.atan2(points[i].y - points[i - 1].y, points[i].x - points[i - 1].x);
+    const b = Math.atan2(points[i + 1].y - points[i].y, points[i + 1].x - points[i].x);
+    let turn = Math.abs(b - a);
+    if (turn > Math.PI) turn = Math.PI * 2 - turn;
+    turns.push(turn);
+  }
+  const total = turns.reduce((sum, turn) => sum + turn, 0);
+  return total > 1e-6 ? Math.max(...turns) / total : 0;
+}
+
+function closedShapeClass(points) {
+  if (points.length < 7) return null;
+  const closed = Math.hypot(
+    points[0].x - points[points.length - 1].x,
+    points[0].y - points[points.length - 1].y,
+  ) < 0.08;
+  if (!closed) return null;
+  const simplified = simplifyClosed(points);
+  const concentration = turnConcentration(simplified);
+  if (simplified.length <= 7 && concentration >= 0.27) return 'angular';
+  if (simplified.length >= 7 && concentration <= 0.24) return 'round';
+  return null;
+}
+
 export class Recognizer {
   constructor(templates = [], opts = {}) {
     this.n = opts.n || DEFAULT_N;
@@ -132,11 +200,23 @@ export class Recognizer {
     if (this.templates.length === 0) { diag.reason = 'no-templates'; return diag; }
 
     const q = preprocess(raw, this.n);
-    const scores = this.templates.map((t) => ({
+    const shapePoints = normalize(dedupe(raw));
+    const shapeClass = closedShapeClass(shapePoints);
+    const scores = this.templates.map((t) => {
+      let score = Math.max(0, distanceToScore(meanDistance(q, t.pts))
+        - (1 - startAxisFit(q, t.startAxis)) * 0.22);
+      if (shapeClass === 'round') {
+        if (t.spellId === 11 || t.spellId === 13) score += 0.12;
+        else if (t.spellId === 20) score -= 0.16;
+      } else if (shapeClass === 'angular') {
+        if (t.spellId === 20) score += 0.16;
+        else if (t.spellId === 11 || t.spellId === 13) score -= 0.12;
+      }
+      return {
       spellId: t.spellId, name: t.name, gestureKey: t.gestureKey,
-      score: Math.max(0, distanceToScore(meanDistance(q, t.pts))
-        - (1 - startAxisFit(q, t.startAxis)) * 0.22),
-    })).sort((a, b) => b.score - a.score);
+        score: Math.max(0, Math.min(1, score)),
+      };
+    }).sort((a, b) => b.score - a.score);
 
     diag.scores = scores;
     diag.best = scores[0];
@@ -146,6 +226,11 @@ export class Recognizer {
     diag.second = rival;
     diag.margin = scores[0].score - (rival ? rival.score : 0);
 
+    const closed = Math.hypot(q[0].x - q[q.length - 1].x, q[0].y - q[q.length - 1].y) < 0.12;
+    if (raw.length < 6 && closed && (scores[0].spellId === 11 || scores[0].spellId === 13 || scores[0].spellId === 20)) {
+      diag.reason = 'ambiguous';
+      return diag;
+    }
     if (scores[0].score < this.acceptThreshold) { diag.reason = 'below-threshold'; return diag; }
     if (rival && diag.margin < this.marginThreshold) { diag.reason = 'ambiguous'; return diag; }
 

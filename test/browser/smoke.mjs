@@ -175,7 +175,7 @@ try {
   if (!pausedForeground.gameMenuPaused || pausedForeground.running) {
     fail('foregrounding resumed the online game behind its pause menu: ' + JSON.stringify(pausedForeground));
   }
-  await page.click('#btn-resume-game');
+  await activate(page, '#btn-resume-game');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
   const resumedOnlineGuide = await page.evaluate(() => ({
     selected: document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell,
@@ -488,7 +488,16 @@ try {
   if (cooldownOff.text !== 'Off' || cooldownOff.state !== false) {
     fail('Glyph Laboratory cooldown toggle should default Off: ' + JSON.stringify(cooldownOff));
   }
-  await cooldownToggle.click();
+  await page.evaluate(() => {
+    const original = document.querySelector('#spellbar .spell-cooldown-toggle');
+    original.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 77, pointerType: 'touch',
+    }));
+    original.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true, cancelable: true, pointerId: 77, pointerType: 'touch',
+    }));
+    document.querySelector('#spellbar .spell-cooldown-toggle')?.click();
+  });
   const cooldownOn = await page.evaluate(() => ({
     text: document.querySelector('#spellbar .spell-cooldown-toggle .sb-cost')?.textContent,
     state: window.__aegTest.info().labCooldowns,
@@ -537,9 +546,9 @@ try {
   const labBraceInfo = await page.evaluate(() => window.__aegTest.info());
   await page.keyboard.up('b');
   if (labBraceInfo.playerBraceTicks <= 0) fail('Brace (B) keyboard binding did not activate in Glyph Laboratory');
-  await page.click('#btn-menu');
+  await activate(page, '#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
-  await page.click('#btn-resume-game');
+  await activate(page, '#btn-resume-game');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
   await page.evaluate(() => window.__aegTest.nativeBack());
   await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
@@ -622,6 +631,49 @@ try {
     if (afterGuide.selectedGuideId !== guideSpell || afterGuide.playerCasting !== null
         || afterGuide.playerCastsResolved !== beforeGuide.playerCastsResolved || !afterGuide.assisted) {
       fail(`spellbar button must select a guide without casting (${diff}): ` + JSON.stringify({ beforeGuide, afterGuide, guideSpell }));
+    }
+    if (diff === 'easy') {
+      const multitouchGuide = await page.evaluate(() => {
+        const pad = document.querySelector('#move-pad');
+        const r = pad.getBoundingClientRect();
+        pad.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerId: 101, pointerType: 'touch',
+          clientX: r.right - 8, clientY: r.top + r.height / 2,
+        }));
+        const buttons = Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]'));
+        const target = buttons.find((button) => !button.classList.contains('selected'));
+        const targetId = target?.dataset.spell;
+        target?.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerId: 102, pointerType: 'touch',
+        }));
+        target?.dispatchEvent(new PointerEvent('pointerup', {
+          bubbles: true, cancelable: true, pointerId: 102, pointerType: 'touch',
+        }));
+        const info = window.__aegTest.info();
+        const selected = document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell;
+        const scrollTarget = Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]'))
+          .find((button) => button.dataset.spell !== selected);
+        scrollTarget?.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerId: 103, pointerType: 'touch', clientX: 20, clientY: 20,
+        }));
+        scrollTarget?.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, cancelable: true, pointerId: 103, pointerType: 'touch', clientX: 55, clientY: 20,
+        }));
+        scrollTarget?.dispatchEvent(new PointerEvent('pointerup', {
+          bubbles: true, cancelable: true, pointerId: 103, pointerType: 'touch', clientX: 55, clientY: 20,
+        }));
+        const afterScroll = document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell;
+        pad.dispatchEvent(new PointerEvent('pointerup', {
+          bubbles: true, cancelable: true, pointerId: 101, pointerType: 'touch',
+          clientX: r.right - 8, clientY: r.top + r.height / 2,
+        }));
+        return { targetId, selected, afterScroll, movementActive: info.movementActive, moveInput: info.moveInput };
+      });
+      if (!multitouchGuide.targetId || multitouchGuide.selected !== multitouchGuide.targetId
+          || multitouchGuide.afterScroll !== multitouchGuide.selected
+          || !multitouchGuide.movementActive || multitouchGuide.moveInput === 0) {
+        fail('guide selection failed while the movement pointer was held: ' + JSON.stringify(multitouchGuide));
+      }
     }
     // Draw a real glyph, then force the round to a finish and read the coaching.
     await drawEmberFlick(page);

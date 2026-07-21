@@ -4,9 +4,12 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.4.1 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.4.2 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
-service, and the deterministic shared simulation. Version 1.4.1 replaces the raw
+service, and the deterministic shared simulation. Version 1.4.2 separates smooth
+circle gestures from angular diamonds using corner-concentration checks and adds
+more hand-drawn variants, making Barrier Dome reliable without confusing it with
+Grounding Mantle. Version 1.4.1 replaces the raw
 spell CSV link with an in-game **Public Spell Roster** containing all 36
 non-secret spells, their directional glyph diagrams, costs, cooldowns, detailed
 effects, uses, synergies, and counters. Version 1.4.0 rebuilds mobile
@@ -125,8 +128,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10401 /
-versionName 1.4.1). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10402 /
+versionName 1.4.2). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -377,7 +380,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10401` / `versionName 1.4.1`, no cleartext production traffic,
+  `versionCode 10402` / `versionName 1.4.2`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.

@@ -37,7 +37,7 @@ export class MovementControl {
 
   _down(e) {
     e.preventDefault();
-    this.pad.setPointerCapture(e.pointerId);
+    try { this.pad.setPointerCapture(e.pointerId); } catch { /* synthetic/test or unsupported capture */ }
     this.active = true;
     this.pointerId = e.pointerId;
     const c = this._center(e);

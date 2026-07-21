@@ -13,6 +13,23 @@ function jitter(pts, amp, seed) {
   return pts.map((p) => ({ x: p.x + rnd() * amp, y: p.y + rnd() * amp }));
 }
 
+function denseNoisyPath(points, samplesPerEdge, noise, seed) {
+  let s = seed >>> 0;
+  const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return (s / 4294967296) - 0.5; };
+  const out = [];
+  for (let edge = 0; edge < points.length - 1; edge++) {
+    for (let i = 0; i < samplesPerEdge; i++) {
+      const t = i / samplesPerEdge;
+      out.push({
+        x: points[edge].x + (points[edge + 1].x - points[edge].x) * t + rnd() * noise,
+        y: points[edge].y + (points[edge + 1].y - points[edge].y) * t + rnd() * noise,
+      });
+    }
+  }
+  out.push({ ...points[points.length - 1] });
+  return out;
+}
+
 export function run() {
   const { ok, eq, near, report } = createHarness();
 
@@ -51,6 +68,75 @@ export function run() {
   }
   eq(blinkQuakeCorrect, 200,
     'rough Blink and Quake traces remain distinct through their horizontal/vertical opening strokes');
+
+  const roughDiamond = resample(GESTURE_TEMPLATES.diamond[0], 7);
+  let barrierCorrect = 0, groundingCorrect = 0, circleDiamondCrosscasts = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const barrier = full.recognize(jitter(GESTURE_TEMPLATES.circle[0], 8, seed * 197));
+    const grounding = full.recognize(jitter(roughDiamond, 4, seed * 197));
+    if (barrier.accepted && barrier.spellId === 11) barrierCorrect++;
+    if (grounding.accepted && grounding.spellId === 20) groundingCorrect++;
+    if ((barrier.accepted && barrier.spellId === 20) || (grounding.accepted && grounding.spellId === 11)) {
+      circleDiamondCrosscasts++;
+    }
+  }
+  ok(barrierCorrect >= 190, `rough Barrier circles remain recognizable (${barrierCorrect}/200)`);
+  ok(groundingCorrect >= 170, `rough Grounding diamonds remain recognizable (${groundingCorrect}/200)`);
+  eq(circleDiamondCrosscasts, 0, 'rough circles and diamonds never cross-cast as each other');
+
+  let denseBarrier = 0, denseGrounding = 0, denseCrosscasts = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const barrier = full.recognize(denseNoisyPath(GESTURE_TEMPLATES.circle[0], 4, 5, seed * 211));
+    const grounding = full.recognize(denseNoisyPath(GESTURE_TEMPLATES.diamond[0], 12, 5, seed * 211));
+    if (barrier.accepted && barrier.spellId === 11) denseBarrier++;
+    if (grounding.accepted && grounding.spellId === 20) denseGrounding++;
+    if ((barrier.accepted && barrier.spellId === 20) || (grounding.accepted && grounding.spellId === 11)) {
+      denseCrosscasts++;
+    }
+  }
+  ok(denseBarrier >= 195, `dense noisy phone circles remain Barrier Dome (${denseBarrier}/200)`);
+  ok(denseGrounding >= 190, `dense noisy phone diamonds remain Grounding Mantle (${denseGrounding}/200)`);
+  eq(denseCrosscasts, 0, 'dense noisy circles and diamonds never cross-cast');
+
+  const sparseCircle = GESTURE_TEMPLATES.circle[0].filter((_, i) => i % 4 === 0);
+  const sparseDispel = GESTURE_TEMPLATES.circleCCW[0].filter((_, i) => i % 4 === 0);
+  const sparseDiamond = resample(GESTURE_TEMPLATES.diamond[0], 7);
+  let sparseBarrier = 0, sparseDispelCorrect = 0, sparseGrounding = 0, sparseCircleCrosscasts = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const barrier = full.recognize(jitter(sparseCircle, 6, seed * 223));
+    const dispel = full.recognize(jitter(sparseDispel, 6, seed * 223));
+    const grounding = full.recognize(jitter(sparseDiamond, 4, seed * 223));
+    if (barrier.accepted && barrier.spellId === 11) sparseBarrier++;
+    if (dispel.accepted && dispel.spellId === 13) sparseDispelCorrect++;
+    if (grounding.accepted && grounding.spellId === 20) sparseGrounding++;
+    if (barrier.accepted && barrier.spellId === 20) sparseCircleCrosscasts++;
+  }
+  ok(sparseBarrier >= 190, `sparse phone circles remain Barrier Dome (${sparseBarrier}/200)`);
+  ok(sparseDispelCorrect >= 180, `sparse counterclockwise circles remain Dispel (${sparseDispelCorrect}/200)`);
+  ok(sparseGrounding >= 180, `sparse phone diamonds remain Grounding Mantle (${sparseGrounding}/200)`);
+  eq(sparseCircleCrosscasts, 0, 'sparse Barrier circles never cross-cast as Grounding Mantle');
+
+  const fiveCircle = full.recognize(resample(GESTURE_TEMPLATES.circle[0], 5));
+  const fiveDiamond = full.recognize(resample(GESTURE_TEMPLATES.diamond[0], 5));
+  eq(fiveCircle.reason, 'ambiguous', 'five-sample closed loop is rejected instead of guessed as Grounding');
+  eq(fiveDiamond.reason, 'ambiguous', 'five-sample diamond is rejected until enough geometry exists');
+  const sixCircle = resample(GESTURE_TEMPLATES.circle[0], 6);
+  const sixDiamond = resample(GESTURE_TEMPLATES.diamond[0], 6);
+  let sixPointCrosscasts = 0;
+  for (let seed = 1; seed <= 500; seed++) {
+    const barrier = full.recognize(jitter(sixCircle, 4, seed * 227));
+    const grounding = full.recognize(jitter(sixDiamond, 4, seed * 227));
+    if ((barrier.accepted && barrier.spellId === 20) || (grounding.accepted && grounding.spellId === 11)) {
+      sixPointCrosscasts++;
+    }
+  }
+  eq(sixPointCrosscasts, 0, 'six-sample closed traces remain neutral instead of cross-casting');
+  for (let count = 7; count <= 11; count++) {
+    eq(full.recognize(resample(GESTURE_TEMPLATES.circle[0], count)).spellId, 11,
+      `${count}-sample circle remains Barrier Dome`);
+    eq(full.recognize(resample(GESTURE_TEMPLATES.diamond[0], count)).spellId, 20,
+      `${count}-sample diamond remains Grounding Mantle`);
+  }
 
   // Each starter gesture's own template classifies to its spell, even jittered.
   const keyToId = {};
