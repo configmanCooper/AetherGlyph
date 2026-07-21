@@ -9,6 +9,10 @@ AI difficulties: Easy, Medium, Hard
 > roster spell when its normal requirements are met. Eight-spell selections are
 > guide shortcuts only. Tutorial lessons may still scope recognition to their
 > curriculum, and AI spell lists remain strategy preferences rather than rules.
+>
+> **Version 1.3.1 override:** Tutorial cooldowns run at 35% of canonical duel
+> values. Lessons that explicitly require repeated casts of the same spell use
+> 8% cooldowns so repetition drills do not become waiting exercises.
 
 ## 1. Outcome
 

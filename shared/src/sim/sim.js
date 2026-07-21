@@ -84,14 +84,15 @@ export class Sim {
     this.healingDisabled = false;
     this.events = [];
     // Optional rule toggles. Defaults preserve the authoritative online/offline
-    // behaviour exactly; the solo tutorial disables the round timer and Arcane
-    // Pressure for early teaching lessons (SOLO-MODES-PLAN §4) without changing
-    // any combat resolution. `timer:false` means the round never ends on the
-    // clock; `pressure:false` means the arc never shrinks.
+    // behaviour exactly. Tutorial instances may shorten cooldowns for teaching;
+    // Practice and online omit the multiplier and therefore remain at 1.
     this.rules = {
       timer: opts.rules?.timer !== false,
       pressure: opts.rules?.pressure !== false,
       projectileTravelScale: Math.max(0.5, Math.min(4, Number(opts.rules?.projectileTravelScale) || 1)),
+      cooldownScale: Number.isFinite(Number(opts.rules?.cooldownScale))
+        ? Math.max(0.05, Math.min(1, Number(opts.rules.cooldownScale)))
+        : 1,
       sandbox: opts.rules?.sandbox === true,
       sandboxCooldowns: opts.rules?.sandboxCooldowns === true,
     };
@@ -110,6 +111,11 @@ export class Sim {
   emit(type, data) { this.events.push({ tick: this.tick, type, ...data }); }
 
   spellData(id) { return SPELLS_BY_ID[id]; }
+
+  cooldownTicks(id) {
+    const spell = this.spellData(id);
+    return spell ? sToTicks(spell.cooldown_s * this.rules.cooldownScale) : 0;
+  }
 
   hasStatus(w, name) { return !!w.statuses[name] && w.statuses[name].ticks > 0; }
 
@@ -404,7 +410,7 @@ export class Sim {
     const cost = Math.round(this.effectiveCost(w, spell));
     w.aether = Math.max(0, w.aether - cost);
     if (spell.charges) w.charges = Math.max(0, w.charges - spell.charges);
-    w.cooldowns[c.spellId] = sToTicks(spell.cooldown_s);
+    w.cooldowns[c.spellId] = this.cooldownTicks(c.spellId);
     w.recoveryTicks = sToTicks(0.15 * (1 + Math.max(0, this.moveSlow(w))));
     w.castsResolved += 1;
     w.lastActivityTick = this.tick;
@@ -758,7 +764,7 @@ export class Sim {
     if (eff.interrupt) {
       if (defender.casting) {
         this.emit('interrupt', { target: defender.id, spellId: defender.casting.spellId });
-        defender.cooldowns[defender.casting.spellId] = sToTicks(this.spellData(defender.casting.spellId).cooldown_s);
+        defender.cooldowns[defender.casting.spellId] = this.cooldownTicks(defender.casting.spellId);
         defender.casting = null;
         defender.recoveryTicks = sToTicks(CAST.rejectRecoveryS);
       }

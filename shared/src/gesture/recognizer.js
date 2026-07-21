@@ -90,6 +90,16 @@ export function distanceToScore(d) {
   return Math.max(0, 1 - d * 2.2);
 }
 
+function startAxisFit(points, axis) {
+  if (!axis || points.length < 2) return 1;
+  const end = points[Math.max(1, Math.floor((points.length - 1) * 0.25))];
+  const dx = Math.abs(end.x - points[0].x);
+  const dy = Math.abs(end.y - points[0].y);
+  const total = dx + dy;
+  if (total < 1e-6) return 0.5;
+  return axis === 'horizontal' ? dx / total : dy / total;
+}
+
 export class Recognizer {
   constructor(templates = [], opts = {}) {
     this.n = opts.n || DEFAULT_N;
@@ -98,6 +108,7 @@ export class Recognizer {
     this.minPoints = opts.minPoints ?? 3;
     this.templates = templates.map((t) => ({
       name: t.name, spellId: t.spellId, gestureKey: t.gestureKey,
+      startAxis: t.startAxis || null,
       pts: preprocess(t.points, this.n),
     }));
   }
@@ -123,7 +134,8 @@ export class Recognizer {
     const q = preprocess(raw, this.n);
     const scores = this.templates.map((t) => ({
       spellId: t.spellId, name: t.name, gestureKey: t.gestureKey,
-      score: distanceToScore(meanDistance(q, t.pts)),
+      score: Math.max(0, distanceToScore(meanDistance(q, t.pts))
+        - (1 - startAxisFit(q, t.startAxis)) * 0.22),
     })).sort((a, b) => b.score - a.score);
 
     diag.scores = scores;

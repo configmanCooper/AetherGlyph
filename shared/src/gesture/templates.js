@@ -104,8 +104,9 @@ export const GESTURE_TEMPLATES = {
   circleCCW: [ // 13 Dispel — counterclockwise circle (start top, go left)
     arc(50, 50, 40, -90, -450, 24),
   ],
-  doubleStroke: [ // 14 Blink — lightning "Z" (two offset horizontals)
-    [{ x: 22, y: 26 }, { x: 64, y: 26 }, { x: 28, y: 72 }, { x: 70, y: 72 }],
+  doubleStroke: [ // 14 Blink — wide Z: right, diagonal down-left, right
+    [{ x: 10, y: 20 }, { x: 90, y: 20 }, { x: 10, y: 80 }, { x: 90, y: 80 }],
+    [{ x: 14, y: 24 }, { x: 86, y: 24 }, { x: 18, y: 76 }, { x: 88, y: 76 }],
   ],
   lowSquare: [ // 15 Stone Wall — squared U (down, across, up)
     [{ x: 16, y: 20 }, { x: 16, y: 80 }, { x: 84, y: 80 }, { x: 84, y: 20 }],
@@ -212,6 +213,13 @@ export const GESTURE_TEMPLATES = {
   ],
 };
 
+// Structural hints for pairs whose overall silhouettes can otherwise converge
+// under rough input. Blink must begin horizontally; Quake must begin vertically.
+export const GESTURE_TRAITS = {
+  doubleStroke: { startAxis: 'horizontal' },
+  quakeSlash: { startAxis: 'vertical' },
+};
+
 // Flatten into recognizer template records, tagging each with its spell id via
 // the FULL loadout gesture-key mapping so classification is spell-aware for any
 // legal online loadout (not just the starter eight).
@@ -223,7 +231,10 @@ export function buildTemplates() {
     const spellId = keyToSpellId[key];
     if (spellId == null) continue;
     variants.forEach((points, i) => {
-      records.push({ name: `${key}#${i}`, gestureKey: key, spellId, points });
+      records.push({
+        name: `${key}#${i}`, gestureKey: key, spellId, points,
+        startAxis: GESTURE_TRAITS[key]?.startAxis || null,
+      });
     });
   }
   return records;

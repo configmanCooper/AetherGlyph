@@ -31,14 +31,29 @@ import { CAMPAIGN_BY_ID, nextLessonId } from './campaign.js';
 
 const TICK_MS = 1000 / TICK_HZ;
 const MAX_CATCHUP = 6;
+const TUTORIAL_COOLDOWN_SCALE = 0.35;
+const REPEATED_CAST_COOLDOWN_SCALE = 0.08;
+
+function hasRepeatedCastObjective(lesson) {
+  const counts = new Map();
+  for (const objective of (lesson.objectives || [])) {
+    if (objective.expectSpell) counts.set(objective.expectSpell, (counts.get(objective.expectSpell) || 0) + 1);
+    const match = String(objective.predicate || '').match(/^(?:land|cast)-spell:\d+:(\d+)$/);
+    if (match && Number(match[1]) >= 2) return true;
+  }
+  return [...counts.values()].some((count) => count >= 2);
+}
 
 // Build the shared Sim rules for a lesson (kept in one place so the initial arm
 // and every series-round re-arm stay identical).
 function lessonRules(lesson) {
+  const cooldownScale = lesson.cooldownScale
+    ?? (hasRepeatedCastObjective(lesson) ? REPEATED_CAST_COOLDOWN_SCALE : TUTORIAL_COOLDOWN_SCALE);
   return {
     timer: !!lesson.timerEnabled,
     pressure: !!lesson.pressureEnabled,
     projectileTravelScale: lesson.projectileTravelScale || 1,
+    cooldownScale,
   };
 }
 

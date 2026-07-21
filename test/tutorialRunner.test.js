@@ -12,6 +12,7 @@ import { CAMPAIGN, CAMPAIGN_BY_ID, makeStudent } from '../client/src/tutorial/ca
 import { Recognizer } from '../shared/src/gesture/recognizer.js';
 import { buildTemplates, GESTURE_TEMPLATES } from '../shared/src/gesture/templates.js';
 import { makeLoadout } from '../shared/src/balance/loadouts.js';
+import { TICK_HZ } from '../shared/src/sim/constants.js';
 import { memoryStorage, loadProfile, defaultProfile } from '../client/src/tutorial/progress.js';
 
 function recognizerFor(lesson) {
@@ -19,7 +20,20 @@ function recognizerFor(lesson) {
 }
 
 export function run() {
-  const { ok, eq, report } = createHarness();
+  const { ok, eq, near, report } = createHarness();
+
+  // Tutorial cooldowns are intentionally shorter than duel cooldowns, with a
+  // much stronger reduction for explicit repeated-cast drills.
+  const normalLesson = new TutorialRunner('L01', { seed: 4 });
+  normalLesson.arm();
+  eq(normalLesson.sim.rules.cooldownScale, 0.35, 'ordinary tutorial lessons use 35% cooldowns');
+  const repeatLesson = new TutorialRunner('PROLOGUE', { seed: 4 });
+  repeatLesson.arm();
+  eq(repeatLesson.sim.rules.cooldownScale, 0.08, 'repeated-cast tutorial lessons use greatly reduced 8% cooldowns');
+  repeatLesson._stepOnce({ cast: 1, castQuality: 1 });
+  for (let i = 0; i < 120 && repeatLesson.sim.wizards[0].castsResolved < 1; i++) repeatLesson._stepOnce({});
+  near(repeatLesson.sim.wizards[0].cooldowns[1], Math.round(18 * 0.08 * TICK_HZ), 2,
+    'the repeated Ember drill applies the reduced cooldown in the real sim');
 
   // --- 1. every lesson is completable + no-input never completes ---------
   let scriptedOk = 0, scriptedTotal = 0, formalOk = 0, formalTotal = 0;

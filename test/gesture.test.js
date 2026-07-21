@@ -41,6 +41,17 @@ export function run() {
   }
   eq(fullCorrect, fullTotal, `full-roster duel recognition identifies every canonical glyph (${fullCorrect}/${fullTotal})`);
 
+  let blinkQuakeCorrect = 0;
+  for (const [key, expected] of [['doubleStroke', 14], ['quakeSlash', 34]]) {
+    for (let seed = 1; seed <= 100; seed++) {
+      const rough = jitter(GESTURE_TEMPLATES[key][0], 20, seed * 193);
+      const result = full.recognize(rough);
+      if (result.accepted && result.spellId === expected) blinkQuakeCorrect++;
+    }
+  }
+  eq(blinkQuakeCorrect, 200,
+    'rough Blink and Quake traces remain distinct through their horizontal/vertical opening strokes');
+
   // Each starter gesture's own template classifies to its spell, even jittered.
   const keyToId = {};
   for (const [id, key] of Object.entries(STARTER_GESTURE_KEYS)) keyToId[key] = Number(id);
