@@ -4,10 +4,14 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.6.4 — feature complete.** The final solo phase (Practice vs AI +
-coaching) is implemented on top of the offline campaign, the authoritative online
-service, and the deterministic shared simulation. Version 1.6.0 adds authoritative
-100-point Stamina bars and costs for movement, Dodge, Brace, and Focus; Haste
+**Version 1.7.0 — feature complete.** The castle-styled title page now stages an
+immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
+crossfading menu and duel music. Phone joystick gestures add central up/down
+Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
+(Practice vs AI + coaching) is implemented on top of the offline campaign, the
+authoritative online service, and the deterministic shared simulation. Version
+1.6.x adds 150-point Health, authoritative 100-point Stamina bars and costs for
+movement, Dodge, Brace, and Focus; Haste
 modifies stamina economy; Brace converts damage to Aether; spare Sigil Charges
 empower normal spells; Aether Leech can drain to zero; shared Rain progresses
 both duelists from Wet to Soaked; Blink breaks homing and AI aim; and Stone Wall,
@@ -141,8 +145,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10604 /
-versionName 1.6.4). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10700 /
+versionName 1.7.0). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -393,7 +397,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10604` / `versionName 1.6.4`, no cleartext production traffic,
+  `versionCode 10700` / `versionName 1.7.0`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.

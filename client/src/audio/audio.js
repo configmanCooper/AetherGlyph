@@ -1,4 +1,4 @@
-// audio.js — WebAudio synthesis, no external assets. Unlocked on first gesture.
+// audio.js — synthesized combat SFX plus crossfaded menu/duel music.
 //
 // Each school has a readable audio family (MASTERPLAN §11/§21). Everything is
 // synthesized so the game ships zero audio files and works offline.
@@ -19,19 +19,102 @@ export class Audio {
     this.ctx = null;
     this.enabled = true;
     this.master = null;
+    this.musicScene = 'menu';
+    this.musicVolume = 0.38;
+    this.musicFade = null;
+    this.music = {
+      menu: new window.Audio('./audio/music/wanderlust-menu.mp3'),
+      duel: new window.Audio('./audio/music/spell-duel.mp3'),
+    };
+    for (const track of Object.values(this.music)) {
+      track.loop = true;
+      track.preload = 'auto';
+      track.volume = 0;
+    }
   }
 
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    this.ctx = new AC();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = 0.32;
-    this.master.connect(this.ctx.destination);
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    } else {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = 0.32;
+        this.master.connect(this.ctx.destination);
+      }
+    }
+    this._crossfadeMusic(this.musicScene, 1200);
   }
 
-  setEnabled(on) { this.enabled = on; if (!on && this.ctx) this.master.gain.value = 0; else if (this.master) this.master.gain.value = 0.32; }
+  setEnabled(on) {
+    this.enabled = on;
+    if (!on && this.ctx) this.master.gain.value = 0;
+    else if (this.master) this.master.gain.value = 0.32;
+    if (!on) {
+      if (this.musicFade) cancelAnimationFrame(this.musicFade);
+      for (const track of Object.values(this.music)) {
+        track.volume = 0;
+        track.pause();
+      }
+    } else {
+      this._crossfadeMusic(this.musicScene, 900);
+    }
+  }
+
+  setMusicScene(scene, fadeMs = 2400) {
+    if (!this.music[scene]) return;
+    this.musicScene = scene;
+    this._crossfadeMusic(scene, fadeMs);
+  }
+
+  setSuspended(suspended) {
+    if (suspended) {
+      if (this.musicFade) cancelAnimationFrame(this.musicFade);
+      this.musicFade = null;
+      for (const track of Object.values(this.music)) track.pause();
+      if (this.ctx?.state === 'running') this.ctx.suspend();
+    } else {
+      if (this.ctx?.state === 'suspended') this.ctx.resume();
+      this._crossfadeMusic(this.musicScene, 900);
+    }
+  }
+
+  _crossfadeMusic(scene, fadeMs) {
+    if (!this.enabled || !this.music[scene]) return;
+    const target = this.music[scene];
+    const other = scene === 'menu' ? this.music.duel : this.music.menu;
+    target.play().catch(() => { /* autoplay waits for the first user gesture */ });
+    if (this.musicFade) cancelAnimationFrame(this.musicFade);
+    const targetStart = target.volume;
+    const otherStart = other.volume;
+    const started = performance.now();
+    const duration = Math.max(100, Number(fadeMs) || 0);
+    const tick = (now) => {
+      const p = Math.min(1, (now - started) / duration);
+      const eased = p * p * (3 - 2 * p);
+      target.volume = Math.min(1, targetStart + (this.musicVolume - targetStart) * eased);
+      other.volume = Math.max(0, otherStart * (1 - eased));
+      if (p < 1) {
+        this.musicFade = requestAnimationFrame(tick);
+      } else {
+        other.pause();
+        this.musicFade = null;
+      }
+    };
+    this.musicFade = requestAnimationFrame(tick);
+  }
+
+  musicState() {
+    return {
+      scene: this.musicScene,
+      menuVolume: this.music.menu.volume,
+      duelVolume: this.music.duel.volume,
+      menuPaused: this.music.menu.paused,
+      duelPaused: this.music.duel.paused,
+    };
+  }
 
   _blip({ type = 'sine', freq = 440, dur = 0.18, gain = 0.6, rise = 1, glideTo = null }) {
     if (!this.ctx || !this.enabled) return;

@@ -74,6 +74,7 @@ export class Arena {
     this._buildArena();
     this._buildAcademy();
     this._buildEnemy();
+    this._buildMenuPlayer();
     this._buildHands();
     this._buildStatusIndicators();
 
@@ -655,6 +656,13 @@ export class Arena {
     this.scene.add(this.enemy);
   }
 
+  _buildMenuPlayer() {
+    this.menuPlayer = this._robeFigure(0x243f68, 0x55e2ff);
+    this.menuPlayer.position.set(0, 0, PLAYER_Z);
+    this.menuPlayer.visible = false;
+    this.scene.add(this.menuPlayer);
+  }
+
   // Restrained opponent animation: idle breathing + robe/head sway (skipped
   // under reduced motion) plus a casting tell — the cast arm extends toward the
   // player while the aura and staff crystal light up in the school colour. The
@@ -871,6 +879,10 @@ export class Arena {
   }
 
   _wizardWorld(wid, y = 1.4) {
+    if (this._showcaseMode) {
+      const figure = wid === 0 ? this.menuPlayer : this.enemy;
+      return new THREE.Vector3(figure.position.x, y, figure.position.z);
+    }
     const w = wid === 0 ? this._lastPlayer : this._lastEnemy;
     const x = w ? wizardX(w) : 0;
     return new THREE.Vector3(x, y, wid === 0 ? PLAYER_Z : ENEMY_Z);
@@ -878,6 +890,13 @@ export class Arena {
 
   // Ambient render used while in menus (no active match).
   renderIdle(dtMs) {
+    this._showcaseMode = false;
+    this.menuPlayer.visible = false;
+    this.handRig.visible = true;
+    this.enemy.rotation.y = 0;
+    this.enemy.position.z = ENEMY_Z;
+    this.camera.position.y = 1.7;
+    this.camera.position.z = PLAYER_Z;
     this._idleT = (this._idleT || 0) + dtMs * 0.0002;
     this.camera.position.x = Math.sin(this._idleT) * 1.2;
     this.camera.lookAt(0, 1.5, ENEMY_Z);
@@ -891,6 +910,99 @@ export class Arena {
     this._updateEffects(dtMs);
     this._updateDebug(dtMs);
     this._renderScene();
+  }
+
+  _animateShowcaseFigure(figure, state, dtMs, phase = 0, fallDirection = 1) {
+    if (!figure) return;
+    const ud = figure.userData;
+    const casting = state?.casting || null;
+    const progress = casting ? 1 - casting.ticks / Math.max(1, casting.totalTicks || 1) : 0;
+    const knockedDown = !!(state?.statuses?.KnockedDown?.ticks > 0);
+    const k = this.reduced ? 1 : 1 - Math.exp(-12 * Math.max(0, dtMs) * 0.001);
+    const targetRaise = casting ? 0.5 + progress * 0.7 : 0;
+    ud.anim.castRaise += (targetRaise - ud.anim.castRaise) * k;
+    if (ud.castArm) ud.castArm.rotation.x = ud.rest.castArmX - ud.anim.castRaise;
+    figure.rotation.z += ((knockedDown ? fallDirection * 1.35 : 0) - figure.rotation.z) * k;
+
+    const school = casting ? SPELLS_BY_ID[casting.spellId]?.school : null;
+    const color = SCHOOL_COLOR[school] || 0x8b6bff;
+    if (ud.aura) {
+      ud.aura.material.color.setHex(color);
+      ud.aura.material.opacity += ((casting ? 0.35 + progress * 0.55 : 0.08) - ud.aura.material.opacity) * k;
+    }
+    if (ud.staffCrystal) {
+      ud.staffCrystal.material.color.setHex(color);
+      ud.staffCrystal.material.opacity += ((casting ? 0.95 : 0.5) - ud.staffCrystal.material.opacity) * k;
+    }
+
+    const breath = this.reduced ? 0 : Math.sin(this._t * 1.5 + phase);
+    if (ud.torso) {
+      ud.torso.position.y = ud.rest.torsoY + breath * 0.018;
+      ud.torso.rotation.z = this.reduced ? 0 : Math.sin(this._t * 0.7 + phase) * 0.015;
+    }
+    if (ud.robe) ud.robe.rotation.z = this.reduced ? 0 : Math.sin(this._t * 0.6 + phase) * 0.022;
+    if (ud.head) {
+      ud.head.rotation.x = ud.rest.headX + breath * 0.025;
+      ud.head.rotation.y = this.reduced ? 0 : Math.sin(this._t * 0.5 + phase) * 0.04;
+    }
+    ud.anim.breath = +breath.toFixed(3);
+  }
+
+  updateShowcase(sim, alpha, dtMs) {
+    this._showcaseMode = true;
+    this._t += dtMs * 0.001;
+    const player = sim.wizards[0];
+    const enemy = sim.wizards[1];
+    this._lastPlayer = player;
+    this._lastEnemy = enemy;
+
+    this.handRig.visible = false;
+    this.enemy.visible = enemy.invisibleTicks <= 0;
+    this.menuPlayer.visible = player.invisibleTicks <= 0;
+    this.enemy.position.set(-8, 0, 0);
+    this.menuPlayer.position.set(5, 0, 2.2);
+
+    const dx = this.menuPlayer.position.x - this.enemy.position.x;
+    const dz = this.menuPlayer.position.z - this.enemy.position.z;
+    this.enemy.rotation.y = Math.atan2(dx, dz);
+    this.menuPlayer.rotation.y = Math.atan2(-dx, -dz);
+    this._animateShowcaseFigure(this.enemy, enemy, dtMs, 0.5, -1);
+    this._animateShowcaseFigure(this.menuPlayer, player, dtMs, 2.1, 1);
+
+    this.camera.position.set(0, 3.8, 14);
+    this.camera.lookAt(-0.4, 1.45, 0);
+    this._syncCastCues(sim);
+    this._syncGuards(player, PLAYER_Z);
+    this._syncGuards(enemy, ENEMY_Z);
+    this._syncBeams(sim);
+    this._syncProjectiles(sim, alpha);
+    this._syncZones(sim);
+    this._updateFogVeil(0);
+    this._updateAcademy(dtMs);
+    this._updateEffects(dtMs);
+    this._updateDebug(dtMs);
+    this.keyLight.intensity += (0.72 - this.keyLight.intensity) * 0.06;
+    this._renderScene();
+  }
+
+  showcaseStats() {
+    return {
+      playerVisible: !!this.menuPlayer?.visible,
+      enemyVisible: !!this.enemy?.visible,
+      firstPersonHidden: !this.handRig?.visible,
+      playerX: this.menuPlayer?.position.x ?? 0,
+      enemyX: this.enemy?.position.x ?? 0,
+      playerZ: this.menuPlayer?.position.z ?? 0,
+      enemyZ: this.enemy?.position.z ?? 0,
+    };
+  }
+
+  viewStats() {
+    return {
+      showcaseMode: !!this._showcaseMode,
+      cameraZ: this.camera.position.z,
+      enemyZ: this.enemy.position.z,
+    };
   }
 
   // Animate the living academy: brazier flame flicker + light pulse and gently
@@ -997,10 +1109,15 @@ export class Arena {
 
   // ---- per-frame update from live sim state ----
   update(sim, alpha, dtMs) {
+    this._showcaseMode = false;
     this._t += dtMs * 0.001;
     const player = sim.wizards[0];
     const enemy = sim.wizards[1];
     this._lastPlayer = player; this._lastEnemy = enemy;
+    this.menuPlayer.visible = false;
+    this.enemy.rotation.y = 0;
+    this.enemy.position.z = ENEMY_Z;
+    this.camera.position.z = PLAYER_Z;
     this._syncWizardVisibility(player, enemy);
 
     // Camera follows the player's strafe position; opponent under soft lock.
@@ -1068,22 +1185,25 @@ export class Arena {
     const ward = w.id === 0 ? this.pWard : this.eWard;
     const dome = w.id === 0 ? this.pDome : this.eDome;
     const reflect = w.id === 0 ? this.pReflect : this.eReflect;
+    const figure = this._showcaseMode ? (w.id === 0 ? this.menuPlayer : this.enemy) : null;
+    const x = figure ? figure.position.x : wizardX(w);
+    const worldZ = figure ? figure.position.z : z;
     ward.object3D.visible = !!w.shield;
     if (w.shield) {
-      ward.object3D.position.set(wizardX(w), 1.1, z + (z > 0 ? -0.6 : 0.6));
+      ward.object3D.position.set(x, 1.1, worldZ + (worldZ > 0 ? -0.6 : 0.6));
       ward.object3D.lookAt(0, 1.1, 0);
       ward.update({ dtMs: 16, strength: 1, time: this._t });
     }
     dome.object3D.visible = !!w.barrier;
     if (w.barrier) {
-      dome.object3D.position.set(wizardX(w), 1.2, z);
+      dome.object3D.position.set(x, 1.2, worldZ);
       dome.update({ dtMs: 16, strength: 1, time: this._t });
     }
     // Reflect is a persistent state visual tied to the live reflect window; it
     // vanishes the same tick a projectile consumes it (reflectTicks -> 0).
     reflect.object3D.visible = w.reflectTicks > 0;
     if (w.reflectTicks > 0) {
-      reflect.object3D.position.set(wizardX(w), 1.15, z + (z > 0 ? -0.55 : 0.55));
+      reflect.object3D.position.set(x, 1.15, worldZ + (worldZ > 0 ? -0.55 : 0.55));
       reflect.object3D.lookAt(0, 1.15, 0);
       reflect.update({ dtMs: 16, strength: 1, time: this._t });
     }
@@ -1107,8 +1227,13 @@ export class Arena {
         this.castCues.set(w.id, cue);
       }
       const prog = 1 - w.casting.ticks / Math.max(1, w.casting.totalTicks || 1);
-      if (w.id === 0) cue.handle.object3D.position.set(wizardX(w), 1.15, PLAYER_Z - 1.25);
-      else cue.handle.object3D.position.set(wizardX(w), 1.7, ENEMY_Z + 0.35);
+      if (this._showcaseMode) {
+        cue.handle.object3D.position.copy(this._wizardWorld(w.id, w.id === 0 ? 1.15 : 1.7));
+      } else if (w.id === 0) {
+        cue.handle.object3D.position.set(wizardX(w), 1.15, PLAYER_Z - 1.25);
+      } else {
+        cue.handle.object3D.position.set(wizardX(w), 1.7, ENEMY_Z + 0.35);
+      }
       cue.handle.update({ dtMs: 16, prog, time: this._t });
     }
     for (const [id, cue] of this.castCues) {
@@ -1151,10 +1276,12 @@ export class Arena {
       }
       const total = Math.max(1, p.totalTicks || 1);
       const prog = Math.min(1, (total - p.ticks + alpha) / total);
-      const ownerZ = p.owner === 0 ? PLAYER_Z : ENEMY_Z;
-      const targetZ = p.owner === 0 ? ENEMY_Z : PLAYER_Z;
-      const startX = (p.originPos ?? 0) * ARC_W;
-      const endX = (p.targetPos ?? 0) * ARC_W;
+      const ownerFigure = this._showcaseMode ? (p.owner === 0 ? this.menuPlayer : this.enemy) : null;
+      const targetFigure = this._showcaseMode ? (p.owner === 0 ? this.enemy : this.menuPlayer) : null;
+      const ownerZ = ownerFigure ? ownerFigure.position.z : (p.owner === 0 ? PLAYER_Z : ENEMY_Z);
+      const targetZ = targetFigure ? targetFigure.position.z : (p.owner === 0 ? ENEMY_Z : PLAYER_Z);
+      const startX = ownerFigure ? ownerFigure.position.x : (p.originPos ?? 0) * ARC_W;
+      const endX = targetFigure ? targetFigure.position.x : (p.targetPos ?? 0) * ARC_W;
       const groundHug = entry.handle.object3D.userData && entry.handle.object3D.userData.groundHug;
       const y = groundHug ? 0.12 : 1.4 + Math.sin(prog * Math.PI) * 0.25;
       const pos = entry.handle.object3D.position;

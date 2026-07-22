@@ -8,6 +8,7 @@ import { Audio } from '../audio/audio.js';
 import { GestureInput } from '../input/gestureInput.js';
 import { MovementControl } from '../input/movement.js';
 import { LocalMatch } from '../game/localMatch.js';
+import { MenuDuel } from '../game/menuDuel.js';
 import { OnlineMatch } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
@@ -33,7 +34,7 @@ import { chooseOpponentLoadout, PRACTICE_PROFILES } from '@shared/bot/practiceBo
 import { coachReport } from '@shared/analytics/coach.js';
 import { renderCoachReport } from '../ui/coach.js';
 import { renderSpellReference } from '../ui/spellReference.js';
-import { versionTag } from '@shared/protocol/version.js';
+import { APP_VERSION, versionTag } from '@shared/protocol/version.js';
 import { TICK_HZ } from '@shared/sim/constants.js';
 import { SPELL_VFX, VFX_IDS, REACTION_VFX, REACTION_VFX_NAMES } from '../render/spellVfxProfiles.js';
 import { vfxFamilyCoverage, reactionVfxCoverage } from '../render/spellVfx.js';
@@ -44,6 +45,8 @@ const $ = (sel) => document.querySelector(sel);
 const arena = new Arena($('#scene'));
 const hud = new HUD($('#hud'));
 const audio = new Audio();
+const menuDuel = new MenuDuel();
+let activePanelId = 'panel-main';
 
 const ORIENTATION_KEY = 'aeth-orientation';
 const ORIENTATIONS = new Set(['auto', 'portrait', 'landscape']);
@@ -183,6 +186,9 @@ function haptic(kind) {
 
 // ------------------------------------------------------------------ input wiring
 const dummyInput = { move: 0, sidestep: 0, focus: false, brace: false, pendingCast: null, pendingQuality: 1 };
+const heldActions = { focus: false, brace: false };
+let kbFocus = false;
+let kbBrace = false;
 
 function castSpell(id, quality = 1) {
   if (mode === 'online') return; // online casting is authoritative — gesture pad only
@@ -229,7 +235,7 @@ const movement = new MovementControl($('#move-pad'), $('#move-stick'), dummyInpu
 
 function bindHold(btn, key) {
   const el = $(btn);
-  const set = (v) => { if (match) match.input[key] = v; el.classList.toggle('active', v); };
+  const set = (v) => { heldActions[key] = v; el.classList.toggle('active', v); };
   el.addEventListener('pointerdown', (e) => { e.preventDefault(); audio.unlock(); set(true); });
   el.addEventListener('pointerup', (e) => { e.preventDefault(); set(false); });
   el.addEventListener('pointerleave', () => set(false));
@@ -250,16 +256,15 @@ window.addEventListener('keydown', (e) => {
   if (n >= 1 && n <= playerLoadout.length) castSpell(playerLoadout[n - 1].id, 1);
   else if (e.key === 'a') kbMove = -1;
   else if (e.key === 'd') kbMove = 1;
-  else if (e.key === 'f') match.input.focus = true;
-  else if (e.key === 'b') match.input.brace = true;
+  else if (e.key === 'f') kbFocus = true;
+  else if (e.key === 'b') kbBrace = true;
   else if (e.key === ' ') { match.input.sidestep = dummyInput.__lastDir || 1; e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
-  if (!match) return;
   if (e.key === 'a' && kbMove === -1) kbMove = 0;
   else if (e.key === 'd' && kbMove === 1) kbMove = 0;
-  else if (e.key === 'f') match.input.focus = false;
-  else if (e.key === 'b') match.input.brace = false;
+  else if (e.key === 'f') kbFocus = false;
+  else if (e.key === 'b') kbBrace = false;
 });
 
 // Dev quick-cast buttons (mirror of the selected guide shortcuts).
@@ -279,6 +284,8 @@ function applyInputBridge() {
   if (!match) return;
   const move = kbMove !== 0 ? kbMove : dummyInput.move;
   match.input.move = move;
+  match.input.focus = heldActions.focus || kbFocus || !!dummyInput.focus;
+  match.input.brace = heldActions.brace || kbBrace || !!dummyInput.brace;
   if (move !== 0) dummyInput.__lastDir = move;
   if (dummyInput.sidestep !== 0) { match.input.sidestep = dummyInput.sidestep; dummyInput.sidestep = 0; }
 }
@@ -1085,7 +1092,13 @@ let lastT = performance.now();
 let idleRenderAcc = 0;
 function frame(now) {
   const dt = Math.min(64, now - lastT); lastT = now;
-  if (match && running) {
+  if (menuDuel.active) {
+    idleRenderAcc = 0;
+    menuDuel.update(dt);
+    const events = menuDuel.drainEvents();
+    if (events.length) arena.handleEvents(events, menuDuel.sim);
+    arena.updateShowcase(menuDuel.sim, menuDuel.alpha, dt);
+  } else if (match && running) {
     idleRenderAcc = 0;
     applyInputBridge();
     updateLabEnemySchedule();
@@ -1494,10 +1507,26 @@ function updateConnBadges(p) {
 function disposeOnline() { if (online) { online.dispose(); online = null; } }
 
 // ------------------------------------------------------------------ menu / overlay
-function showOverlay(v) { $('#overlay').classList.toggle('hidden', !v); }
+function showOverlay(v) {
+  $('#overlay').classList.toggle('hidden', !v);
+  if (!v) {
+    menuDuel.setActive(false);
+    document.body.classList.remove('title-showcase');
+  } else if (activePanelId === 'panel-main') {
+    menuDuel.setActive(true);
+    document.body.classList.add('title-showcase');
+  }
+  const gameplayMusic = ['tutorial', 'practice', 'lab', 'online'].includes(mode);
+  audio.setMusicScene(v && activePanelId === 'panel-main' ? 'menu' : (gameplayMusic ? 'duel' : 'menu'));
+}
 function showPanel(id) {
   document.querySelectorAll('#overlay .panel').forEach((p) => p.classList.add('hidden'));
   $('#' + id).classList.remove('hidden');
+  activePanelId = id;
+  const titleActive = id === 'panel-main';
+  document.body.classList.toggle('title-showcase', titleActive);
+  menuDuel.setActive(titleActive);
+  audio.setMusicScene(titleActive ? 'menu' : (['tutorial', 'practice', 'lab', 'online'].includes(mode) ? 'duel' : 'menu'));
 }
 
 document.querySelectorAll('[data-action]').forEach((btn) => {
@@ -1862,11 +1891,13 @@ window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
 // duplicate background event (both APIs can fire) does not clobber resume.
 function onBackgroundChange(hidden) {
   if (hidden) {
+    audio.setSuspended(true);
     if (!pausedForVisibility) pausedForVisibility = running;
     running = false;
     if (mode === 'online' && online) online.setActive(false); // stop issuing inputs while backgrounded
     if (mode === 'tutorial' && tutorial) tutorial.pause();
   } else {
+    audio.setSuspended(false);
     if (gameMenuPaused) {
       if (mode === 'online' && online) online.setActive(false);
       pausedForVisibility = false;
@@ -1899,6 +1930,7 @@ function initPractice() {
 initPractice();
 rebuildForLoadout();
 console.log('Aetherglyph client', versionTag());
+$('#menu-version').textContent = `Version ${APP_VERSION}`;
 showOverlay(true);
 showPanel('panel-main');
 
@@ -1922,11 +1954,15 @@ if (typeof window !== 'undefined') {
       playerBraceTicks: match?.sim?.wizards?.[0]?.braceTicks ?? 0,
       movementActive: movement.active,
       moveInput: dummyInput.move,
+      joystick: movement.debugState(),
       labCooldowns,
       labEnemy: { ...labEnemy },
       enemyCastsResolved: match?.sim?.wizards?.[1]?.castsResolved ?? 0,
       enemyArcPos: match?.sim?.wizards?.[1]?.arcPos ?? 0,
       tutorialTick: tutorial?.sim?.tick ?? null,
+      menuDuelActive: menuDuel.active,
+      menuDuelVariety: menuDuel.castVariety().size,
+      music: audio.musicState(),
     }),
     recognize: (points) => {
       try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }
@@ -1982,6 +2018,8 @@ if (typeof window !== 'undefined') {
     clear: () => { try { arena.debugClear(); } catch { /* ignore */ } },
     coverage: () => { try { return vfxFamilyCoverage(); } catch { return ['error']; } },
     academy: () => { try { return arena.academyStats(); } catch (e) { return { error: String(e && e.message || e) }; } },
+    showcase: () => { try { return arena.showcaseStats(); } catch (e) { return { error: String(e && e.message || e) }; } },
+    view: () => { try { return arena.viewStats(); } catch (e) { return { error: String(e && e.message || e) }; } },
     setReduced: (v) => { try { arena.setReduced(!!v); } catch { /* ignore */ } },
   };
 }

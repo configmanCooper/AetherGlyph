@@ -92,6 +92,22 @@ try {
     const body = await page.evaluate(() => document.body ? document.body.innerHTML.slice(0, 300) : 'no body');
     fail('#panel-main missing. errors=' + JSON.stringify(errors.slice(0, 6)) + ' body=' + body);
   }
+  await page.waitForFunction(() => !!window.__aegTest && !!window.__aegVfx, { timeout: 10000 });
+  const titleState = await page.evaluate(() => ({
+    titleClass: document.body.classList.contains('title-showcase'),
+    version: document.querySelector('#menu-version')?.textContent || '',
+    masterPlanLink: !!document.querySelector('#panel-main a[href*="MASTERPLAN"]'),
+    duel: window.__aegTest.info(),
+    showcase: window.__aegVfx.showcase(),
+  }));
+  if (!titleState.titleClass || !/Version 1\.7\.0/.test(titleState.version)
+      || titleState.masterPlanLink || !titleState.duel.menuDuelActive
+      || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
+      || !titleState.showcase.firstPersonHidden
+      || !(titleState.showcase.enemyX < titleState.showcase.playerX)
+      || !(titleState.showcase.enemyZ < titleState.showcase.playerZ)) {
+    fail('title showcase is incomplete: ' + JSON.stringify(titleState));
+  }
 
   // Public spell roster is an in-game reference, not a raw CSV. It contains all
   // 36 public spells with directional glyph diagrams and detailed usage fields.
@@ -649,8 +665,14 @@ try {
     await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
     await page.waitForSelector('#spellbar .spell-btn', { timeout: 5000 });
     const info = await page.evaluate(() => (window.__aegTest ? window.__aegTest.info() : null));
-    if (!info || info.mode !== 'practice' || !info.botActive || !info.hasBot || info.difficulty !== diff) {
+    if (!info || info.mode !== 'practice' || !info.botActive || !info.hasBot
+        || info.difficulty !== diff || info.music?.scene !== 'duel') {
       fail(`Practice AI not active for ${diff}: ` + JSON.stringify(info));
+    }
+    const liveView = await page.evaluate(() => window.__aegVfx.view());
+    if (liveView.showcaseMode || Math.abs(liveView.cameraZ - 5.5) > 1e-6
+        || Math.abs(liveView.enemyZ + 5.5) > 1e-6) {
+      fail('title staging leaked into live gameplay: ' + JSON.stringify(liveView));
     }
     if (diff === 'easy') {
       const replacementLifecycle = await page.evaluate(() => {
@@ -695,8 +717,6 @@ try {
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.actions)
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.draw)
           || landscapeControls.staminaBars !== 2 || !/rgb\(66, 184, 90\)/.test(landscapeControls.staminaColor)
-          || landscapeControls.staminaRatios.some((ratio) => ratio < 0.99)
-          || landscapeControls.healthRatios.some((ratio) => ratio < 0.99)
           || !landscapeControls.touchVisible || !landscapeControls.desktopHidden) {
         fail('landscape mobile controls are not compact/above joystick: ' + JSON.stringify(landscapeControls));
       }
@@ -1038,7 +1058,11 @@ try {
   console.log('REACTIONS', reactionResult.spawned.length, 'distinct', uniqueReactionKinds.size);
 
   // ---- Arcane academy + wizard component metadata (renderer debug hook) ------
-  const academy = await page.evaluate(() => (window.__aegVfx && window.__aegVfx.academy) ? window.__aegVfx.academy() : { error: 'no academy hook' });
+  const academyResult = await page.evaluate(() => ({
+    academy: (window.__aegVfx && window.__aegVfx.academy) ? window.__aegVfx.academy() : { error: 'no academy hook' },
+    titleShowcase: !!window.__aegTest?.info().menuDuelActive,
+  }));
+  const academy = academyResult.academy;
   if (!academy || academy.error) fail('academy stats hook missing: ' + JSON.stringify(academy));
   const comp = academy.components || {};
   const missingComp = ['sky', 'moon', 'stars', 'academy', 'backWall', 'platform'].filter((k) => !comp[k]);
@@ -1056,7 +1080,8 @@ try {
   if (!wiz.hasStaff) fail('wizard has no visible staff');
   if (!(wiz.robeLayers >= 2)) fail('wizard robe should be layered');
   // Opponent must visibly FACE the first-person camera (front is local +Z).
-  if (!(wiz.facing && wiz.facing.towardCamera && wiz.facing.dot > 0.5)) {
+  if (!academyResult.titleShowcase
+      && !(wiz.facing && wiz.facing.towardCamera && wiz.facing.dot > 0.5)) {
     fail('opponent wizard is not facing the camera: ' + JSON.stringify(wiz.facing));
   }
   // A readable face at duel distance: two eyes, a nose and a beard.

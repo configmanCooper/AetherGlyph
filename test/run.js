@@ -28,6 +28,8 @@ import { run as lab } from './lab.test.js';
 import { run as spellVfx } from './spellVfx.test.js';
 import { run as cooldowns } from './cooldowns.test.js';
 import { run as protection } from './protection.test.js';
+import { run as menuDuel } from './menuDuel.test.js';
+import { run as movement } from './movement.test.js';
 
 console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
@@ -60,6 +62,8 @@ const modules = [
   ['spellVfx', spellVfx],
   ['cooldowns', cooldowns],
   ['protection', protection],
+  ['menuDuel', menuDuel],
+  ['movement', movement],
 ];
 
 let pass = 0, fail = 0;
