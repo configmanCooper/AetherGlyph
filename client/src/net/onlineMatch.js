@@ -10,6 +10,7 @@
 
 import { EVENTS } from '../../../shared/src/protocol/events.js';
 import { NET } from '../../../shared/src/protocol/net.js';
+import { MATCH } from '../../../shared/src/sim/constants.js';
 import { openSocket, clientIdentity, saveResume, loadResume, clearResume, qualityFromRtt } from './net.js';
 
 const INPUT_INTERVAL_MS = 1000 / NET.INPUT_HZ;
@@ -17,7 +18,7 @@ const PING_INTERVAL_MS = 2000;
 
 function neutralWizard(id) {
   return {
-    id, health: 100, aether: 60, stamina: 100, charges: 0, arcPos: id === 0 ? -0.35 : 0.35,
+    id, health: MATCH.startHealth, aether: 60, stamina: 100, charges: 0, arcPos: id === 0 ? -0.35 : 0.35,
     casting: null, channel: null, focusing: false, focusTicks: 0, braceTicks: 0,
     shield: null, barrier: null, reflectTicks: 0, tenacityTicks: 0, evadeTicks: 0, invisibleTicks: 0,
     mirrorTicks: 0, sidestepCharges: 2, recoveryTicks: 0,

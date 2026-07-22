@@ -8,10 +8,11 @@ import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
 
 const STATUS_ICON = {
   Burning: 'Bu', Chilled: 'Ch', Wet: 'Wt', Soaked: 'So', Static: 'St', Sundered: 'Sd',
-  Weakened: 'Wk', Marked: 'Mk', Rooted: 'Rt', Frozen: 'Fz', Stunned: 'Sn',
+  Weakened: 'Wk', Marked: 'Mk', Rooted: 'Rt', KnockedDown: 'Kd', Frozen: 'Fz', Stunned: 'Sn',
   Sloth: 'Sl', Blinded: 'Bl', Veiled: 'Vl',
   Haste: 'Ha', Grounded: 'Gr', AetherSurge: 'AS', Attunement: 'At', Phoenix: 'Px',
 };
+const STATUS_LABEL = { KnockedDown: 'Knocked Down' };
 
 const ZONE_ICON = {
   Oil: 'Oil', Wet: 'Wet', Fog: 'Fog', Frozen: 'Ice', Snare: 'Snare',
@@ -70,7 +71,8 @@ export class HUD {
       .filter(([, v]) => v.ticks > 0)
       .map(([name, v]) => {
         const cls = BUFFS.has(name) ? 'status-chip buff' : 'status-chip';
-        return `<span class="${cls}" title="${name}">${STATUS_ICON[name] || name.slice(0, 2)} ${name}${v.stacks > 1 ? ' ' + v.stacks : ''}</span>`;
+        const label = STATUS_LABEL[name] || name;
+        return `<span class="${cls}" title="${label}">${STATUS_ICON[name] || name.slice(0, 2)} ${label}${v.stacks > 1 ? ' ' + v.stacks : ''}</span>`;
       });
     if (w.braceTicks > 0) chips.push('<span class="status-chip">Brace</span>');
     if (w.tenacityTicks > 0) chips.push('<span class="status-chip">Tenacity</span>');
@@ -226,8 +228,8 @@ export class HUD {
 
   update(sim) {
     const [p, e] = sim.wizards;
-    this.el.playerHealth.style.width = `${Math.max(0, p.health)}%`;
-    this.el.enemyHealth.style.width = `${Math.max(0, e.health)}%`;
+    this.el.playerHealth.style.width = `${(Math.max(0, p.health) / MATCH.startHealth) * 100}%`;
+    this.el.enemyHealth.style.width = `${(Math.max(0, e.health) / MATCH.startHealth) * 100}%`;
     this.el.playerAether.style.width = `${(p.aether / AETHER.max) * 100}%`;
     this.el.enemyAether.style.width = `${(e.aether / AETHER.max) * 100}%`;
     this.el.playerStamina.style.width = `${(p.stamina / STAMINA.max) * 100}%`;

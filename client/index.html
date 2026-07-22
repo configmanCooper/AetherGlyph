@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.6.3" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.6.4" />
   <script type="importmap">
   {
     "imports": {
@@ -88,6 +88,9 @@
       <ul id="coach-objectives" class="coach-objectives"></ul>
       <p id="coach-guide" class="coach-guide">Guide: Full</p>
       <p id="coach-fail" class="coach-fail hidden"></p>
+      <div class="coach-remediate">
+        <button class="coach-btn" data-action="tut-replay">Replay lesson</button>
+      </div>
       <div id="coach-remediate" class="coach-remediate hidden">
         <button class="coach-btn" data-action="tut-showme">Show Me</button>
         <button class="coach-btn" data-action="tut-tryagain">Try again</button>
@@ -361,6 +364,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.6.3"></script>
+  <script type="module" src="./src/app/main.js?v=1.6.4"></script>
 </body>
 </html>

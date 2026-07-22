@@ -12,6 +12,7 @@
 // the actor, so an idle player cannot passively satisfy an action objective.
 
 import { SPELLS_BY_ID } from '../../../shared/src/balance/spellData.generated.js';
+import { TICK_HZ } from '../../../shared/src/sim/constants.js';
 
 const NAME_TO_ID = {};
 for (const s of Object.values(SPELLS_BY_ID)) NAME_TO_ID[s.name] = s.id;
@@ -38,8 +39,10 @@ export class ObjectiveTracker {
       damageDealtToOpp: 0,
       damageTakenBySelf: 0,
       hitsOnOppBySpell: new Map(),                     // spellId -> hit count
+      markedHitsOnOppBySpell: new Map(),                     // spellId -> hit count
       statusAppliedToOpp: new Map(),                   // name -> count
       statusAppliedToSelf: new Map(),
+      lastStatusTickOnSelf: new Map(),
       reactionsByPlayer: [],                           // ordered names (player-caused)
       reactionsSetPlayer: new Set(),
       reactionsAny: new Set(),
@@ -107,7 +110,12 @@ export class ObjectiveTracker {
           if (e.target === B) {
             f.damageDealtToOpp += e.amount;
             const id = NAME_TO_ID[e.source];
-            if (id != null) f.hitsOnOppBySpell.set(id, (f.hitsOnOppBySpell.get(id) || 0) + 1);
+            if (id != null) {
+              f.hitsOnOppBySpell.set(id, (f.hitsOnOppBySpell.get(id) || 0) + 1);
+              if (e.markedPayoff) {
+                f.markedHitsOnOppBySpell.set(id, (f.markedHitsOnOppBySpell.get(id) || 0) + 1);
+              }
+            }
           } else if (e.target === P) {
             f.damageTakenBySelf += e.amount;
           }
@@ -115,7 +123,10 @@ export class ObjectiveTracker {
         }
         case 'status':
           if (e.target === B) f.statusAppliedToOpp.set(e.status, (f.statusAppliedToOpp.get(e.status) || 0) + 1);
-          else if (e.target === P) f.statusAppliedToSelf.set(e.status, (f.statusAppliedToSelf.get(e.status) || 0) + 1);
+          else if (e.target === P) {
+            f.statusAppliedToSelf.set(e.status, (f.statusAppliedToSelf.get(e.status) || 0) + 1);
+            f.lastStatusTickOnSelf.set(e.status, sim.tick);
+          }
           break;
         case 'reaction':
           f.reactionsAny.add(e.name);
@@ -268,6 +279,9 @@ export const OBJECTIVE_PREDICATES = {
   'cast-spell': (ctx, [id, n]) => (ctx.facts.castsBy[ctx.playerId].get(Number(id)) || 0) >= num(n, 1),
   // Player landed (dealt damage with) a specific spell N times.
   'land-spell': (ctx, [id, n]) => (ctx.facts.hitsOnOppBySpell.get(Number(id)) || 0) >= num(n, 1),
+  // Player landed a specific spell while consuming Mark's damage payoff.
+  'land-marked-spell': (ctx, [id, n]) =>
+    (ctx.facts.markedHitsOnOppBySpell.get(Number(id)) || 0) >= num(n, 1),
   // Total direct damage dealt to the opponent.
   'damage-opponent': (ctx, [n]) => ctx.facts.damageDealtToOpp >= num(n, 1),
   // A harmful/other status was applied to the opponent N times.
@@ -336,6 +350,11 @@ export const OBJECTIVE_PREDICATES = {
   // --- medal / mastery constraints (optional; never gate ranked) ---
   // The player never suffered a given status (e.g. conduct without being Soaked).
   'no-self-status': (ctx, [name]) => (ctx.facts.statusAppliedToSelf.get(name) || 0) === 0,
+  // Maintain a continuous streak without receiving a named status.
+  'status-free-streak': (ctx, [name, seconds]) => {
+    const last = ctx.facts.lastStatusTickOnSelf.get(name) ?? 0;
+    return ctx.facts.tick - last >= num(seconds, 1) * TICK_HZ;
+  },
   // The player finished without emptying both Sidestep charges.
   'sidestep-charges-kept': (ctx) => ctx.facts.minSidestepCharges >= 1,
   // The player took no damage all round (flawless).

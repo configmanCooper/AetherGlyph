@@ -449,6 +449,7 @@ body.lefthand .coach { left: auto; right: calc(12px + var(--safe-left)); }
 .coach-btn {
   flex: 1; padding: 8px 6px; border-radius: 9px; font-size: 12px; cursor: pointer;
   background: rgba(139,107,255,0.25); border: 1px solid var(--accent); color: var(--ink);
+  pointer-events: auto;
 }
 .coach-btn:active { transform: translateY(1px); }
 

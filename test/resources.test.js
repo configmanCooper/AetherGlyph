@@ -3,7 +3,7 @@
 import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
 import { starterLoadout } from '../shared/src/balance/loadouts.js';
-import { AETHER, STAMINA, SIGIL, FOCUS, BRACE, SIDESTEP, TICK_HZ } from '../shared/src/sim/constants.js';
+import { MATCH, AETHER, STAMINA, SIGIL, FOCUS, BRACE, SIDESTEP, TICK_HZ } from '../shared/src/sim/constants.js';
 
 function freshSim(seed = 1) {
   return new Sim({ seed, loadouts: [starterLoadout(), starterLoadout()] });
@@ -17,7 +17,7 @@ export function run() {
 
   // Starting resources (MASTERPLAN §3/§6).
   let sim = freshSim();
-  eq(sim.wizards[0].health, 100, 'start health 100');
+  eq(sim.wizards[0].health, MATCH.startHealth, 'start health 150');
   eq(sim.wizards[0].aether, AETHER.start, 'start Aether 60');
   eq(sim.wizards[0].stamina, STAMINA.start, 'start Stamina 100');
   eq(sim.wizards[0].charges, SIGIL.start, 'start charges 0');

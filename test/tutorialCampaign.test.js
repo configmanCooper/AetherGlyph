@@ -72,6 +72,14 @@ export function run() {
   eq(secretTrials.length, 4, 'there are four secret trials');
   ok(secretTrials.every((l) => l.optional), 'every secret trial is optional (never gates ranked)');
   ok(secretTrials.every((l) => !(l.reward && l.reward.rankedReady)), 'no secret trial grants ranked readiness');
+  const clueProfile = defaultProfile();
+  ok(secretTrials.every((l) => !lessonUnlocked(l, clueProfile)),
+    'secret trials remain hidden until their tutorial clue is earned');
+  for (const trial of secretTrials) {
+    clueProfile.clues[trial.clue] = true;
+    ok(lessonUnlocked(trial, clueProfile), `${trial.id} unlocks from clue ${trial.clue}`);
+    delete clueProfile.clues[trial.clue];
+  }
 
   // --- formal duels use legal loadouts ----------------------------------
   let formalLegal = true;
@@ -80,6 +88,10 @@ export function run() {
     if (!validateLoadout(l.opponentLoadout).valid) { formalLegal = false; console.log('    illegal opponent loadout', l.id); }
   }
   ok(formalLegal, 'every formal duel uses a legal 8-spell / 14-point loadout');
+  ok(CAMPAIGN_BY_ID.L12.fullRoster === true,
+    'First Formal Duel enables recognition for the full spell roster');
+  ok(CAMPAIGN_BY_ID.A16.fullRoster === true,
+    'Eight Schools Examination enables recognition for the full spell roster');
 
   // --- teaching loadouts are non-empty, distinct, known -----------------
   let teachingOk = true;

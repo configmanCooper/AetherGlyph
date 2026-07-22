@@ -27,7 +27,7 @@ export function run() {
     else winners.draw++;
 
     // Someone should have taken damage (bots actually fight).
-    if (res.health[0] < 100 || res.health[1] < 100) anyDamage = true;
+    if (res.health[0] < MATCH.startHealth || res.health[1] < MATCH.startHealth) anyDamage = true;
 
     // Resource bounds never violated.
     for (const w of sim.wizards) {
@@ -62,7 +62,7 @@ export function run() {
       const r = runMatch(s, [(x) => bs[0].act(x), (x) => bs[1].act(x)]);
       if (!r.ended) archEnded = false;
       if (r.hitCap) archNoCap = false;
-      if (r.health[0] < 100 || r.health[1] < 100) archDamage++;
+      if (r.health[0] < MATCH.startHealth || r.health[1] < MATCH.startHealth) archDamage++;
       for (const w of s.wizards) {
         if (w.aether < -0.001 || w.aether > AETHER.max + 0.001) archLegal = false;
         if (w.charges < 0 || w.charges > SIGIL.max) archLegal = false;

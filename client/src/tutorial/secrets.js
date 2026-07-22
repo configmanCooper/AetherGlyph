@@ -43,8 +43,8 @@ export function allClueIds() {
 
 export function secretForTrial(trialId) { return SECRETS_BY_TRIAL[trialId] || null; }
 
-// A secret is "hinted" once the player has found all of its clues (a codex hint,
-// not a gate — the trial can be attempted regardless).
+// A secret is "hinted" once the player has found all of its clues. Its optional
+// trial then becomes visible and playable in the tutorial hub.
 export function isSecretHinted(profile, spellId) {
   const s = SECRETS_BY_ID[spellId];
   return !!s && s.clues.every((c) => hasClue(profile, c));

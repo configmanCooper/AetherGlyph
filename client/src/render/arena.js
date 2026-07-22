@@ -34,12 +34,12 @@ const SCHOOL_COLOR = {
 const STATUS_COLOR = {
   Burning: 0xff4a1c, Chilled: 0x64d8ff, Sloth: 0xa56de2, Wet: 0x65bfff, Soaked: 0x368cff,
   Static: 0xffe45c, Sundered: 0xff7a4d, Weakened: 0xb56cff, Marked: 0xff4fd8,
-  Blinded: 0xf4f4ff, Veiled: 0x7863aa, Rooted: 0x70cf5c, Frozen: 0xb9f4ff,
+  Blinded: 0xf4f4ff, Veiled: 0x7863aa, Rooted: 0x70cf5c, KnockedDown: 0xd9a66f, Frozen: 0xb9f4ff,
   Stunned: 0xffff73, Haste: 0x63ff9b, Grounded: 0xc6a878,
   AetherSurge: 0x45f6ff, Attunement: 0xff8738, Phoenix: 0xffd36a,
 };
 const STATUS_PRIORITY = [
-  'Frozen', 'Stunned', 'Burning', 'Rooted', 'Static', 'Chilled', 'Soaked', 'Wet',
+  'Frozen', 'Stunned', 'KnockedDown', 'Burning', 'Rooted', 'Static', 'Chilled', 'Soaked', 'Wet',
   'Marked', 'Sundered', 'Weakened', 'Sloth', 'Blinded', 'Veiled',
   'Phoenix', 'Grounded', 'AetherSurge', 'Attunement', 'Haste',
 ];
@@ -664,7 +664,11 @@ export class Arena {
     const e = this.enemy; if (!e) return;
     const ud = e.userData; const t = this._t;
     const casting = enemyState && enemyState.casting ? enemyState.casting : null;
+    const knockedDown = !!(enemyState?.statuses?.KnockedDown?.ticks > 0);
     const prog = casting ? 1 - casting.ticks / Math.max(1, casting.totalTicks || 1) : 0;
+    const targetFall = knockedDown ? 1.35 : 0;
+    const fallK = this.reduced ? 1 : 1 - Math.exp(-14 * Math.max(0, dtMs) * 0.001);
+    e.rotation.z += (targetFall - e.rotation.z) * fallK;
 
     // Aura tint + staff crystal glow (school-coloured cast tell).
     const aura = ud.aura, crystal = ud.staffCrystal;

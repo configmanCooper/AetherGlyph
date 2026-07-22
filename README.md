@@ -4,7 +4,7 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.6.3 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.6.4 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
 service, and the deterministic shared simulation. Version 1.6.0 adds authoritative
 100-point Stamina bars and costs for movement, Dodge, Brace, and Focus; Haste
@@ -141,8 +141,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10603 /
-versionName 1.6.3). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10604 /
+versionName 1.6.4). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -393,7 +393,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10603` / `versionName 1.6.3`, no cleartext production traffic,
+  `versionCode 10604` / `versionName 1.6.4`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.

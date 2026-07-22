@@ -252,6 +252,19 @@ export function run() {
   ok(!sim.hasStatus(sim.wizards[1], 'Stunned'),
     'one Static stack does not prime a Storm Stun');
 
+  sim = mk([34], [1]);
+  fire(sim, 34, 0, 90);
+  ok(sim.hasStatus(sim.wizards[1], 'KnockedDown'), 'Quake knocks the target down for movement denial');
+
+  sim = mk([33], [1]);
+  fire(sim, 33, 0, 90);
+  ok(sim.hasStatus(sim.wizards[1], 'KnockedDown'), 'Gust Wall knocks the opposing wizard down');
+
+  sim = mk([33], [1]);
+  sim.applyStatus(sim.wizards[1], 'Grounded', 1);
+  fire(sim, 33, 0, 90);
+  ok(!sim.hasStatus(sim.wizards[1], 'KnockedDown'), 'Grounded targets resist Gust Wall knockdown');
+
   // Two zones per player: a third owned zone replaces the oldest.
   sim = mk([31, 32, 35], [1]);
   fire(sim, 31); fire(sim, 32); fire(sim, 35);

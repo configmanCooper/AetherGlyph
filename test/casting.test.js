@@ -175,6 +175,25 @@ export function run() {
   ok(!sim.wizards[1].focusing || sim.wizards[1].charges === 0, 'Concussive interrupts Focus');
   ok(sim.wizards[0].countersLanded >= 1, 'interrupt counts as a counter landed');
 
+  sim = freshSim();
+  sim.wizards[0].aether = 100;
+  sim.step({ 0: { cast: 28, castQuality: 1 }, 1: {} });
+  idleFor(sim, 60);
+  ok(sim.hasStatus(sim.wizards[1], 'KnockedDown'), 'Concussive Blast knocks the target down');
+  const knockedPos = sim.wizards[1].arcPos;
+  const knockedDodges = sim.wizards[1].sidestepCharges;
+  sim.step({ 0: {}, 1: { move: 1, sidestep: 1, cast: 1, castQuality: 1 } });
+  eq(sim.wizards[1].arcPos, knockedPos, 'Knocked Down blocks movement and Dodge');
+  eq(sim.wizards[1].sidestepCharges, knockedDodges, 'Knocked Down does not consume a failed Dodge charge');
+  ok(!!sim.wizards[1].casting, 'Knocked Down still allows spell casting');
+
+  sim = freshSim();
+  sim.wizards[0].aether = 100;
+  sim.applyStatus(sim.wizards[1], 'Grounded', 1);
+  sim.step({ 0: { cast: 28, castQuality: 1 }, 1: {} });
+  idleFor(sim, 60);
+  ok(!sim.hasStatus(sim.wizards[1], 'KnockedDown'), 'Grounding Mantle prevents Concussive knockdown');
+
   // Guide selection does not restrict casting. With normal resource/charge
   // requirements met, every roster spell can begin from the starter guide set.
   let unrestricted = 0;

@@ -609,6 +609,7 @@ const ZONE_BUILDERS = {
   // screen-space haze while this world-space bank supplies depth and motion.
   Fog(reduced, r, c) {
     const g = new THREE.Group();
+    const heightScale = 1.5;
     const grey = 0x9aa3b2, greyHi = 0xc4ccd8;
     const ground = mesh(G.disc(), matBasic(grey, 0.16, false)); ground.rotation.x = -Math.PI / 2; ground.scale.setScalar(r); ground.position.y = 0.05; g.add(ground);
     const layers = [];
@@ -616,10 +617,10 @@ const ZONE_BUILDERS = {
     for (let i = 0; i < n; i++) {
       const puff = mesh(G.ballHi(), matBasic(i % 2 ? greyHi : grey, 0.16, false));
       const sx = r * (0.72 + (i % 3) * 0.16);
-      puff.scale.set(sx, 0.7 + (i % 3) * 0.25, sx);
+      puff.scale.set(sx, (0.7 + (i % 3) * 0.25) * heightScale, sx);
       const bx = (i / Math.max(1, n - 1) - 0.5) * 1.7 * r;
       const bz = (((i * 37) % 100) / 100 - 0.5) * 0.9 * r;
-      puff.position.set(bx, 0.65 + (i % 4) * 0.34, bz);
+      puff.position.set(bx, (0.65 + (i % 4) * 0.34) * heightScale, bz);
       puff.userData = { bx, bz, ph: i };
       g.add(puff); layers.push(puff);
     }

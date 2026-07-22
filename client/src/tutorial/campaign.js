@@ -253,7 +253,7 @@ export const CAMPAIGN = [
       'Complete one Focus, then interrupt theirs with Concussive Blast.',
     ],
     timerEnabled: false, pressureEnabled: false,
-    playerLoadout: [28], opponentLoadout: [1],
+    playerLoadout: [28], opponentLoadout: [1, 2, 3],
     taughtSpells: [{ id: 28, enterStage: 0, exitStage: 2 }],
     drills: [],
     opponent: { type: 'script', config: { behavior: 'focus-loop', startTick: 120 } },
@@ -276,23 +276,27 @@ export const CAMPAIGN = [
     narration: [
       'Setups pay off later: Amplify Marks the target for a bigger hit.',
       'Do not spend the payoff into a raised defence — wait for the window.',
-      'Mark the instructor, wait out their Barrier, then land Arcane Missile.',
+      'Mark the instructor, wait out their Barrier, then land Arcane Missile before Mark expires.',
     ],
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [18, 5], opponentLoadout: [11],
     taughtSpells: [{ id: 18, enterStage: 0, exitStage: 2 }, { id: 5, enterStage: 0, exitStage: 2 }],
     drills: [22],
     arena: { playerCharges: 1 },
-    opponent: { type: 'script', config: { behavior: 'on-mark-defend', defendId: 11, triggerStatus: 'Marked' } },
+    opponent: {
+      type: 'script',
+      config: { behavior: 'on-mark-defend', defendId: 11, triggerStatus: 'Marked', recastDelayTicks: 180 },
+    },
     objectives: [
       { id: 'mark', text: 'Mark the instructor with Amplify', predicate: 'apply-status:Marked', expectSpell: 18 },
-      { id: 'payoff', text: 'Land Arcane Missile after the defence drops', predicate: 'land-spell:5', expectSpell: 5 },
+      { id: 'payoff', text: 'Land Arcane Missile while the instructor is still Marked', predicate: 'land-marked-spell:5', expectSpell: 5 },
     ],
     remediation: ['slow-script'],
     maxTicks: 2400,
     solution: (sim, t) => {
       const bot = sim.wizards[1];
       if (t.statusOnOpp('Marked') < 1) return pc(sim, 18) ? { cast: 18, castQuality: 1 } : IDLE;
+      if (bot.casting?.spellId === 11) return IDLE; // let the first Barrier finish forming
       if (bot.barrier && bot.barrier.ticks > 0) return IDLE; // wait out the defence
       if (t.facts.hitsOnOppBySpell.get(5) >= 1) return IDLE;
       return pc(sim, 5) ? { cast: 5, castQuality: 1 } : IDLE;
@@ -345,7 +349,10 @@ export const CAMPAIGN = [
       { id: 1, enterStage: 1, exitStage: 1 },
     ],
     drills: [],
-    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 0, cast: 31 }] } },
+    opponent: {
+      type: 'script',
+      config: { behavior: 'sequence', loop: true, loopEveryTicks: 900, steps: [{ tick: 0, cast: 31 }] },
+    },
     objectives: [
       { id: 'wash', text: 'Wash the instructor\'s Oil slick with Rain', predicate: 'reaction:WashedGround', expectSpell: 32 },
       { id: 'oil-fire', text: 'Place an Oil slick to ignite', predicate: 'create-zone:Oil', expectSpell: 31 },
@@ -491,6 +498,7 @@ export const CAMPAIGN = [
       'Defeat the fair Easy AI in one legal round.',
     ],
     formal: true,
+    fullRoster: true,
     timerEnabled: true, pressureEnabled: true,
     loadoutRule: 'legal',
     playerLoadout: PRESETS_BY_KEY['ember-rush'].ids.slice(),
@@ -545,16 +553,25 @@ export const CAMPAIGN = [
       'Repeated same-school casts build resonance and discounts.',
       'Switching schools deliberately triggers shared reactions.',
       'Attune to Ember, cast across three schools, and trigger two reactions.',
+      'The dotted guide changes for each step; every spell in this lesson remains castable.',
     ],
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [19, 32, 3, 31, 1], opponentLoadout: [1],
-    taughtSpells: [{ id: 19, enterStage: 0, exitStage: 2 }],
+    taughtSpells: [
+      { id: 19, enterStage: 0, exitStage: 2 },
+      { id: 32, enterStage: 0, exitStage: 2 },
+      { id: 3, enterStage: 0, exitStage: 2 },
+      { id: 31, enterStage: 0, exitStage: 2 },
+      { id: 1, enterStage: 0, exitStage: 2 },
+    ],
     drills: [],
     opponent: { type: 'script', config: { behavior: 'idle' } },
     objectives: [
-      { id: 'attune', text: 'Attune to Ember', predicate: 'self-status:Attunement' },
-      { id: 'schools', text: 'Cast from three schools', predicate: 'schools-cast:3' },
-      { id: 'reactions', text: 'Trigger two reactions', predicate: 'reactions-distinct:2' },
+      { id: 'attune', text: 'Attune to Ember', predicate: 'self-status:Attunement', expectSpell: 19 },
+      { id: 'rain', text: 'Cast Rain Glyph from the Tide school', predicate: 'cast-spell:32', expectSpell: 32 },
+      { id: 'conduct', text: 'Cast Spark Dart from Storm to trigger Conductive Arc', predicate: 'reaction:ConductiveArc', expectSpell: 3 },
+      { id: 'oil', text: 'Cast Oil Script from Ember', predicate: 'cast-spell:31', expectSpell: 31 },
+      { id: 'flash', text: 'Cast Ember Bolt to trigger Flash Fire', predicate: 'reaction:FlashFire', expectSpell: 1 },
     ],
     clues: ['prismaticReactions'],
     remediation: ['slow-script'],
@@ -587,8 +604,14 @@ export const CAMPAIGN = [
     playerLoadout: [12, 11, 5], opponentLoadout: [5, 8],
     taughtSpells: [{ id: 12, enterStage: 0, exitStage: 2 }, { id: 11, enterStage: 0, exitStage: 2 }],
     drills: [],
-    arena: { botCharges: 2 },
-    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }] } },
+    arena: { botCharges: 3 },
+    opponent: {
+      type: 'script',
+      config: {
+        behavior: 'sequence', loop: true, loopEveryTicks: 900,
+        steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }],
+      },
+    },
     objectives: [
       { id: 'reflect', text: 'Reflect the Arcane Missile', predicate: 'reflect', expectSpell: 12 },
       { id: 'survive', text: 'Survive the Fireball behind a Barrier', predicate: 'block-damage:20', expectSpell: 11 },
@@ -615,7 +638,7 @@ export const CAMPAIGN = [
 
   {
     id: 'A16', chapter: 'academy', title: 'The Eight Schools Examination', order: 16,
-    optional: true, formal: true, bestOfThree: true,
+    optional: true, formal: true, bestOfThree: true, fullRoster: true,
     narration: [
       'Adapt across schools against a sharper opponent.',
       'Win a best-of-three against the fair Medium AI — take two rounds.',
@@ -649,8 +672,14 @@ export const CAMPAIGN = [
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [12, 11, 5], opponentLoadout: [5, 8],
     taughtSpells: [], drills: [],
-    arena: { botCharges: 2 },
-    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }] } },
+    arena: { botCharges: 3 },
+    opponent: {
+      type: 'script',
+      config: {
+        behavior: 'sequence', loop: true, loopEveryTicks: 900,
+        steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }],
+      },
+    },
     objectives: [
       { id: 'reflect', text: 'Reflect the Arcane Missile', predicate: 'reflect' },
       { id: 'survive', text: 'Survive the Fireball behind a Barrier', predicate: 'block-damage:20' },
@@ -684,17 +713,22 @@ export const CAMPAIGN = [
     ],
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [13, 1], opponentLoadout: [2, 27],
-    taughtSpells: [], drills: [],
-    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 60, cast: 2 }, { tick: 300, cast: 27 }] } },
+    taughtSpells: [{ id: 13, enterStage: 0, exitStage: 2 }], drills: [],
+    opponent: {
+      type: 'script',
+      config: {
+        behavior: 'sequence', loop: true, loopEveryTicks: 600,
+        steps: [{ tick: 60, cast: 2 }, { tick: 300, cast: 27 }],
+      },
+    },
     objectives: [
-      { id: 'cleanse', text: 'Cleanse the Chill with Dispel', predicate: 'cleanse:Chilled' },
-      { id: 'safe', text: 'Never be Frozen', predicate: 'no-self-status:Frozen' },
+      { id: 'cleanse', text: 'Cleanse the Chill with Dispel', predicate: 'cleanse:Chilled', expectSpell: 13 },
+      { id: 'safe', text: 'Last 60 seconds without being Frozen', predicate: 'status-free-streak:Frozen:60' },
     ],
     remediation: ['slow-script'],
-    maxTicks: 2400,
+    maxTicks: 9000,
     solution: (sim, t) => {
       const p = sim.wizards[0];
-      if (t.facts.dispelRemovedBySelf.includes('Chilled')) return IDLE;
       if (sim.hasStatus(p, 'Chilled') && pc(sim, 13)) return { cast: 13, castQuality: 1 };
       return IDLE;
     },
@@ -842,7 +876,7 @@ export const CAMPAIGN = [
   // --- secret trials (optional; cover roster 37-40) -------------------------
   {
     id: 'T37', chapter: 'secret', title: 'Mirror Twin', order: 100,
-    optional: true, secret: 37,
+    optional: true, secret: 37, clue: 'mirrorEight',
     narration: [
       'Two hands write one intention. A decoy matches your next windup.',
       'Draw Mirror Twin, then let the decoy absorb the intended shot.',
@@ -853,7 +887,10 @@ export const CAMPAIGN = [
     drills: [],
     trialSpell: 37,
     arena: { playerCharges: 2 },
-    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 150, cast: 1 }] } },
+    opponent: {
+      type: 'script',
+      config: { behavior: 'sequence', loop: true, loopEveryTicks: 480, steps: [{ tick: 150, cast: 1 }] },
+    },
     objectives: [
       { id: 'cast', text: 'Draw Mirror Twin', predicate: 'cast-spell:37' },
       { id: 'decoy', text: 'Let the decoy absorb the shot', predicate: 'decoy-absorb' },
@@ -868,7 +905,7 @@ export const CAMPAIGN = [
 
   {
     id: 'T38', chapter: 'secret', title: 'Hourglass Field', order: 101,
-    optional: true, secret: 38,
+    optional: true, secret: 38, clue: 'hourglassMovement',
     narration: [
       'The sand slows all, including its keeper.',
       'Lay the Hourglass Field, then slip a fast shot it has slowed.',
@@ -894,7 +931,7 @@ export const CAMPAIGN = [
 
   {
     id: 'T39', chapter: 'secret', title: 'Phoenix Covenant', order: 102,
-    optional: true, secret: 39,
+    optional: true, secret: 39, clue: 'phoenixOil',
     narration: [
       'A flame survives only when the enemy knows it burns.',
       'Light the covenant, then survive a committed lethal strike.',
@@ -904,8 +941,14 @@ export const CAMPAIGN = [
     taughtSpells: [],
     drills: [],
     trialSpell: 39,
-    arena: { playerCharges: 3, playerHealth: 24, botCharges: 1 },
-    opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 120, cast: 1 }, { tick: 240, cast: 8 }] } },
+    arena: { playerCharges: 3, playerHealth: 24, botCharges: 3 },
+    opponent: {
+      type: 'script',
+      config: {
+        behavior: 'sequence', loop: true, loopEveryTicks: 600,
+        steps: [{ tick: 120, cast: 1 }, { tick: 240, cast: 8 }],
+      },
+    },
     objectives: [
       { id: 'covenant', text: 'Activate Phoenix Covenant', predicate: 'self-status:Phoenix' },
       { id: 'survive', text: 'Survive a lethal strike', predicate: 'phoenix-survive' },
@@ -919,7 +962,7 @@ export const CAMPAIGN = [
 
   {
     id: 'T40', chapter: 'secret', title: 'Prismatic Beam', order: 103,
-    optional: true, secret: 40,
+    optional: true, secret: 40, clue: 'prismaticReactions',
     narration: [
       'No single color opens the spectrum.',
       'Build mixed resonance, then complete the six-segment channel within the cap.',
@@ -1028,7 +1071,9 @@ export function groupProgress(profile, group) {
 // True when a lesson has no unmet prerequisites. Lessons without `requires` are
 // always unlocked (the entire non-exam campaign, and the gauntlet stages).
 export function lessonUnlocked(lesson, profile) {
-  if (!lesson || !lesson.requires || !lesson.requires.length) return true;
+  if (!lesson) return false;
+  if (lesson.clue && !(profile && profile.clues && profile.clues[lesson.clue])) return false;
+  if (!lesson.requires || !lesson.requires.length) return true;
   const completed = (profile && profile.completedLessons) || [];
   for (const req of lesson.requires) {
     if (req.group != null) {
@@ -1046,6 +1091,9 @@ export function lockReason(lesson, profile) {
   if (lessonUnlocked(lesson, profile)) return null;
   const completed = (profile && profile.completedLessons) || [];
   const parts = [];
+  if (lesson.clue && !(profile && profile.clues && profile.clues[lesson.clue])) {
+    parts.push('reveal its secret clue');
+  }
   for (const req of lesson.requires || []) {
     if (req.group != null) {
       const gp = groupProgress(profile, req.group);

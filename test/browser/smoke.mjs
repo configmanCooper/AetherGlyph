@@ -203,6 +203,18 @@ try {
   await drawCalibrationBaseline(page);
 
   await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('#coach [data-action="tut-replay"]', { timeout: 5000 });
+  await new Promise((r) => setTimeout(r, 500));
+  const tutorialTickBeforeReplay = await page.evaluate(() => window.__aegTest.info().tutorialTick);
+  await page.click('#coach [data-action="tut-replay"]');
+  await new Promise((r) => setTimeout(r, 120));
+  const replayState = await page.evaluate(() => window.__aegTest.info());
+  if (replayState.mode !== 'tutorial' || !replayState.running
+      || replayState.tutorialTick == null || replayState.tutorialTick >= tutorialTickBeforeReplay) {
+    fail('Replay lesson did not restart the active tutorial: ' + JSON.stringify({
+      before: tutorialTickBeforeReplay, after: replayState,
+    }));
+  }
   const calibDone = await page.evaluate(() => {
     try { return JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}').calibration; } catch { return null; }
   });
@@ -414,8 +426,8 @@ try {
         arrows: Number(document.querySelector('#draw-canvas')?.dataset.guideArrows || 0),
         labels: document.querySelector('#draw-canvas')?.dataset.guideCueLabels || '',
       }));
-      if (frostCues.arrows !== 1 || frostCues.labels !== '') {
-        fail('Frost Bind should show one clear right-pointing bottom connector arrow: ' + JSON.stringify(frostCues));
+      if (frostCues.arrows !== 4 || frostCues.labels !== '') {
+        fail('Frost Bind should show a leftward start cue plus three path arrows: ' + JSON.stringify(frostCues));
       }
     }
     if (ids.includes(33)) {
@@ -666,6 +678,11 @@ try {
             const parentWidth = fill.parentElement.getBoundingClientRect().width;
             return parentWidth > 0 ? fill.getBoundingClientRect().width / parentWidth : 0;
           }),
+          healthRatios: ['#player-health', '#enemy-health'].map((selector) => {
+            const fill = document.querySelector(selector);
+            const parentWidth = fill.parentElement.getBoundingClientRect().width;
+            return parentWidth > 0 ? fill.getBoundingClientRect().width / parentWidth : 0;
+          }),
           touchVisible: getComputedStyle(touch).display !== 'none',
           desktopHidden: getComputedStyle(desktop).display === 'none',
         };
@@ -679,6 +696,7 @@ try {
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.draw)
           || landscapeControls.staminaBars !== 2 || !/rgb\(66, 184, 90\)/.test(landscapeControls.staminaColor)
           || landscapeControls.staminaRatios.some((ratio) => ratio < 0.99)
+          || landscapeControls.healthRatios.some((ratio) => ratio < 0.99)
           || !landscapeControls.touchVisible || !landscapeControls.desktopHidden) {
         fail('landscape mobile controls are not compact/above joystick: ' + JSON.stringify(landscapeControls));
       }
@@ -1066,6 +1084,7 @@ try {
     fog: window.__aegVfx.fogVeil(1),
     fogInside: window.__aegVfx.fogForPosition(0.1, 0, 0.55),
     fogOutside: window.__aegVfx.fogForPosition(0.9, 0, 0.55),
+    fogBounds: window.__aegVfx.zoneBounds('Fog'),
     blind: window.__aegVfx.blindVeil(true),
     cover: window.__aegVfx.zoneBounds('Cover'),
   }));
@@ -1074,6 +1093,9 @@ try {
   }
   if (!perceptionVfx.fogInside.visible || perceptionVfx.fogOutside.visible) {
     fail('Fog screen haze does not clear after leaving the zone: ' + JSON.stringify(perceptionVfx));
+  }
+  if (perceptionVfx.fogBounds.height < 4.6) {
+    fail('Fog Cloud world bank is not 50% taller: ' + JSON.stringify(perceptionVfx.fogBounds));
   }
   if (!perceptionVfx.blind.visible || perceptionVfx.blind.opacity < 0.85
       || perceptionVfx.blind.width < 6 || perceptionVfx.blind.height < 4

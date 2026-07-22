@@ -6,7 +6,7 @@ import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { effectFor } from '../shared/src/sim/spellEffects.js';
-import { STATUSES, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
+import { MATCH, STATUSES, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
 
 const sToTicks = (s) => Math.max(0, Math.round(s * TICK_HZ));
 
@@ -110,7 +110,7 @@ export function run() {
   guarded.wizards[1].barrier = { absorb: 1, ticks: 600 };
   guarded.step({ 0: { cast: 3, castQuality: 1 }, 1: {} });
   for (let t = 0; t < 120 && !guarded.ended; t++) guarded.step({ 0: {}, 1: {} });
-  ok(guarded.wizards[1].health < 100, 'projectile overflow can damage through a broken Barrier');
+  ok(guarded.wizards[1].health < MATCH.startHealth, 'projectile overflow can damage through a broken Barrier');
   ok(!guarded.hasStatus(guarded.wizards[1], 'Static'),
     'a projectile that collided with Barrier cannot deliver its status rider');
 

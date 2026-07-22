@@ -4,6 +4,7 @@ import { createHarness } from './tiny.js';
 import { Series, runSeries, SERIES } from '../shared/src/sim/match.js';
 import { presetLoadout, PRESETS } from '../shared/src/balance/loadouts.js';
 import { makeBots } from '../shared/src/bot/bot.js';
+import { MATCH } from '../shared/src/sim/constants.js';
 
 function sourcesFor(seed) {
   return (sim, ri) => {
@@ -40,7 +41,8 @@ export function run() {
   const idsB = simB.wizards.map((w) => w.loadoutIds.join(','));
   eq(idsA[0], idsB[0], 'player loadout preserved across rounds');
   eq(idsA[1], idsB[1], 'opponent loadout preserved across rounds');
-  ok(simB.wizards[0].health === 100 && simB.wizards[0].charges === 0, 'round state resets (full health, no charges)');
+  ok(simB.wizards[0].health === MATCH.startHealth && simB.wizards[0].charges === 0,
+    'round state resets (full health, no charges)');
   ok(simB !== simA, 'each round uses a fresh sim');
 
   // A full headless best-of-three always decides and never exceeds max rounds.

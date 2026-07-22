@@ -7,7 +7,7 @@ export const DT = 1 / TICK_HZ;
 
 // --- Match structure (MASTERPLAN §3) -------------------------------------
 export const MATCH = {
-  startHealth: 100,
+  startHealth: 150,
   roundLimitS: 105,
   arcanePressureStartS: 60,
   arcanePressureStepS: 10,
@@ -98,6 +98,7 @@ export const STATUSES = {
   Blinded:  { durationS: 4, maxStacks: 1, kind: 'flag', harmful: true },   // Eclipse Glare
   Veiled:   { durationS: 6, maxStacks: 1, kind: 'flag', harmful: true },   // Veil Hex (visual)
   Rooted:   { durationS: 3, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
+  KnockedDown: { durationS: 2, maxStacks: 1, canCast: true, kind: 'control', harmful: true },
   Frozen:   { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   // Self buffs -------------------------------------------------------------
@@ -113,7 +114,7 @@ export const HARD_CONTROL = new Set(['Frozen', 'Stunned']);
 
 // Harmful statuses Dispel can strip (order = Dispel removal priority).
 export const DISPELLABLE = [
-  'Frozen', 'Stunned', 'Rooted', 'Marked', 'Sundered', 'Weakened',
+  'Frozen', 'Stunned', 'Rooted', 'KnockedDown', 'Marked', 'Sundered', 'Weakened',
   'Burning', 'Chilled', 'Sloth', 'Soaked', 'Wet', 'Static', 'Blinded', 'Veiled',
 ];
 

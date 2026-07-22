@@ -116,7 +116,7 @@ export const SPELL_EFFECTS = {
       consume: 'Chilled', grantsTenacity: true, ignoreHardCap: true }, school: 'Tide',
   },
   28: { // Concussive Blast
-    type: PROJECTILE, damage: 6, knockback: true, interrupt: true, status: null,
+    type: PROJECTILE, damage: 6, knockback: true, knockdown: true, interrupt: true, status: null,
     travelS: 0.28, homing: 0, dodgeRadius: 0.34, school: 'Gale', reflectable: false,
   },
   29: { type: HEX, status: { name: 'Blinded', stacks: 1 }, school: 'Umbra' }, // Eclipse Glare
@@ -132,9 +132,9 @@ export const SPELL_EFFECTS = {
   // === Environmental (6) ===================================================
   31: { type: ZONE, zoneKind: 'Oil', school: 'Ember' }, // Oil Script
   32: { type: ZONE, zoneKind: 'Wet', dousesBurning: true, school: 'Tide' }, // Rain Glyph
-  33: { type: ZONE, zoneKind: 'Gust', deflect: true, deflectWindowS: 1.2, movesZones: true, school: 'Gale' }, // Gust Wall
+  33: { type: ZONE, zoneKind: 'Gust', deflect: true, deflectWindowS: 1.2, movesZones: true, knockdown: true, school: 'Gale' }, // Gust Wall
   34: { // Quake — area damage + interrupt + destroy cover
-    type: PROJECTILE, damage: 10, interrupt: true, destroysCover: true, status: null, charges: 1,
+    type: PROJECTILE, damage: 10, interrupt: true, knockdown: true, destroysCover: true, status: null, charges: 1,
     travelS: 0.2, homing: 0, dodgeRadius: 0.5, area: true, school: 'Stone', reflectable: false,
     quake: true,
   },

@@ -15,6 +15,7 @@ import { EVENTS, ERR } from '../shared/src/protocol/events.js';
 import { boundTrace } from '../shared/src/protocol/net.js';
 import { GESTURE_TEMPLATES } from '../shared/src/gesture/templates.js';
 import { presetLoadout } from '../shared/src/balance/loadouts.js';
+import { MATCH } from '../shared/src/sim/constants.js';
 
 let pass = 0, fail = 0;
 const fails = [];
@@ -123,18 +124,19 @@ async function main() {
 
     // --- 5. Authoritative damage / resource state ------------------------
     // Poll snapshots for the authoritative outcome (robust to tick timing).
-    const damaged = await waitUntil(() => snaps.some((m) => m.state && m.state.wizards[1].health < 100), 4000);
+    const damaged = await waitUntil(() => snaps.some((m) =>
+      m.state && m.state.wizards[1].health < MATCH.startHealth), 4000);
     ok(damaged, 'opponent took authoritative damage from the drawn Ember Bolt');
-    let minOppHealth = 100, minSelfAether = 100, sawSelf100 = true;
+    let minOppHealth = MATCH.startHealth, minSelfAether = 100, sawSelfFull = true;
     for (const m of snaps) {
       const w = m.state && m.state.wizards;
       if (!w) continue;
       minOppHealth = Math.min(minOppHealth, w[1].health);
       minSelfAether = Math.min(minSelfAether, w[0].aether);
-      if (w[0].health < 100) sawSelf100 = false;
+      if (w[0].health < MATCH.startHealth) sawSelfFull = false;
     }
     ok(minSelfAether < 60, `caster spent Aether authoritatively (min ${minSelfAether.toFixed(1)})`);
-    ok(sawSelf100, 'still caster took no damage (state is server-owned, not client-set)');
+    ok(sawSelfFull, 'still caster took no damage (state is server-owned, not client-set)');
 
     // Frost Lance is not one of the host's eight submitted guide shortcuts, but
     // the authoritative recognizer still accepts its real glyph.

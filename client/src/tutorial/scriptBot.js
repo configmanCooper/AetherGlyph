@@ -31,6 +31,9 @@ export class ScriptBot {
       nextHeavy: config.heavyStartTick ?? 200,
       returnArmed: false,
       wardArmed: true,
+      defenseWasActive: false,
+      nextDefenseAttempt: 0,
+      sequenceCycleStart: 0,
     };
   }
 
@@ -99,10 +102,18 @@ export class ScriptBot {
     return { move: 0 };
   }
 
-  // Continuously Focus so the student can practise interrupting a channel.
+  // Focus to three charges, spend one on an available spell, then resume Focus.
   _focusLoop(sim) {
     const startTick = this.config.startTick ?? 0;
     if (sim.tick < startTick) return { move: 0 };
+    const w = sim.wizards[this.id];
+    if (w.charges >= 3) {
+      // Release Focus first; casting while Focus is held is intentionally illegal.
+      if (w.focusing) return { move: 0 };
+      const spellId = this.firstProjectile(sim);
+      if (spellId != null) return { move: 0, cast: spellId, castQuality: 1 };
+      return { move: 0 };
+    }
     return { move: 0, focus: true };
   }
 
@@ -112,6 +123,16 @@ export class ScriptBot {
     const w = sim.wizards[this.id];
     const defendId = this.config.defendId ?? 11; // Barrier Dome
     const trigger = this.config.triggerStatus ?? 'Marked';
+    const delayTicks = this.config.recastDelayTicks ?? 180;
+    if (w.barrier && w.barrier.ticks > 0) {
+      this.mem.defenseWasActive = true;
+      return { move: 0 };
+    }
+    if (this.mem.defenseWasActive) {
+      this.mem.defenseWasActive = false;
+      this.mem.nextDefenseAttempt = sim.tick + delayTicks;
+    }
+    if (sim.tick < this.mem.nextDefenseAttempt) return { move: 0 };
     if (sim.hasStatus(w, trigger) && !w.barrier && this.canCast(sim, defendId)) {
       return { move: 0, cast: defendId, castQuality: 1 };
     }
@@ -132,10 +153,11 @@ export class ScriptBot {
   // Each step fires once, on or after its tick, when castable.
   _sequence(sim) {
     const steps = this.config.steps || [];
+    const cycleStart = this.mem.sequenceCycleStart;
     for (let i = 0; i < steps.length; i++) {
       if (this.mem.seqDone.has(i)) continue;
       const step = steps[i];
-      if (sim.tick < step.tick) continue;
+      if (sim.tick < cycleStart + step.tick) continue;
       if (step.focus) { this.mem.seqDone.add(i); return { move: 0, focus: true }; }
       if (step.cast != null) {
         if (this.canCast(sim, step.cast)) { this.mem.seqDone.add(i); return { move: 0, cast: step.cast, castQuality: 1 }; }
@@ -143,6 +165,14 @@ export class ScriptBot {
         return { move: 0 };
       }
       this.mem.seqDone.add(i);
+    }
+    if (this.config.loop && this.mem.seqDone.size >= steps.length) {
+      const loopEveryTicks = this.config.loopEveryTicks
+        ?? Math.max(1, ...steps.map((step) => Number(step.tick) || 0)) + 300;
+      if (sim.tick >= cycleStart + loopEveryTicks) {
+        this.mem.seqDone.clear();
+        this.mem.sequenceCycleStart = sim.tick;
+      }
     }
     return { move: 0 };
   }

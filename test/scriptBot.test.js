@@ -50,9 +50,43 @@ export function run() {
   ok(resourcesLegal, 'the ScriptBot keeps its resources within legal bounds');
 
   // --- 2. focus-loop actually sustains a focus (teachable moment) --------
-  const focusRun = driveScript({ behavior: 'focus-loop', startTick: 20 }, [28], [1], { ticks: 200 });
+  const focusRun = driveScript({ behavior: 'focus-loop', startTick: 20 }, [28], [1, 2, 3], { ticks: 500 });
   const focusCompletes = focusRun.events.filter((e) => e.type === 'focusComplete' && e.caster === 1).length;
   ok(focusCompletes >= 1, 'focus-loop sustains a Focus channel to completion (does not start-and-cancel)');
+  const focusCasts = focusRun.events.filter((e) => e.type === 'cast' && e.caster === 1);
+  ok(focusCasts.length >= 1, 'focus-loop spends a charge on a spell after reaching three charges');
+  const castTick = focusRun.events.findIndex((e) => e.type === 'cast' && e.caster === 1);
+  ok(focusRun.events.slice(castTick + 1).some((e) => e.type === 'focusStart' && e.caster === 1),
+    'focus-loop resumes Focusing after spending a charge');
+
+  {
+    const defendSim = new Sim({
+      seed: 4,
+      loadouts: [makeLoadout([18, 5]), makeLoadout([11])],
+      rules: { timer: false, pressure: false, cooldownScale: 0.05 },
+    });
+    defendSim.wizards[1].aether = 100;
+    defendSim.applyStatus(defendSim.wizards[1], 'Marked', 1);
+    const defendBot = makeScriptBot(1, {
+      behavior: 'on-mark-defend', defendId: 11, triggerStatus: 'Marked', recastDelayTicks: 180,
+    });
+    let firstBarrierEnd = null, secondBarrierStart = null, barrierStarts = 0;
+    for (let tick = 0; tick < 1000 && secondBarrierStart == null; tick++) {
+      const events = defendSim.step({ 0: {}, 1: defendBot.act(defendSim) });
+      for (const e of events) {
+        if (e.type === 'castStart' && e.caster === 1 && e.spellId === 11) {
+          barrierStarts += 1;
+          if (barrierStarts === 2) secondBarrierStart = defendSim.tick;
+        }
+      }
+      if (barrierStarts === 1 && !defendSim.wizards[1].barrier && defendSim.wizards[1].castsResolved >= 1
+          && firstBarrierEnd == null) firstBarrierEnd = defendSim.tick;
+    }
+    ok(firstBarrierEnd != null && secondBarrierStart != null,
+      'on-mark defender eventually raises a second Barrier while Mark remains');
+    ok(secondBarrierStart - firstBarrierEnd >= 180,
+      'on-mark defender waits a few seconds before replacing an expired Barrier');
+  }
 
   // --- 3. wall-focus places cover then channels behind it ---------------
   const wallRun = driveScript({ behavior: 'wall-focus', wallId: 15, startTick: 30 }, [15], [15], { ticks: 300 });
@@ -64,6 +98,16 @@ export function run() {
   const s1 = driveScript({ behavior: 'periodic', spellId: 1, startTick: 30, periodTicks: 90 }, [1], [1], { seed: 55, ticks: 400 });
   const s2 = driveScript({ behavior: 'periodic', spellId: 1, startTick: 30, periodTicks: 90 }, [1], [1], { seed: 55, ticks: 400 });
   eq(s1.intents.join(''), s2.intents.join(''), 'same config + seed replays an identical intent sequence');
+
+  const repeatedFreeze = driveScript({
+    behavior: 'sequence', loop: true, loopEveryTicks: 1200,
+    steps: [{ tick: 60, cast: 2 }, { tick: 300, cast: 27 }],
+  }, [13, 1], [2, 27], { ticks: 2600 });
+  const freezePatternCasts = repeatedFreeze.events.filter((e) =>
+    e.type === 'cast' && e.caster === 1 && (e.spellId === 2 || e.spellId === 27));
+  ok(freezePatternCasts.filter((e) => e.spellId === 2).length >= 2
+      && freezePatternCasts.filter((e) => e.spellId === 27).length >= 2,
+  'looping sequence repeats the Frost Lance/Frost Bind teaching pattern');
 
   // --- 5. canWizardCast gate matches the sim's own acceptance -----------
   const sim = new Sim({ seed: 1, loadouts: [makeLoadout([18]), makeLoadout([1])], rules: { timer: false, pressure: false } });
@@ -132,7 +176,7 @@ export function run() {
     }
     ok(!castBeforeWard, 'Ward drill does not attack before the student raises Ward');
     ok(blocked, 'Ward drill fires a bolt that is absorbed by the active Ward');
-    eq(wardSim.wizards[0].health, 100, 'a correct Ward prevents the teaching bolt from damaging health');
+    eq(wardSim.wizards[0].health, MATCH.startHealth, 'a correct Ward prevents the teaching bolt from damaging health');
   }
 
   return report('scriptBot');

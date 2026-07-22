@@ -261,6 +261,10 @@ export class Sim {
       this.emit('grounded', { target: target.id, blocked: 'Static' });
       return false;
     }
+    if (name === 'KnockedDown' && this.hasStatus(target, 'Grounded')) {
+      this.emit('grounded', { target: target.id, blocked: 'KnockedDown' });
+      return false;
+    }
     if (name === 'Wet' && this.hasStatus(target, 'Soaked')) return false;
     if (name === 'Soaked' && target.statuses.Wet) {
       delete target.statuses.Wet;
@@ -315,6 +319,7 @@ export class Sim {
   dealDamage(attacker, target, rawAmount, opts = {}) {
     if (rawAmount <= 0 || target.health <= 0) return 0;
     let dmg = rawAmount;
+    let markedPayoff = false;
 
     // Attacker Weakened reduces outgoing damage.
     if (attacker && this.hasStatus(attacker, 'Weakened')) {
@@ -326,6 +331,7 @@ export class Sim {
     }
     // Marked: next direct hit amplified, then consumed.
     if (!opts.ignoreAmp && this.hasStatus(target, 'Marked')) {
+      markedPayoff = true;
       dmg *= (1 + STATUSES.Marked.markBonus);
       delete target.statuses.Marked;
       this.emit('statusEnd', { target: target.id, status: 'Marked' });
@@ -382,7 +388,9 @@ export class Sim {
       target.lastActivityTick = this.tick;
       if (attacker) { attacker.damageDealt += dmg; attacker.lastActivityTick = this.tick; }
       this.emit('phoenixSave', { target: target.id });
-      if (!opts.silent) this.emit('damage', { target: target.id, amount: dmg, source: opts.source });
+      if (!opts.silent) this.emit('damage', {
+        target: target.id, amount: dmg, source: opts.source, markedPayoff,
+      });
       return dmg;
     }
 
@@ -392,7 +400,9 @@ export class Sim {
       attacker.damageDealt += dmg;
       attacker.lastActivityTick = this.tick;
     }
-    if (!opts.silent) this.emit('damage', { target: target.id, amount: dmg, source: opts.source });
+    if (!opts.silent) this.emit('damage', {
+      target: target.id, amount: dmg, source: opts.source, markedPayoff,
+    });
     if (target.health <= 0) this.endMatch(attacker ? attacker.id : this.opponentOf(target.id).id, 'health');
     return dmg;
   }
@@ -626,6 +636,9 @@ export class Sim {
     }
     zoneOpts.durationS = (ZONE.durations[eff.zoneKind] || 5) * durationScale;
     const zone = this.addZone(w.id, eff.zoneKind, zoneOpts);
+    if (eff.knockdown && !this.hasBarrier(opponent)) {
+      this.applyStatus(opponent, 'KnockedDown', 1);
+    }
     // Incoming water (Rain Glyph) immediately douses Burning + fire zones.
     let incoming = null;
     if (eff.zoneKind === 'Wet') incoming = 'water';
@@ -961,6 +974,9 @@ export class Sim {
         if (ok) { attacker.countersLanded += 1; this.emit('hardControl', { target: defender.id, status: 'Stunned' }); }
       }
     }
+    if (eff.knockdown && dealt > 0 && !barrierProtected) {
+      this.applyStatus(defender, 'KnockedDown', 1);
+    }
 
     // Knockback with diminishing returns (max 2 per 4s).
     if (eff.knockback) {
@@ -1103,6 +1119,7 @@ export class Sim {
     if (!intent) return;
     const canAct = this.canAct(w);
     const rooted = this.hasStatus(w, 'Rooted') || this.hasStatus(w, 'Frozen');
+    const knockedDown = this.hasStatus(w, 'KnockedDown');
     const wantsOther = !!(intent.sidestep || intent.brace || intent.cast != null);
     if (!intent.focus) this.clearActionReject(w, 'focus');
     if (!intent.brace) this.clearActionReject(w, 'brace');
@@ -1185,6 +1202,7 @@ export class Sim {
       else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
       else if (w.channel) reason = 'channeling';
       else if (rooted) reason = 'rooted';
+      else if (knockedDown) reason = 'knocked-down';
       else if (w.focusing || intent.focus) reason = 'focusing';
 
       const speed = MOVE.speedPerS * (1 - this.moveSlow(w)) * DT;
@@ -1212,6 +1230,7 @@ export class Sim {
       else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
       else if (w.channel) reason = 'channeling';
       else if (rooted) reason = 'rooted';
+      else if (knockedDown) reason = 'knocked-down';
       else if (w.focusing || intent.focus) reason = 'focusing';
       else if (w.sidestepCharges <= 0) reason = 'no-dodges';
 

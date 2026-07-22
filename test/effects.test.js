@@ -6,6 +6,7 @@ import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { SPELL_CATALOG } from '../shared/src/balance/spellData.generated.js';
 import { effectFor, everySpellHasEffect, categoryOf } from '../shared/src/sim/spellEffects.js';
+import { MATCH } from '../shared/src/sim/constants.js';
 
 // Cast one spell in isolation and report the observable deltas it produced.
 function castIsolated(id, prime = {}) {
@@ -20,7 +21,7 @@ function castIsolated(id, prime = {}) {
   sim.step({ 0: { cast: id, castQuality: 1 }, 1: {} });
   for (let t = 0; t < 200 && !sim.ended; t++) {
     sim.step({ 0: {}, 1: {} });
-    if (o.health < 100 - 0.001) dmg = true;
+    if (o.health < MATCH.startHealth - 0.001) dmg = true;
     if (Object.keys(o.statuses).length > 0) oppStatus = true;
     if (sim.zones.length > 0) zoneMade = true;
     if (w.shield || w.barrier || w.reflectTicks > 0 || w.mirrorTicks > 0 || w.evadeTicks > 0 || w.channel) selfDef = true;

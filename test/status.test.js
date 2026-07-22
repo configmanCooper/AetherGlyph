@@ -25,6 +25,7 @@ export function run() {
   eq(STATUSES.Blinded.durationS, 4, 'Eclipse Glare blindness lasts 4 seconds');
   eq(STATUSES.Veiled.durationS, 6, 'Veiled lasts 3x its baseline');
   eq(STATUSES.Rooted.durationS, 3, 'Entangle Root lasts 3 seconds');
+  eq(STATUSES.KnockedDown.durationS, 2, 'Knocked Down lasts 2 seconds');
   eq(STATUSES.Haste.durationS, 18, 'Haste lasts 3x its baseline');
   eq(STATUSES.AetherSurge.durationS, 18, 'Aether Surge lasts 3x its baseline');
   eq(STATUSES.Attunement.durationS, 18, 'Attunement lasts 3x its baseline');

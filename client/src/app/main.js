@@ -109,7 +109,10 @@ function guideTemplateFor(spellId) {
 
 const GUIDE_CUES = Object.freeze({
   27: [
+    { from: { x: 32, y: 66 }, to: { x: 20, y: 60 } },
+    { from: { x: 32, y: 34 }, to: { x: 43, y: 40 } },
     { from: { x: 43, y: 66 }, to: { x: 57, y: 66 } },
+    { from: { x: 68, y: 66 }, to: { x: 56, y: 60 } },
   ],
   33: [
     { from: { x: 50, y: 86 }, to: { x: 24, y: 26 }, bidirectional: true, label: '1', labelDx: -9 },
@@ -565,6 +568,8 @@ function renderTutorialHub() {
   const medalCount = Object.keys(p.medals).length;
   const clueCount = Object.keys(p.clues).length;
   const secretCount = Object.values(p.secretsFound).filter(Boolean).length;
+  const revealedSecretHints = SECRETS.filter((secret) =>
+    secret.clues.every((clue) => p.clues && p.clues[clue]));
   const grandmaster = p.medals && p.medals.grandmaster === true;
 
   const sum = $('#tut-summary');
@@ -578,7 +583,12 @@ function renderTutorialHub() {
       `<div class="tut-stat"><span class="k">Secrets</span><span class="v">${secretCount}/4</span></div>` +
       `<div class="tut-stat ranked ${p.rankedReady ? 'on' : ''}"><span class="k">Ranked</span>` +
       `<span class="v">${p.rankedReady ? 'Ready ✓' : 'Locked (win Lesson 12)'}</span></div>` +
-      (grandmaster ? '<div class="tut-stat ranked on"><span class="k">Title</span><span class="v">Grandmaster ★</span></div>' : '');
+      (grandmaster ? '<div class="tut-stat ranked on"><span class="k">Title</span><span class="v">Grandmaster ★</span></div>' : '') +
+      (revealedSecretHints.length
+        ? `<div class="tut-stat ranked on"><span class="k">Secret hints</span><span class="v">${
+          revealedSecretHints.map((secret) => `${secret.name}: ${secret.tagline}`).join(' · ')
+        }</span></div>`
+        : '');
   }
 
   const list = $('#tut-chapters');
@@ -645,14 +655,17 @@ function lessonButton(l, p) {
   btn.dataset.lesson = l.id;
   if (!unlocked) {
     const reason = lockReason(l, p) || 'Locked';
-    btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-lock">🔒 ${reason}</span>`;
+    const title = l.secret ? 'Unknown Secret Trial' : l.title;
+    btn.innerHTML = `<span class="tl-title">${title}</span><span class="tl-lock">🔒 ${reason}</span>`;
     btn.disabled = true;
     btn.setAttribute('aria-disabled', 'true');
     btn.setAttribute('aria-label', `${l.title} — ${reason}`);
     return btn;
   }
   const badge = done ? '✓' : (l.optional ? '☆' : '');
-  btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-badge">${badge}</span>`;
+  const secret = l.secret ? SECRETS.find((entry) => entry.trialId === l.id) : null;
+  btn.innerHTML = `<span class="tl-title">${l.title}</span><span class="tl-badge">${badge}</span>` +
+    (secret && !done ? `<span class="tl-lock">${secret.tagline}</span>` : '');
   btn.setAttribute('aria-label', `${l.title}${done ? ' (completed)' : ''}${l.optional ? ' (optional)' : ''}`);
   btn.addEventListener('click', () => startTutorialLesson(l.id));
   return btn;
@@ -678,7 +691,10 @@ function startTutorialLesson(lessonId) {
   tutorialLesson = lesson;
   mode = 'tutorial';
   series = null;
-  const recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(lesson.playerLoadout));
+  const recognitionIds = lesson.fullRoster
+    ? SPELL_CATALOG.map((spell) => spell.id)
+    : lesson.playerLoadout;
+  const recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(recognitionIds));
   gesture.recognizer = recognizer;
 
   tutorial = new TutorialRunner(lesson, {
@@ -945,7 +961,14 @@ function onTutorialComplete(res) {
   const lesson = tutorialLesson;
   const bits = [];
   if (res.medal) bits.push(`Medal earned: ${res.medal.text || res.medal.id}.`);
-  if (res.clues && res.clues.length) bits.push('A secret clue was revealed.');
+  if (res.clues && res.clues.length) {
+    const revealed = SECRETS.filter((secret) => secret.clues.some((clue) => res.clues.includes(clue)));
+    if (revealed.length) {
+      bits.push(`Secret trial unlocked: ${revealed.map((secret) => `${secret.name} — ${secret.tagline}`).join('; ')}.`);
+    } else {
+      bits.push('A secret clue was revealed.');
+    }
+  }
   if (res.secretFound) bits.push(`Secret discovered: ${SECRETS.find((s) => s.spellId === res.secretFound)?.name || 'a hidden glyph'}!`);
   if (lesson.reward && lesson.reward.rankedReady) bits.push('Ranked play unlocked — all public spells available.');
 
@@ -980,6 +1003,13 @@ function tutorialTryAgain() {
   if (!tutorial) return;
   tutorial.retry();
   updateCoachState();
+}
+
+function replayTutorialLesson() {
+  if (!tutorial || !tutorialLesson) return;
+  tutorial.restart();
+  armTutorialLesson();
+  toast('Lesson restarted.');
 }
 
 // ------------------------------------------------------------------ main loop
@@ -1031,6 +1061,7 @@ function handleEvents(events) {
         frozen: `You are Frozen and cannot ${action}.`,
         stunned: `You are Stunned and cannot ${action}.`,
         rooted: `You are Rooted and cannot ${action}.`,
+        'knocked-down': `You are Knocked Down and cannot ${action}.`,
         channeling: `You cannot ${action} while channeling a spell.`,
         casting: `You cannot ${action} while casting a spell.`,
         focusing: `You cannot ${action} while Focusing.`,
@@ -1500,6 +1531,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'tut-begin') beginTutorialLesson();
     else if (a === 'tut-showme') tutorialShowMe();
     else if (a === 'tut-tryagain') tutorialTryAgain();
+    else if (a === 'tut-replay') replayTutorialLesson();
     else if (a === 'calib-skip') skipCalibration();
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
@@ -1894,6 +1926,7 @@ if (typeof window !== 'undefined') {
       labEnemy: { ...labEnemy },
       enemyCastsResolved: match?.sim?.wizards?.[1]?.castsResolved ?? 0,
       enemyArcPos: match?.sim?.wizards?.[1]?.arcPos ?? 0,
+      tutorialTick: tutorial?.sim?.tick ?? null,
     }),
     recognize: (points) => {
       try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }

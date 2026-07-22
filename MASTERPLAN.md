@@ -53,7 +53,7 @@ The intended emotional arc is: recognize, prepare, bait, counter, transform the 
 ### Format
 
 - Best of three rounds.
-- 100 health each round.
+- 150 health each round.
 - Round limit: 105 seconds.
 - Aether starts at 60 of 100.
 - Sigil Charges start at 0 of 3.
@@ -226,6 +226,7 @@ Decision: become efficient but predictable, or switch schools to create a reacti
 | Chilled | 18 percent movement and cast recovery slow for 3 sec | Haste, Dispel |
 | Soaked | Lightning deals 25 percent more; removes Burning | leave water, Dispel |
 | Static | next channel is interrupted; 2 stacks prime stun; Spark Dart Static lasts 45 sec | Dispel |
+| Knocked Down | cannot move or Dodge for 2 sec; casting remains available | Grounding Mantle, Dispel |
 | Sundered | 20 percent more direct damage for 4 sec | Dispel, defensive play |
 | Weakened | 22 percent less outgoing damage for 4 sec | Dispel |
 | Marked | next direct hit gains 35 percent damage, then consumes mark | Dispel, Brace |
