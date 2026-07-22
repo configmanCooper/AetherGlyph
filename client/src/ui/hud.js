@@ -83,6 +83,7 @@ export class HUD {
   buildSpellbar(loadout, onCast, opts = {}) {
     if (!this.el.spellbar) return;
     this.el.spellbar.innerHTML = '';
+    if (opts.resetScroll) this.el.spellbar.scrollLeft = 0;
     this.spellButtons.clear();
     if (typeof opts.onBlank === 'function') {
       const blank = document.createElement('button');

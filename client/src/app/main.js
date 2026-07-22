@@ -405,6 +405,7 @@ function renderLabSpellbar() {
     onEnemyControl: () => openLabEnemyPanel(),
     enemyEnabled: labEnemy.enabled || labEnemy.movement,
     enemyLabel: labEnemyLabel(),
+    resetScroll: true,
     onNext: () => {
       labPage = (labPage + 1) % pages;
       labSelectedId = labPageIds()[0];
@@ -450,7 +451,7 @@ function startLab() {
   $('#devcast').classList.toggle('hidden', !settings.devcast);
   renderLabSpellbar();
   selectLabSpell(labSelectedId);
-  toast('Glyph Laboratory — draw freely. No opponent.');
+  toast('Glyph Laboratory — use Enemy in the guide bar to schedule attacks or movement.');
 }
 
 // Resolve the player + opponent loadouts for the configured practice round, then

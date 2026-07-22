@@ -79,7 +79,7 @@ imports, so every call is a safe no-op in a plain browser:
 ## Android project (`android/`, checked in)
 
 - `variables.gradle`: `minSdk 24`, `compileSdk 36`, `targetSdk 36`.
-- `app/build.gradle`: `versionCode 10500`, `versionName "1.5.0"`; release signing
+- `app/build.gradle`: `versionCode 10501`, `versionName "1.5.1"`; release signing
   read from an ignored `keystore.properties` (unsigned when absent).
 - `AndroidManifest.xml`: `singleTask`, orientation unlocked for the in-app
   Auto/Portrait/Landscape selector,

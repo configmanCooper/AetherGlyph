@@ -477,6 +477,7 @@ try {
   }
 
   // Blank guide mode clears the template but keeps all public spells recognizable.
+  await page.evaluate(() => { const bar = document.querySelector('#spellbar'); bar.scrollLeft = bar.scrollWidth; });
   await page.click('#spellbar .spell-blank');
   await new Promise((r) => setTimeout(r, 120));
   const blankLab = await page.evaluate(() => {
@@ -492,11 +493,12 @@ try {
       stage: canvas?.dataset.guideStage,
       guide: canvas?.dataset.guideSpell,
       selected: document.querySelector('#spellbar .spell-blank')?.classList.contains('selected'),
+      scrollLeft: document.querySelector('#spellbar')?.scrollLeft,
       painted,
     };
   });
   if (!/any public spell/i.test(blankLab.hint) || blankLab.stage !== 'blank'
-      || blankLab.guide != null || !blankLab.selected || blankLab.painted !== 0) {
+      || blankLab.guide != null || !blankLab.selected || blankLab.painted !== 0 || blankLab.scrollLeft !== 0) {
     fail('Glyph Laboratory Blank mode did not clear the guide: ' + JSON.stringify(blankLab));
   }
   const cooldownToggle = await page.$('#spellbar .spell-cooldown-toggle');

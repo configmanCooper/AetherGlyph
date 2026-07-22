@@ -4,9 +4,11 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.5.0 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.5.1 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
-service, and the deterministic shared simulation. Version 1.5.0 adds programmable
+service, and the deterministic shared simulation. Version 1.5.1 keeps the Glyph
+Lab Enemy control visible by resetting the horizontal guide strip and explains
+where to configure scheduled casts and patrol movement. Version 1.5.0 adds programmable
 Glyph Lab enemy casts, a real four-second Eclipse Glare whiteout that also removes
 Practice AI awareness, opponent-lane two-second Rune Snares, stronger Fog Cloud
 obscuration, larger Stone Walls, clearer Frost Bind/Gust directions, and broader
@@ -132,8 +134,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10500 /
-versionName 1.5.0). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10501 /
+versionName 1.5.1). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -384,7 +386,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10500` / `versionName 1.5.0`, no cleartext production traffic,
+  `versionCode 10501` / `versionName 1.5.1`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.
