@@ -3,11 +3,11 @@
 // / best-of-three series score. Statuses use text + icon, never color alone
 // (accessibility, MASTERPLAN §4).
 
-import { MATCH, AETHER, SIGIL, TICK_HZ } from '@shared/sim/constants.js';
+import { MATCH, AETHER, STAMINA, SIGIL, TICK_HZ } from '@shared/sim/constants.js';
 import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
 
 const STATUS_ICON = {
-  Burning: 'Bu', Chilled: 'Ch', Soaked: 'So', Static: 'St', Sundered: 'Sd',
+  Burning: 'Bu', Chilled: 'Ch', Wet: 'Wt', Soaked: 'So', Static: 'St', Sundered: 'Sd',
   Weakened: 'Wk', Marked: 'Mk', Rooted: 'Rt', Frozen: 'Fz', Stunned: 'Sn',
   Sloth: 'Sl', Blinded: 'Bl', Veiled: 'Vl',
   Haste: 'Ha', Grounded: 'Gr', AetherSurge: 'AS', Attunement: 'At', Phoenix: 'Px',
@@ -31,11 +31,13 @@ export class HUD {
     this.el = {
       enemyHealth: root.querySelector('#enemy-health'),
       enemyAether: root.querySelector('#enemy-aether'),
+      enemyStamina: root.querySelector('#enemy-stamina'),
       enemyCharges: root.querySelector('#enemy-charges'),
       enemyStatus: root.querySelector('#enemy-status'),
       enemyCast: root.querySelector('#enemy-cast'),
       playerHealth: root.querySelector('#player-health'),
       playerAether: root.querySelector('#player-aether'),
+      playerStamina: root.querySelector('#player-stamina'),
       playerCharges: root.querySelector('#player-charges'),
       playerStatus: root.querySelector('#player-status'),
       timer: root.querySelector('#round-timer'),
@@ -228,6 +230,8 @@ export class HUD {
     this.el.enemyHealth.style.width = `${Math.max(0, e.health)}%`;
     this.el.playerAether.style.width = `${(p.aether / AETHER.max) * 100}%`;
     this.el.enemyAether.style.width = `${(e.aether / AETHER.max) * 100}%`;
+    this.el.playerStamina.style.width = `${(p.stamina / STAMINA.max) * 100}%`;
+    this.el.enemyStamina.style.width = `${(e.stamina / STAMINA.max) * 100}%`;
     this._pips(this.el.playerCharges, p.charges);
     this._pips(this.el.enemyCharges, e.charges);
     this._statuses(this.el.playerStatus, p);

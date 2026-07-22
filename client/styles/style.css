@@ -47,6 +47,7 @@ html, body {
 .bar .fill { height: 100%; width: 100%; transition: width 0.12s linear; }
 .bar.health .fill { background: linear-gradient(90deg, #ff5d73, #ffb45d); }
 .bar.aether .fill { background: linear-gradient(90deg, #4f8bff, #4fd6c9); }
+.bar.stamina .fill { background: linear-gradient(90deg, #42b85a, #8ee56b); }
 .mini-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .mini-row .bar { flex: 1; margin-top: 0; }
 .charges { display: flex; gap: 3px; }

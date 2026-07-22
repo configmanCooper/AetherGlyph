@@ -239,6 +239,12 @@ export class Recognizer {
     if (scores[0].spellId === 15 && scores[0].score >= 0.78) {
       diag.requiredMargin = Math.min(diag.requiredMargin, 0.015);
     }
+    if (scores[0].spellId === 5 && scores[0].score >= 0.80 && rival?.spellId !== 39) {
+      diag.requiredMargin = Math.min(diag.requiredMargin, 0.01);
+    }
+    if (scores[0].spellId === 30 && scores[0].score >= 0.78) {
+      diag.requiredMargin = Math.min(diag.requiredMargin, 0.015);
+    }
 
     const closed = Math.hypot(q[0].x - q[q.length - 1].x, q[0].y - q[q.length - 1].y) < 0.16;
     if (raw.length < 6 && closed && (scores[0].spellId === 11 || scores[0].spellId === 13 || scores[0].spellId === 20)) {

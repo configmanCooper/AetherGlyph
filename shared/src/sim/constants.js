@@ -18,8 +18,20 @@ export const MATCH = {
 export const AETHER = {
   max: 100,
   start: 60,
-  regenPerS: 8,
-  protectedFloor: 12, // Aether Leech cannot drain below this
+  regenPerS: 4,
+  protectedFloor: 0,
+};
+
+export const STAMINA = {
+  max: 100,
+  start: 100,
+  movePerS: 1,
+  dodgeCost: 5,
+  bracePerS: 3,
+  focusPerS: 3,
+  regenPerS: 1,
+  hasteRegenPerS: 1.5,
+  hasteCostMul: 0.75,
 };
 
 // --- Sigil charges (MASTERPLAN §6) ---------------------------------------
@@ -39,9 +51,9 @@ export const SIDESTEP = {
   arcDelta: 0.42, // fraction of the movement arc covered by one sidestep
 };
 export const BRACE = {
-  durationS: 0.45,
-  damageReduction: 0.4,
-  aetherCost: 12,
+  durationS: 0.08,
+  damageReduction: 0.75,
+  aetherGain: 0.25,
 };
 
 // --- Movement arc (MASTERPLAN §12) ---------------------------------------
@@ -76,7 +88,8 @@ export const STATUSES = {
   // Debuffs / crowd control ------------------------------------------------
   Burning:  { durationS: 9, maxStacks: 2, dps: 2, kind: 'dot', harmful: true },
   Chilled:  { durationS: 9, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
-  Sloth:    { durationS: 12, maxStacks: 1, slow: 0.18, kind: 'slow', harmful: true },
+  Sloth:    { durationS: 12, maxStacks: 1, slow: 0.30, kind: 'slow', harmful: true },
+  Wet:      { durationS: 6, maxStacks: 1, kind: 'flag', harmful: true },
   Soaked:   { durationS: 12, maxStacks: 1, lightningBonus: 0.25, kind: 'flag', harmful: true },
   Static:   { durationS: 9, maxStacks: 3, kind: 'flag', harmful: true },
   Sundered: { durationS: 12, maxStacks: 1, damageTaken: 0.20, kind: 'amp', harmful: true },
@@ -88,7 +101,7 @@ export const STATUSES = {
   Frozen:   { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   Stunned:  { durationS: 1.0, maxStacks: 1, canCast: false, hard: true, kind: 'control', harmful: true },
   // Self buffs -------------------------------------------------------------
-  Haste:       { durationS: 18, maxStacks: 1, haste: 0.15, kind: 'buff' },
+  Haste:       { durationS: 18, maxStacks: 1, haste: 0.30, kind: 'buff' },
   Grounded:    { durationS: 15, maxStacks: 1, dmgReduction: 0.15, moveSlow: 0.15, kind: 'buff' },
   AetherSurge: { durationS: 18, maxStacks: 1, aetherPerS: 5, kind: 'buff' },
   Attunement:  { durationS: 18, maxStacks: 1, school: 'Ember', costMul: 0.85, kind: 'buff' },
@@ -101,7 +114,7 @@ export const HARD_CONTROL = new Set(['Frozen', 'Stunned']);
 // Harmful statuses Dispel can strip (order = Dispel removal priority).
 export const DISPELLABLE = [
   'Frozen', 'Stunned', 'Rooted', 'Marked', 'Sundered', 'Weakened',
-  'Burning', 'Chilled', 'Sloth', 'Soaked', 'Static', 'Blinded', 'Veiled',
+  'Burning', 'Chilled', 'Sloth', 'Soaked', 'Wet', 'Static', 'Blinded', 'Veiled',
 ];
 
 // --- Environmental zones (MASTERPLAN §10, environment-matrix.md) ----------
@@ -112,9 +125,9 @@ export const ZONE = {
   radius: 0.55,           // arc half-width a zone covers
   hourglassSlow: 0.25,    // Hourglass Field slows movement + projectiles 25%
   frozenSlow: 0.22,       // Frozen Ground slows movement while standing on it
-  coverReduction: 0.5,    // Stone Wall cover reduces incoming projectile dmg
   coverHp: 26,
   snareRootS: 2,
+  soakAfterS: 5,
   durations: {
     Oil: 21, Wet: 21, Fog: 18, Frozen: 9, Snare: 24, Cover: 24,
     Hourglass: 18, Fire: 12, Gust: 1.8, Grounded: 3,

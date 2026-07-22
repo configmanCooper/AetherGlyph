@@ -21,7 +21,7 @@
 import { makeRng } from '../rng/rng.js';
 import {
   effectFor, categoryOf, isHeavyProjectile,
-  REFLECT, SHIELD, BARRIER, BLINK, DISPEL, CHANNEL,
+  REFLECT, SHIELD, BARRIER, BLINK, DISPEL, CHANNEL, PROJECTILE,
 } from '../sim/spellEffects.js';
 import { TICK_HZ, SIGIL } from '../sim/constants.js';
 import { SPELLS_BY_ID } from '../balance/spellData.generated.js';
@@ -47,21 +47,21 @@ export const PRACTICE_PROFILES = {
     perceptionMs: 450, replanMs: 500, horizonMs: 0,
     scoreMean: 0.68, scoreSpread: 0.12, flubRate: 0.03, mistakeRate: 0.22,
     counter: 'basic', combo: 'one-step', adapt: 'none', loadout: 'beginner',
-    aggression: 0.55, defends: 0.35, dodge: 0.45, focusBias: 0.25, defenseReserve: 0,
+    aggression: 0.55, defends: 0.35, dodge: 0.45, focusBias: 0.25, defenseReserve: 0, staminaReserve: 0,
   },
   medium: {
     key: 'medium', label: 'Medium',
     perceptionMs: 280, replanMs: 267, horizonMs: 1000,
     scoreMean: 0.82, scoreSpread: 0.08, flubRate: 0.06, mistakeRate: 0.10,
     counter: 'common', combo: 'two-step', adapt: 'cast-frequency', loadout: 'soft-counter',
-    aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40, defenseReserve: 0.4,
+    aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40, defenseReserve: 0.4, staminaReserve: 10,
   },
   hard: {
     key: 'hard', label: 'Hard',
     perceptionMs: 150, replanMs: 133, horizonMs: 2500,
     scoreMean: 0.93, scoreSpread: 0.05, flubRate: 0.03, mistakeRate: 0.03,
     counter: 'complete', combo: 'expert', adapt: 'timing-school', loadout: 'counter-build',
-    aggression: 0.85, defends: 0.90, dodge: 0.90, focusBias: 0.55, defenseReserve: 0.6,
+    aggression: 0.85, defends: 0.90, dodge: 0.90, focusBias: 0.55, defenseReserve: 0.6, staminaReserve: 25,
   },
 };
 
@@ -215,6 +215,12 @@ export class PracticeBot {
       return;
     }
     const opp = sim.opponentOf(this.id);
+    if (opp.invisibleTicks > 0) {
+      this.seenProjectiles.clear();
+      this.castTell = null;
+      this._prevOppCasting = null;
+      return;
+    }
     for (const p of sim.projectiles) {
       if (p.owner === this.id) continue;
       if (!this.seenProjectiles.has(p.id)) this.seenProjectiles.set(p.id, sim.tick + this.perceptionTicks);
@@ -477,10 +483,35 @@ export class PracticeBot {
       this.moveDir *= -1;
       this.nextStrafeFlip = sim.tick + this.rng.int(18, 42);
     }
-    intent.move = this.moveDir;
+    intent.move = w.stamina > this.profile.staminaReserve ? this.moveDir : 0;
     if (sim.hasStatus(w, 'Blinded')) return intent;
 
     const b = this.categorize(sim);
+    if (w.stamina <= this.profile.staminaReserve) {
+      intent.move = 0;
+      const protectedRest = (w.barrier && w.barrier.ticks > 0)
+        || sim.zones.some((z) => z.kind === 'Cover' && z.owner === w.id && z.ticks > 0 && z.hp > 0);
+      if (protectedRest) return intent;
+
+      for (const name of ['Haste', 'Stone Wall', 'Barrier Dome']) {
+        const recoverySpell = w.loadout.find((spell) => spell.name === name && this.canCast(sim, w, spell));
+        if (recoverySpell) return this._commitCast(recoverySpell.id, intent);
+      }
+      return intent;
+    }
+
+    if (o.invisibleTicks > 0) {
+      if (sim.tick - this.lastPlanTick < this.replanTicks) return intent;
+      this.lastPlanTick = sim.tick;
+      const blindShots = w.loadout.filter((spell) => {
+        const effect = effectFor(spell.id);
+        return effect && effect.type === PROJECTILE && this.canCast(sim, w, spell);
+      });
+      if (!blindShots.length) return intent;
+      const shot = blindShots[this.rng.int(0, blindShots.length - 1)];
+      return this._commitCast(shot.id, intent);
+    }
+
     const threat = this.noticedThreat(sim);
     const mistake = this.rng.next() < this.profile.mistakeRate;
 

@@ -88,10 +88,10 @@ Arcane Pressure is symmetric, visually obvious, and never randomly targets one p
 
 These are available to every loadout so no player can be drafted into helplessness:
 
-1. `Focus`: hold the center sigil for 0.95 seconds to gain one Sigil Charge. It is visibly interruptible.
-2. `Sidestep`: left-thumb flick, costs one of two movement charges, 2.5-second recharge each.
+1. `Focus`: hold the center sigil for 0.95 seconds to gain one Sigil Charge. It costs 3 Stamina/sec, prevents movement, and is visibly interruptible.
+2. `Sidestep`: left-thumb flick, costs 5 Stamina and one of two movement charges, 2.5-second recharge each.
 3. `Break Trace`: two-finger tap to cancel a glyph with no Aether cost.
-4. `Brace`: hold both thumbs for a weak 0.45-second frontal guard. It reduces damage by 40 percent, costs 12 Aether, and cannot reflect or stop crowd control.
+4. `Brace`: hold to spend 3 Stamina/sec, reduce incoming damage by 75 percent, and convert 25 percent of the incoming damage into Aether. It cannot reflect or stop crowd control.
 
 Full defenses such as Ward, Reflect, Barrier, Dispel, and Blink remain loadout spells and are materially stronger.
 
@@ -180,12 +180,20 @@ Limits:
 
 - Range: 0-100.
 - Starts at 60.
-- Regenerates at 8 per second.
+- Regenerates at 4 per second.
 - Most spells cost 10-45.
 - Aether does not regenerate during Focus.
-- The final 12 Aether is protected from Aether Leech so a universal Brace remains possible.
+- Aether Leech can drain the target to zero.
 
 Decision: spend rapidly for initiative or reserve enough to answer the opponent.
+
+### Stamina
+
+- Range: 0-100, starts at 100.
+- Moving costs 1/sec; Dodge costs 5; Brace and Focus cost 3/sec.
+- Regenerates 1/sec whenever not moving.
+- Haste raises idle regeneration to 1.5/sec and reduces all Stamina costs by 25 percent.
+- Actions fail when their Stamina cost cannot be paid.
 
 ### Sigil Charges: visible setup
 

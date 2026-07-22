@@ -53,6 +53,61 @@ export function run() {
   }
   eq(scripted(5), scripted(5), 'scripted run reproducible');
 
+  const untargeted = new Sim({ seed: 8, loadouts: [starterLoadout(), starterLoadout()] });
+  const centerTargeted = new Sim({ seed: 8, loadouts: [starterLoadout(), starterLoadout()] });
+  untargeted.beginCast(untargeted.wizards[0], 1, 1, null);
+  centerTargeted.beginCast(centerTargeted.wizards[0], 1, 1, 0);
+  ok(untargeted.hash() !== centerTargeted.hash(),
+    'untargeted and explicitly center-targeted casts have distinct state hashes');
+
+  const coverState = new Sim({ seed: 9, loadouts: [starterLoadout(), starterLoadout()] });
+  const cover = coverState.addZone(0, 'Cover', { center: 0 });
+  const fullCoverHash = coverState.hash();
+  cover.hp = 1;
+  ok(coverState.hash() !== fullCoverHash, 'Stone Wall HP participates in deterministic hashes');
+  eq(coverState.snapshot().zones[0].hp, 1, 'Stone Wall HP is included in authoritative snapshots');
+
+  const staminaLow = new Sim({ seed: 10, loadouts: [starterLoadout(), starterLoadout()] });
+  const staminaHigh = new Sim({ seed: 10, loadouts: [starterLoadout(), starterLoadout()] });
+  staminaLow.wizards[0].stamina = 0.049;
+  staminaHigh.wizards[0].stamina = 0.051;
+  ok(staminaLow.hash() !== staminaHigh.hash(), 'hash distinguishes stamina values around action-payment thresholds');
+
+  const shieldShort = new Sim({ seed: 11, loadouts: [starterLoadout(), starterLoadout()] });
+  const shieldLong = new Sim({ seed: 11, loadouts: [starterLoadout(), starterLoadout()] });
+  shieldShort.wizards[0].shield = { absorb: 30, ticks: 756 };
+  shieldLong.wizards[0].shield = { absorb: 30, ticks: 907 };
+  ok(shieldShort.hash() !== shieldLong.hash(), 'hash includes shield duration');
+
+  const rngA = new Sim({ seed: 12, loadouts: [starterLoadout(), starterLoadout()] });
+  const rngB = new Sim({ seed: 12, loadouts: [starterLoadout(), starterLoadout()] });
+  rngB.rng.next();
+  ok(rngA.hash() !== rngB.hash(), 'hash includes current simulation RNG state');
+
+  const assertHashChanges = (label, mutate) => {
+    const base = new Sim({ seed: 13, loadouts: [starterLoadout(), starterLoadout()] });
+    const changed = new Sim({ seed: 13, loadouts: [starterLoadout(), starterLoadout()] });
+    mutate(changed);
+    ok(base.hash() !== changed.hash(), `hash includes ${label}`);
+  };
+  assertHashChanges('focus duration', (sim) => { sim.wizards[0].focusTicks = 9; });
+  assertHashChanges('channel state', (sim) => {
+    sim.wizards[0].channel = {
+      spellId: 40, ticks: 5, totalTicks: 10, perTick: 0.37,
+      utility: { key: 'storm-tide', applyStatic: 1 }, staticApplied: false,
+    };
+  });
+  assertHashChanges('reaction cooldowns', (sim) => { sim.reactionCooldowns.steam = 8; });
+  assertHashChanges('sidestep timers', (sim) => { sim.wizards[0].sidestepTimers.push(14); });
+  assertHashChanges('resonance state', (sim) => { sim.wizards[0].resonance.push({ school: 'Ember', ticks: 20 }); });
+  assertHashChanges('last activity tick', (sim) => { sim.wizards[0].lastActivityTick = 17; });
+  assertHashChanges('Phoenix use', (sim) => { sim.wizards[0].phoenixUsed = true; });
+  assertHashChanges('knockback history', (sim) => { sim.wizards[0].knockbackTimes.push(21); });
+  assertHashChanges('triggered snares', (sim) => { sim.wizards[0].snaredZones.add(4); });
+  assertHashChanges('damage tie-break total', (sim) => { sim.wizards[0].damageDealt = 3.5; });
+  assertHashChanges('resolved cast count', (sim) => { sim.wizards[0].castsResolved = 2; });
+  assertHashChanges('healing lock', (sim) => { sim.healingDisabled = true; });
+
   // Determinism WITH zones + statuses + reactions: a scripted environmental
   // sequence (Oil -> ignite -> Rain douse) hashes identically across runs.
   function scriptedEnv(seed) {

@@ -587,7 +587,7 @@ export const CAMPAIGN = [
     playerLoadout: [12, 11, 5], opponentLoadout: [5, 8],
     taughtSpells: [{ id: 12, enterStage: 0, exitStage: 2 }, { id: 11, enterStage: 0, exitStage: 2 }],
     drills: [],
-    arena: { botCharges: 1 },
+    arena: { botCharges: 2 },
     opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }] } },
     objectives: [
       { id: 'reflect', text: 'Reflect the Arcane Missile', predicate: 'reflect', expectSpell: 12 },
@@ -649,7 +649,7 @@ export const CAMPAIGN = [
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [12, 11, 5], opponentLoadout: [5, 8],
     taughtSpells: [], drills: [],
-    arena: { botCharges: 1 },
+    arena: { botCharges: 2 },
     opponent: { type: 'script', config: { behavior: 'sequence', steps: [{ tick: 120, cast: 5 }, { tick: 330, cast: 8 }] } },
     objectives: [
       { id: 'reflect', text: 'Reflect the Arcane Missile', predicate: 'reflect' },
@@ -940,6 +940,7 @@ export const CAMPAIGN = [
       if (t.facts.channelCompletesBySelf.get(40) >= 1) return IDLE;
       if (!t.facts.schoolsCastByPlayer.has('Ember') && pc(sim, 1)) return { cast: 1, castQuality: 1 };
       if (!t.facts.schoolsCastByPlayer.has('Tide') && pc(sim, 2)) return { cast: 2, castQuality: 1 };
+      if (sim.wizards[0].charges < 2) return { focus: true };
       if (pc(sim, 40)) return { cast: 40, castQuality: 1 };
       return IDLE;
     },

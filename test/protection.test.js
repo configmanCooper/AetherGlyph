@@ -13,9 +13,10 @@ const sToTicks = (s) => Math.max(0, Math.round(s * TICK_HZ));
 // Cast one spell in isolation and report the first-observed value of a field
 // (before per-tick decay eats into it), so we can read the granted window.
 function firstSeen(id, pick, prime = {}) {
-  const sim = new Sim({ seed: 5, loadouts: [[spellWithGesture(id)], [spellWithGesture(1)]] });
+  const spell = spellWithGesture(id);
+  const sim = new Sim({ seed: 5, loadouts: [[spell], [spellWithGesture(1)]] });
   const w = sim.wizards[0], o = sim.wizards[1];
-  w.aether = 100; w.charges = 3; w.arcPos = 0; o.arcPos = 0.4;
+  w.aether = 100; w.charges = spell.charges || 0; w.arcPos = 0; o.arcPos = 0.4;
   if (prime.selfStatus) sim.applyStatus(w, prime.selfStatus, 1);
   sim.step({ 0: { cast: id, castQuality: 1 }, 1: {} });
   for (let t = 0; t < 240 && !sim.ended; t++) {

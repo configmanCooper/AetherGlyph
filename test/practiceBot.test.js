@@ -80,6 +80,49 @@ export function run() {
     ok(intent.move === -1 || intent.move === 1, 'a blinded AI may still move without opponent awareness');
   }
 
+  {
+    const sim = createMatch({ seed: 23 });
+    const bot = new PracticeBot(1, {
+      difficulty: 'hard', seed: 23,
+      overrides: { flubRate: 0, scoreMean: 1, scoreSpread: 0 },
+    });
+    sim.wizards[0].arcPos = 0.73;
+    sim.wizards[0].invisibleTicks = 180;
+    sim.wizards[0].casting = { spellId: 8, ticks: 30, totalTicks: 60 };
+    sim.wizards[1].aether = 100;
+    sim.wizards[1].charges = 3;
+    const intent = bot.act(sim);
+    ok(intent.cast != null && intent.targetPos == null,
+      'AI defers invisible-target aim until the projectile releases');
+    ok(bot.castTell === null && bot.seenProjectiles.size === 0,
+      'AI retains no opponent awareness during Blink invisibility');
+
+    sim.wizards[0].invisibleTicks = 1;
+    sim.step({ 0: {}, 1: intent });
+    ok(sim.wizards[1].casting && sim.wizards[1].casting.targetPos == null,
+      'AI cast keeps its target unresolved during windup');
+    while (!sim.projectiles.length) sim.step({ 0: {}, 1: {} });
+    near(sim.projectiles[0].targetPos, sim.wizards[0].arcPos, 1e-6,
+      'AI aims at the visible target when Blink expires before release');
+  }
+
+  {
+    const sim = new Sim({
+      seed: 24,
+      loadouts: [presetLoadout('ember-rush'), [spellWithGesture(40)]],
+      rules: { timer: false, pressure: false },
+    });
+    const bot = new PracticeBot(1, {
+      difficulty: 'hard', seed: 24,
+      overrides: { flubRate: 0, scoreMean: 1, scoreSpread: 0 },
+    });
+    sim.wizards[0].invisibleTicks = 180;
+    sim.wizards[1].aether = 100;
+    sim.wizards[1].charges = 3;
+    const intent = bot.act(sim);
+    ok(intent.cast == null, 'AI does not auto-hit an invisible target with Prismatic Beam');
+  }
+
   // --- perception isolation: cannot react before the notice tick ---------
   {
     const sim = createMatch({ seed: 1 });
@@ -195,6 +238,38 @@ export function run() {
       sim.wizards[1].focusing = true;
       const intent = bot.act(sim);
       eq(intent.focus, true, 'Practice AI continues holding an active Focus channel when safe');
+    }
+
+    {
+      const sim = new Sim({
+        seed: 34,
+        loadouts: [presetLoadout('ember-rush'), [
+          spellWithGesture(16), spellWithGesture(15), spellWithGesture(11),
+          spellWithGesture(1), spellWithGesture(7), spellWithGesture(25),
+        ]],
+        rules: { timer: false, pressure: false },
+      });
+      const hard = new PracticeBot(1, {
+        difficulty: 'hard', seed: 34,
+        overrides: { flubRate: 0, scoreMean: 1, scoreSpread: 0 },
+      });
+      sim.wizards[1].stamina = hard.profile.staminaReserve;
+      sim.wizards[1].aether = 100;
+      eq(hard.act(sim).cast, 16, 'low-Stamina AI casts Haste before creating protection');
+
+      sim.wizards[1].cooldowns[16] = TICK_HZ;
+      eq(hard.act(sim).cast, 15, 'low-Stamina AI creates a Stone Wall when Haste is unavailable');
+
+      sim.wizards[1].cooldowns[15] = TICK_HZ;
+      eq(hard.act(sim).cast, 11, 'low-Stamina AI creates a Barrier Dome when Haste and Stone Wall are unavailable');
+
+      sim.zones.push({
+        id: 700, kind: 'Cover', owner: 1, ticks: TICK_HZ, totalTicks: TICK_HZ,
+        center: sim.wizards[1].arcPos, radius: 0.12, hp: 20,
+      });
+      const resting = hard.act(sim);
+      ok(resting.cast == null && resting.move === 0,
+        'low-Stamina AI rests while protected by its Stone Wall');
     }
   }
 

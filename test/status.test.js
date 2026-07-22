@@ -21,6 +21,7 @@ export function run() {
   eq(STATUSES.Weakened.durationS, 12, 'Weakened lasts 3x its baseline');
   eq(STATUSES.Marked.durationS, 15, 'Marked lasts 3x its baseline');
   eq(STATUSES.Sloth.durationS, 12, 'Sloth lasts 3x its baseline');
+  eq(STATUSES.Wet.durationS, 6, 'Wet lingers for 6 seconds after rain exposure');
   eq(STATUSES.Blinded.durationS, 4, 'Eclipse Glare blindness lasts 4 seconds');
   eq(STATUSES.Veiled.durationS, 6, 'Veiled lasts 3x its baseline');
   eq(STATUSES.Rooted.durationS, 3, 'Entangle Root lasts 3 seconds');
@@ -71,6 +72,17 @@ export function run() {
   sim.applyStatus(sim.wizards[0], 'Chilled', 1);
   sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
   ok(sim.wizards[0].casting.totalTicks > baseWindup, 'Chilled lengthens windup');
+
+  const moveDelta = (status) => {
+    const moving = freshSim();
+    moving.wizards[0].arcPos = 0;
+    if (status) moving.applyStatus(moving.wizards[0], status, 1);
+    moving.step({ 0: { move: 1 }, 1: {} });
+    return moving.wizards[0].arcPos;
+  };
+  const normalMove = moveDelta(null);
+  near(moveDelta('Haste') / normalMove, 1.3, 0.01, 'Haste increases movement speed by 30%');
+  near(moveDelta('Sloth') / normalMove, 0.7, 0.01, 'Sloth reduces movement speed by 30%');
 
   // Hard control is capped at 1.0s.
   sim = freshSim(); b = sim.wizards[1];

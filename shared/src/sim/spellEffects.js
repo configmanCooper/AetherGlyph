@@ -123,7 +123,10 @@ export const SPELL_EFFECTS = {
   30: { // Thunderclap — damage + conditional stun
     type: PROJECTILE, damage: 8, status: null, charges: 1,
     travelS: 0.25, homing: 0, dodgeRadius: 0.32, school: 'Storm', reflectable: false,
-    conditionalStun: { needs: 'soakedOrStatic3', durationS: 0.8, grantsTenacity: true, consumeStatic: true },
+    conditionalStun: {
+      needs: 'soakedOrStatic3', durationS: 2, grantsTenacity: true,
+      consumeStatic: true, ignoreHardCap: true,
+    },
   },
 
   // === Environmental (6) ===================================================

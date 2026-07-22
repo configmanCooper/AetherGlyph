@@ -6,6 +6,7 @@ import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { REACTIONS, sortByPriority, priorityOf, prismaticUtility } from '../shared/src/sim/reactions.js';
 import { REACTION, REACTION_PRIORITY, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
+import { effectFor } from '../shared/src/sim/spellEffects.js';
 
 function mk(ids0, ids1 = [1]) {
   const sim = new Sim({ seed: 5, loadouts: [ids0.map(spellWithGesture), ids1.map(spellWithGesture)] });
@@ -40,6 +41,37 @@ export function run() {
   eq(ZONE.durations.Grounded, 3, 'Grounded strip lasts three times the original duration');
   eq(ZONE.snareRootS, 2, 'Rune Snare roots for 2 seconds');
   eq(REACTION.frozenGroundSlowS, 9, 'Frozen Ground reaction lasts three times as long');
+
+  const rainSim = mk([32, 13], [1]);
+  fire(rainSim, 32);
+  ok(rainSim.hasStatus(rainSim.wizards[0], 'Wet') && rainSim.hasStatus(rainSim.wizards[1], 'Wet'),
+    'Rain Glyph makes both duelists Wet');
+  for (let t = 0; t < 230; t++) rainSim.step({ 0: {}, 1: {} });
+  ok(rainSim.hasStatus(rainSim.wizards[0], 'Soaked') && rainSim.hasStatus(rainSim.wizards[1], 'Soaked'),
+    'five continuous seconds of shared Rain upgrades both duelists to Soaked');
+  fire(rainSim, 13);
+  ok(!rainSim.hasStatus(rainSim.wizards[0], 'Soaked') && rainSim.hasStatus(rainSim.wizards[0], 'Wet'),
+    'Dispel downgrades Soaked to Wet instead of removing both layers');
+
+  const priorityDispel = mk([13], [1]);
+  priorityDispel.applyStatus(priorityDispel.wizards[0], 'Rooted', 1);
+  priorityDispel.applyStatus(priorityDispel.wizards[0], 'Sundered', 1);
+  priorityDispel.applyStatus(priorityDispel.wizards[0], 'Soaked', 1);
+  fire(priorityDispel, 13);
+  ok(!priorityDispel.hasStatus(priorityDispel.wizards[0], 'Rooted')
+      && !priorityDispel.hasStatus(priorityDispel.wizards[0], 'Sundered')
+      && priorityDispel.hasStatus(priorityDispel.wizards[0], 'Soaked'),
+    'Dispel honors priority before considering the Soaked-to-Wet downgrade');
+
+  const wetDispel = mk([13], [1]);
+  wetDispel.addZone(1, 'Wet', {});
+  wetDispel.applyStatus(wetDispel.wizards[0], 'Wet', 1);
+  wetDispel.wizards[0].wetExposureTicks = Math.round(ZONE.soakAfterS * TICK_HZ) - 1;
+  wetDispel.resolveDispel(wetDispel.wizards[0], wetDispel.wizards[1], effectFor(13));
+  eq(wetDispel.wizards[0].wetExposureTicks, 0, 'dispelling Wet resets accumulated Rain exposure');
+  wetDispel.step({ 0: {}, 1: {} });
+  ok(!wetDispel.hasStatus(wetDispel.wizards[0], 'Soaked'),
+    'cleansed Wet does not immediately rebound into Soaked on the next Rain tick');
 
   const snareSim = mk([36]);
   snareSim.wizards[0].arcPos = -0.7;
@@ -178,8 +210,24 @@ export function run() {
   // Soaked + Thunderclap -> Stun (hard control) + Tenacity.
   sim = mk([30], [1]);
   sim.applyStatus(sim.wizards[1], 'Soaked', 1);
-  fire(sim, 30);
-  ok(sim.wizards[1].tenacityTicks > 0, 'Thunderclap stuns a Soaked target (Tenacity engaged)');
+  sim.step({ 0: { cast: 30, castQuality: 1 }, 1: {} });
+  let stunTicks = 0;
+  for (let t = 0; t < 120 && stunTicks === 0; t++) {
+    sim.step({ 0: {}, 1: {} });
+    stunTicks = sim.wizards[1].statuses.Stunned?.ticks || 0;
+  }
+  ok(stunTicks >= 118 && stunTicks <= 120, `Thunderclap grants about 2 seconds of Stun (${stunTicks} ticks)`);
+  const stunnedPos = sim.wizards[1].arcPos;
+  sim.step({ 0: {}, 1: { move: 1, cast: 1, castQuality: 1 } });
+  eq(sim.wizards[1].arcPos, stunnedPos, 'Thunderclap target cannot move while stunned');
+  ok(!sim.wizards[1].casting, 'Thunderclap target cannot cast while stunned');
+
+  sim = mk([30], [1]);
+  sim.applyStatus(sim.wizards[1], 'Soaked', 1);
+  sim.wizards[1].barrier = { absorb: 60, ticks: 600 };
+  fire(sim, 30, 0, 90);
+  ok(!sim.hasStatus(sim.wizards[1], 'Stunned'),
+    'a fully barrier-absorbed Thunderclap does not apply Stun');
 
   // Two zones per player: a third owned zone replaces the oldest.
   sim = mk([31, 32, 35], [1]);

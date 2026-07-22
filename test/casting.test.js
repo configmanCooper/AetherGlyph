@@ -29,6 +29,24 @@ export function run() {
   ok(sim.wizards[1].statuses.Burning, 'Ember Bolt applied Burning');
   ok(sim.wizards[0].aether < 60 && sim.wizards[0].aether > 45, 'Ember Bolt spent ~12 Aether (net of regen)');
 
+  // Stone Wall intercepts non-piercing projectiles before they reach the wizard.
+  sim = freshSim();
+  sim.wizards[0].arcPos = -1;
+  sim.wizards[1].arcPos = 0.7;
+  const missedCover = sim.addZone(1, 'Cover', { center: -1 });
+  const cover = sim.addZone(1, 'Cover', { center: 0 });
+  const coveredHp = sim.wizards[1].health;
+  sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
+  let coverBlocked = false;
+  for (let t = 0; t < 90 && !coverBlocked; t++) {
+    const events = sim.step({ 0: {}, 1: {} });
+    coverBlocked = events.some((event) => event.type === 'coverBlock' && event.spellId === 1);
+  }
+  ok(coverBlocked, 'Stone Wall collides with Ember Bolt before the target');
+  eq(sim.wizards[1].health, coveredHp, 'a Stone Wall-blocked projectile deals no wizard damage');
+  ok(cover.hp < 26, 'blocked projectile lowers Stone Wall HP');
+  eq(missedCover.hp, 26, 'projectile checks every wall and leaves non-intersecting cover untouched');
+
   // A target that strafes away after release dodges (homing-free bolt).
   sim = freshSim();
   const hp2 = sim.wizards[1].health;
@@ -46,6 +64,42 @@ export function run() {
   sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
   idleFor(sim, 60);
   eq(sim.wizards[1].health, hp3, 'Ward fully absorbs Ember Bolt');
+  ok(sim.wizards[1].shield && sim.wizards[1].shield.absorb < 30, 'Ward collision lowers Ward HP');
+
+  // A barrier at or below zero HP is destroyed and only overflow reaches health.
+  sim = freshSim();
+  sim.wizards[1].barrier = { absorb: 5, ticks: Math.round(4.5 * TICK_HZ) };
+  const barrierHp = sim.wizards[1].health;
+  sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
+  idleFor(sim, 60);
+  ok(sim.wizards[1].barrier === null, 'Barrier Dome is destroyed when its HP reaches zero');
+  ok(sim.wizards[1].health < barrierHp && sim.wizards[1].health > barrierHp - 5,
+    'only barrier overflow damage reaches the wizard');
+
+  // Blink invisibility prevents a homing missile from updating its aim.
+  sim = freshSim();
+  sim.wizards[0].aether = 100;
+  sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
+  const missile = sim.projectiles[0];
+  ok(!!missile, 'Arcane Missile released for homing test');
+  const hiddenAim = missile.targetPos;
+  sim.wizards[1].arcPos = 0.8;
+  sim.wizards[1].invisibleTicks = 180;
+  for (let t = 0; t < 5; t++) sim.step({ 0: {}, 1: {} });
+  near(missile.targetPos, hiddenAim, 1e-6, 'homing does not track an invisible Blink target');
+  sim.wizards[1].invisibleTicks = 0;
+  sim.step({ 0: {}, 1: {} });
+  ok(missile.targetPos > hiddenAim, 'homing resumes after the target becomes visible');
+
+  sim = freshSim(44);
+  sim.wizards[0].aether = 100;
+  sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
+  sim.wizards[1].arcPos = -0.91;
+  sim.wizards[1].invisibleTicks = 180;
+  for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
+  ok(Math.abs(sim.projectiles[0].targetPos - sim.wizards[1].arcPos) > 1e-6,
+    'a target that Blinks during windup receives seeded random aim at release');
 
   // Piercing (Stone Shard) partially bypasses a Ward.
   sim = freshSim();

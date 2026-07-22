@@ -126,7 +126,10 @@ export const GESTURE_TEMPLATES = {
 
   // === Offensive (remaining) ==============================================
   arcUp: [ // 5 Arcane Missile — upward-bulging dome (rainbow, L -> R)
-    arc(50, 80, 60, -158, -22, 18),
+    arc(50, 78, 48, -145, -35, 18),
+    arc(50, 82, 52, -145, -35, 20),
+    arc(50, 76, 46, -150, -30, 16),
+    [{ x: 10, y: 58 }, { x: 24, y: 38 }, { x: 50, y: 26 }, { x: 76, y: 38 }, { x: 90, y: 58 }],
   ],
   wideArc: [ // 6 Flame Wave — wide rising sweep (low-left up to high-right)
     [{ x: 10, y: 88 }, { x: 28, y: 74 }, { x: 48, y: 56 }, { x: 70, y: 36 }, { x: 92, y: 14 }],
@@ -217,6 +220,8 @@ export const GESTURE_TEMPLATES = {
   ],
   twinLines: [ // 30 Thunderclap — two inward-leaning vertical lines
     [{ x: 28, y: 16 }, { x: 40, y: 84 }, { x: 72, y: 16 }, { x: 60, y: 84 }],
+    [{ x: 24, y: 12 }, { x: 38, y: 88 }, { x: 76, y: 12 }, { x: 62, y: 88 }],
+    [{ x: 32, y: 18 }, { x: 42, y: 82 }, { x: 68, y: 14 }, { x: 58, y: 86 }],
   ],
 
   // === Environmental ======================================================

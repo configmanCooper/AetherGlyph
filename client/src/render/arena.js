@@ -32,14 +32,14 @@ const SCHOOL_COLOR = {
 };
 
 const STATUS_COLOR = {
-  Burning: 0xff4a1c, Chilled: 0x64d8ff, Sloth: 0xa56de2, Soaked: 0x368cff,
+  Burning: 0xff4a1c, Chilled: 0x64d8ff, Sloth: 0xa56de2, Wet: 0x65bfff, Soaked: 0x368cff,
   Static: 0xffe45c, Sundered: 0xff7a4d, Weakened: 0xb56cff, Marked: 0xff4fd8,
   Blinded: 0xf4f4ff, Veiled: 0x7863aa, Rooted: 0x70cf5c, Frozen: 0xb9f4ff,
   Stunned: 0xffff73, Haste: 0x63ff9b, Grounded: 0xc6a878,
   AetherSurge: 0x45f6ff, Attunement: 0xff8738, Phoenix: 0xffd36a,
 };
 const STATUS_PRIORITY = [
-  'Frozen', 'Stunned', 'Burning', 'Rooted', 'Static', 'Chilled', 'Soaked',
+  'Frozen', 'Stunned', 'Burning', 'Rooted', 'Static', 'Chilled', 'Soaked', 'Wet',
   'Marked', 'Sundered', 'Weakened', 'Sloth', 'Blinded', 'Veiled',
   'Phoenix', 'Grounded', 'AetherSurge', 'Attunement', 'Haste',
 ];
@@ -1192,6 +1192,9 @@ export class Arena {
       }
       const centered = z.kind === 'Cover' || z.kind === 'Snare' || z.kind === 'Grounded';
       handle.object3D.position.x = centered ? (z.center || 0) * ARC_W : 0;
+      handle.object3D.position.z = z.kind === 'Cover'
+        ? (z.owner === 0 ? PLAYER_Z - 1.4 : ENEMY_Z + 1.4)
+        : 0;
       const fade = Math.min(1, z.ticks / Math.max(1, z.totalTicks || 1));
       if (z.kind === 'Fog' && sim.wizardInZone(sim.wizards[0], z)) {
         fogStrength = Math.max(fogStrength, fade);

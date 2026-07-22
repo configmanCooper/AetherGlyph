@@ -133,7 +133,8 @@ try {
       || /recovery speed/i.test(spellReference.hasteDetails)
       || /Ward/.test(spellReference.leechCounters) || !/Soaked/.test(spellReference.chainDetails)
       || !/protected wizard, not the cover/i.test(spellReference.stoneShardDetails)
-      || !/globally enables Conductive Arc/i.test(spellReference.rainDetails)
+      || !/Both duelists become Wet/i.test(spellReference.rainDetails)
+      || !/globally enables weather reactions/i.test(spellReference.rainDetails)
       || /prevents lightning payoff/i.test(spellReference.rainCounters)
       || !/leaves Soaked active/i.test(spellReference.thunderDetails) || spellReference.clippedGlyphs !== 0) {
     fail('public spell roster is incomplete or reveals secrets: ' + JSON.stringify(spellReference));
@@ -656,6 +657,8 @@ try {
         return {
           move: rect('#move-pad'), actions: rect('.action-buttons'),
           draw: rect('#draw-pad'), spellbar: rect('#spellbar'),
+          staminaBars: document.querySelectorAll('.bar.stamina .fill').length,
+          staminaColor: getComputedStyle(document.querySelector('.bar.stamina .fill')).backgroundImage,
           touchVisible: getComputedStyle(touch).display !== 'none',
           desktopHidden: getComputedStyle(desktop).display === 'none',
         };
@@ -667,6 +670,7 @@ try {
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.move)
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.actions)
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.draw)
+          || landscapeControls.staminaBars !== 2 || !/rgb\(66, 184, 90\)/.test(landscapeControls.staminaColor)
           || !landscapeControls.touchVisible || !landscapeControls.desktopHidden) {
         fail('landscape mobile controls are not compact/above joystick: ' + JSON.stringify(landscapeControls));
       }
@@ -1054,7 +1058,7 @@ try {
   if (perceptionVfx.cover.height < 2.2 || perceptionVfx.cover.width < 2.4) {
     fail('Stone Wall visual is not substantially taller and wider: ' + JSON.stringify(perceptionVfx.cover));
   }
-  const statusNames = ['Burning', 'Chilled', 'Sloth', 'Soaked', 'Static', 'Sundered', 'Weakened',
+  const statusNames = ['Burning', 'Chilled', 'Sloth', 'Wet', 'Soaked', 'Static', 'Sundered', 'Weakened',
     'Marked', 'Blinded', 'Veiled', 'Rooted', 'Frozen', 'Stunned', 'Haste', 'Grounded',
     'AetherSurge', 'Attunement', 'Phoenix'];
   const statusPreview = await page.evaluate((names) => names.map((name) => ({

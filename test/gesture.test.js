@@ -158,6 +158,28 @@ export function run() {
   eq(groundingVsFireball, 0, 'Fireball triangles and Grounding diamonds never cross-cast');
   ok(stoneWallCorrect >= 195, `rough Stone Wall U-shapes meet confidence (${stoneWallCorrect}/200)`);
   ok(veilCorrect >= 195, `wider Veil ribbon remains recognizable (${veilCorrect}/200)`);
+  let arcaneMissileCorrect = 0, basicFlickMiscasts = 0, phoenixMissileMiscasts = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const missile = full.recognize(jitter(GESTURE_TEMPLATES.arcUp[0], 12, seed * 239));
+    const flick = full.recognize(jitter(GESTURE_TEMPLATES.flickRight[0], 8, seed * 239));
+    const phoenix = full.recognize(jitter(GESTURE_TEMPLATES.phoenixWing[0], 8, seed * 239));
+    if (missile.accepted && missile.spellId === 5) arcaneMissileCorrect++;
+    if (flick.accepted && flick.spellId === 5) basicFlickMiscasts++;
+    if (phoenix.accepted && phoenix.spellId === 5) phoenixMissileMiscasts++;
+  }
+  ok(arcaneMissileCorrect >= 195, `rough Arcane Missile arcs remain recognizable (${arcaneMissileCorrect}/200)`);
+  eq(basicFlickMiscasts, 0, 'Ember Bolt flicks do not become Arcane Missile');
+  eq(phoenixMissileMiscasts, 0, 'Phoenix Covenant wings do not become Arcane Missile');
+  eq(full.recognize(GESTURE_TEMPLATES.arcUp[0]).requiredMargin, 0.01,
+    'high-confidence Arcane Missile uses the forgiving ambiguity margin');
+  let thunderclapCorrect = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const thunder = full.recognize(jitter(GESTURE_TEMPLATES.twinLines[0], 12, seed * 241));
+    if (thunder.accepted && thunder.spellId === 30) thunderclapCorrect++;
+  }
+  ok(thunderclapCorrect >= 195, `rough Thunderclap twin lines remain recognizable (${thunderclapCorrect}/200)`);
+  eq(full.recognize(GESTURE_TEMPLATES.twinLines[0]).requiredMargin, 0.015,
+    'high-confidence Thunderclap uses the forgiving ambiguity margin');
   const concussiveXs = GESTURE_TEMPLATES.arc.flat().map((point) => point.x);
   ok(Math.min(...concussiveXs) >= 0 && Math.max(...concussiveXs) <= 100,
     'Concussive Blast guide stays fully inside the draw pad');

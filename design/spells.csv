@@ -12,25 +12,25 @@ id,name,school,category,gesture,aether,charges,cooldown_s,min_cast_s,loadout_poi
 11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,18,0.72,2,"360 degree barrier for 9 sec","Caster cannot use offense while active","Wait; Sunder; Quake",false
 12,Reflect,Gale,Defensive,check mark,20,0,8,0.30,2,"Reflect projectile during 3.6 sec window","Perfect timing grants half Sigil Charge","Area spell; feint; delayed projectile",false
 13,Dispel,Arcane,Defensive,counterclockwise circle,22,0,10,0.55,1,"Remove two harmful statuses or one zone edge","Destroys Mark and setup investment","Bait it; reapply later; direct damage",false
-14,Blink,Arcane,Defensive,wide Z: right then diagonal down-left then right,18,0,9,0.30,2,"Short movement burst; invisible for 3 sec with brief evade","Escapes Root but not already resolved damage","Track landing; area zone; delay release",false
+14,Blink,Arcane,Defensive,wide Z: right then diagonal down-left then right,18,0,9,0.30,2,"Short movement burst; invisible for 3 sec with brief evade; breaks homing","Escapes Root and makes Practice AI aim randomly","Track landing; area zone; delay release",false
 15,Stone Wall,Stone,Defensive,low square,26,0,48,0.78,2,"Create destructible line-of-sight cover for up to 24 sec","Can channel Focus behind it","Quake; Fireball; reposition",false
-16,Haste,Gale,Buff,upward spiral,25,0,36,0.72,2,"15 percent movement and recovery speed for 18 sec","Counters Chilled and supports rushdown","Dispel; Weaken; force defense",false
+16,Haste,Gale,Buff,upward spiral,25,0,36,0.72,2,"30 percent movement speed for 18 sec; removes Chilled","Counters Chilled and supports rushdown","Sloth Hex; Aether Leech; force defense",false
 17,Aether Surge,Arcane,Buff,figure eight,30,0,36,1.10,2,"Gain 5 extra Aether/sec for 18 sec after channel","Economy setup with interrupt risk","Concussive Blast; Static; Quake",false
 18,Amplify,Arcane,Buff,small clockwise loop,20,1,30,0.58,2,"Apply Mark for up to 15 sec; next direct hit gains 35 percent","Heavy combo setup","Dispel; Brace; force a weak consumption",false
 19,Ember Attunement,Ember,Buff,flame outline,18,0,36,0.68,2,"Ember costs 15 percent less for 18 sec","Broadcasts Ember commitment","Rain; Tide pressure; Dispel",false
 20,Grounding Mantle,Stone,Buff,closed diamond,24,0,30,0.72,2,"Reduce direct damage 15 percent and become Grounded for 15 sec; slower movement","Cancels lightning bonus and new Static while active","Sunder; Aether Leech; zones",false
 21,Weaken,Umbra,Debuff,downward arc,18,0,24,0.48,1,"Target deals 22 percent less damage for 12 sec","Wins an expected damage exchange","Dispel; wait; utility casts",false
 22,Sunder,Stone,Debuff,jagged X,22,0,24,0.62,2,"Target takes 20 percent more direct damage for 12 sec","Burst setup","Dispel; Barrier; evade follow-up",false
-23,Sloth Hex,Umbra,Debuff,slow outward spiral,24,0,24,0.88,2,"Slow movement and recovery 18 percent for 12 sec","Enables zones and heavy spells","Dispel; Haste; interrupt",false
-24,Aether Leech,Umbra,Debuff,downward hook,20,0,14,0.58,2,"Drain up to 18 Aether; gain half","Cannot drain protected final 12 Aether","Ward line; Dispel; spend before hit",false
+23,Sloth Hex,Umbra,Debuff,slow outward spiral,24,0,24,0.88,2,"Slow movement and Stamina recovery 30 percent for 12 sec","Enables zones and heavy spells","Dispel; Blink; interrupt",false
+24,Aether Leech,Umbra,Debuff,downward hook,20,0,14,0.58,2,"Drain up to 18 Aether, including the target's final Aether; gain half","Can reduce target Aether to zero","Spend Aether before hit; pressure the caster",false
 25,Veil Hex,Umbra,Debuff,wide crossing ribbon,30,1,20,0.95,3,"Distort visible trace ink and hide confidence for 6 sec","Does not alter actual input mapping","Dispel; preplanned simple glyph; interrupt",false
 26,Entangle,Stone,Control,U with root ticks,24,0,15,0.70,2,"Root for 3 sec; target may cast","Sets up area pressure","Blink; Dispel; Barrier",false
 27,Frost Bind,Tide,Control,two linked loops,28,0,20,0.82,2,"Freeze for 3 sec only if target is Chilled; target cannot move or cast","Consumes Chilled; earned hard-control payoff","Preemptive Dispel; Tenacity; Blink before resolve",false
 28,Concussive Blast,Gale,Control,pushing arc,20,0,6,0.45,1,"6 damage; knockback; interrupt channel","Punishes Focus and Aether Surge","Ward; spacing; bait",false
 29,Eclipse Glare,Umbra,Control,five point burst,26,0,40,0.68,2,"White out the opponent area for 4 sec while controls, guides, HUD, and spells remain visible","Removes Practice AI opponent awareness for the duration","Dispel; wait; use guides and visible spells",false
-30,Thunderclap,Storm,Control,two inward lines,30,1,20,0.78,3,"8 damage; stun 0.8 sec only on Soaked or Static 3","Consumes setup; grants Tenacity afterward","Dispel setup; Grounding Mantle; distance",false
+30,Thunderclap,Storm,Control,two inward lines,30,1,20,0.78,3,"8 damage; stun 2 sec only on Soaked or Static 3; target cannot move or cast","Consumes Static setup but leaves Soaked; grants Tenacity afterward","Dispel setup; Grounding Mantle; distance",false
 31,Oil Script,Ember,Environmental,wavy horizontal line,16,0,42,0.58,1,"Place shared Oil zone for 21 sec","Ember ignites it for capped burst","Rain; Gust; avoid",false
-32,Rain Glyph,Tide,Environmental,cloud arc then down stroke,20,0,42,0.72,1,"Create Wet zone for 21 sec; douse Burning","Enables lightning and frost reactions","Dispel; Gust; leave zone",false
+32,Rain Glyph,Tide,Environmental,cloud arc then down stroke,20,0,42,0.72,1,"Create shared Rain for 21 sec; both duelists become Wet and become Soaked after 5 sec","Douses Burning; enables lightning and frost reactions","Dispel; wait out weather; Grounding mitigates Storm",false
 33,Gust Wall,Gale,Environmental,three fan strokes,22,0,8,0.62,1,"Create 1.8 sec Gust zone and 1.2 sec light-projectile deflect window","Spreads fire but disperses Fog","Stone Shard; heavy projectile; reposition",false
 34,Quake,Stone,Environmental,vertical line then ground slash,34,1,24,0.92,3,"10 area damage; interrupt; destroy cover","Punishes channeling and wall defense","Blink; Sidestep at release; interrupt windup",false
 35,Fog Cloud,Gale,Environmental,loose open circle,20,0,36,0.68,1,"Shared reduced visibility zone for 18 sec","Conceals setup but affects caster too","Gust; Flame Wave; leave zone",false

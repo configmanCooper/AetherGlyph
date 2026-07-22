@@ -9,7 +9,7 @@
 // events that rendering/audio/ui consume.
 
 import {
-  DT, TICK_HZ, MATCH, AETHER, SIGIL, FOCUS, SIDESTEP, BRACE, MOVE, CONTROL,
+  DT, TICK_HZ, MATCH, AETHER, STAMINA, SIGIL, FOCUS, SIDESTEP, BRACE, MOVE, CONTROL,
   CAST, STATUSES, HARD_CONTROL, DISPELLABLE, ZONE, REACTION,
 } from './constants.js';
 import { SPELLS_BY_ID } from '../balance/spellData.generated.js';
@@ -23,9 +23,6 @@ import { makeRng } from '../rng/rng.js';
 
 const sToTicks = (s) => Math.max(0, Math.round(s * TICK_HZ));
 
-let _projId = 1;
-let _zoneId = 1;
-
 function makeWizard(id, loadout, spawnArc) {
   return {
     id,
@@ -33,6 +30,7 @@ function makeWizard(id, loadout, spawnArc) {
     loadoutIds: loadout.map((s) => s.id),
     health: MATCH.startHealth,
     aether: AETHER.start,
+    stamina: STAMINA.start,
     charges: SIGIL.start,
     arcPos: spawnArc,           // -1..1 along the movement arc
     facing: -spawnArc,          // toward opponent (render hint)
@@ -59,6 +57,8 @@ function makeWizard(id, loadout, spawnArc) {
     knockbackTimes: [],         // tick timestamps of recent knockbacks
     lastActivityTick: 0,        // for sigil decay
     snaredZones: new Set(),     // snare zone ids already triggered on this wizard
+    wetExposureTicks: 0,        // continuous shared Rain exposure before Soaked
+    movedThisTick: false,
     // rolling counters
     damageDealt: 0,
     countersLanded: 0,
@@ -79,6 +79,8 @@ export class Sim {
     this.endReason = null;      // 'health' | 'timer'
     this.projectiles = [];
     this.zones = [];            // active environmental zones (shared)
+    this.nextProjectileId = 1;
+    this.nextZoneId = 1;
     this.reactionCooldowns = {}; // reaction name -> ticks remaining
     this.pressureLevel = 0;
     this.healingDisabled = false;
@@ -112,6 +114,24 @@ export class Sim {
 
   spellData(id) { return SPELLS_BY_ID[id]; }
 
+  staminaCostMultiplier(w) {
+    return this.hasStatus(w, 'Haste') ? STAMINA.hasteCostMul : 1;
+  }
+
+  spendStamina(w, baseCost) {
+    const cost = Math.max(0, baseCost * this.staminaCostMultiplier(w));
+    if (w.stamina + 1e-9 < cost) return false;
+    w.stamina = Math.max(0, w.stamina - cost);
+    return true;
+  }
+
+  regenerateStamina(w) {
+    if (w.movedThisTick) return;
+    let rate = this.hasStatus(w, 'Haste') ? STAMINA.hasteRegenPerS : STAMINA.regenPerS;
+    if (this.hasStatus(w, 'Sloth')) rate *= 0.7;
+    w.stamina = Math.min(STAMINA.max, w.stamina + rate * DT);
+  }
+
   cooldownTicks(id) {
     const spell = this.spellData(id);
     return spell ? sToTicks(spell.cooldown_s * this.rules.cooldownScale) : 0;
@@ -141,11 +161,11 @@ export class Sim {
     if (this.zones.some((z) => z.kind === 'Frozen' && z.ticks > 0 && this.wizardInZone(w, z))) {
       s += ZONE.frozenSlow;
     }
-    return Math.max(-0.15, Math.min(0.6, s));
+    return Math.max(-0.30, Math.min(0.6, s));
   }
 
-  // Slow that lengthens cast WINDUP. Fast drawing never shortens windup, so
-  // Haste does not apply here (it speeds recovery, not the minimum cast time).
+  // Slow that lengthens cast WINDUP. Haste affects movement only and never
+  // shortens a spell's minimum cast time.
   castSlow(w) {
     let s = 0;
     if (this.hasStatus(w, 'Chilled')) s += STATUSES.Chilled.slow;
@@ -180,7 +200,7 @@ export class Sim {
       this.emit('zoneEnd', { id: oldest.id, kind: oldest.kind, reason: 'replaced' });
     }
     const zone = {
-      id: _zoneId++, owner: ownerId, kind, center, radius,
+      id: this.nextZoneId++, owner: ownerId, kind, center, radius,
       ticks: sToTicks(durS), totalTicks: sToTicks(durS),
       hp: kind === 'Cover' ? ZONE.coverHp : 0,
     };
@@ -219,8 +239,13 @@ export class Sim {
       this.emit('grounded', { target: target.id, blocked: 'Static' });
       return false;
     }
-    // Soaked washes off Burning (water beats fire).
-    if (name === 'Soaked' && target.statuses.Burning) {
+    if (name === 'Wet' && this.hasStatus(target, 'Soaked')) return false;
+    if (name === 'Soaked' && target.statuses.Wet) {
+      delete target.statuses.Wet;
+      this.emit('statusEnd', { target: target.id, status: 'Wet' });
+    }
+    // Wet or Soaked washes off Burning (water beats fire).
+    if ((name === 'Wet' || name === 'Soaked') && target.statuses.Burning) {
       delete target.statuses.Burning;
       this.emit('statusEnd', { target: target.id, status: 'Burning' });
     }
@@ -294,18 +319,12 @@ export class Sim {
     }
 
     if (!opts.ignoreDefense) {
-      // Brace: flat frontal reduction.
-      if (target.braceTicks > 0) dmg *= (1 - BRACE.damageReduction);
-
-      // Stone Wall cover soaks part of a non-piercing projectile.
-      if (dmg > 0 && !opts.piercing && opts.source) {
-        const cover = this.zones.find((z) => z.kind === 'Cover' && z.owner === target.id && z.ticks > 0 && z.hp > 0);
-        if (cover) {
-          const before = dmg;
-          dmg *= (1 - ZONE.coverReduction);
-          cover.hp -= (before - dmg);
-          if (cover.hp <= 0) this.removeZones((z) => z === cover, 'shattered');
-        }
+      if (target.braceTicks > 0) {
+        const incoming = dmg;
+        dmg *= (1 - BRACE.damageReduction);
+        const gained = incoming * BRACE.aetherGain;
+        target.aether = Math.min(AETHER.max, target.aether + gained);
+        this.emit('braceAbsorb', { target: target.id, incoming, damage: dmg, aether: gained });
       }
 
       // Barrier (360) absorbs first.
@@ -357,7 +376,7 @@ export class Sim {
   }
 
   // ---------------------------------------------------------------- intents
-  beginCast(w, spellId, quality) {
+  beginCast(w, spellId, quality, targetPos = null) {
     if (!this.canAct(w)) return false;
     if (w.casting || w.focusing || w.recoveryTicks > 0) return false;
     const spell = this.spellData(spellId);
@@ -383,9 +402,19 @@ export class Sim {
     if ((spell.charges || 0) > w.charges) return false;
 
     let windupS = spell.min_cast_s * (1 + this.castSlow(w));
+    const durationEligible = ['Defensive', 'Buff', 'Debuff', 'Environmental'].includes(spell.category);
+    const damageBenefit = (eff.damage || 0) > 0 || (eff.type === CHANNEL && (eff.totalDamage || 0) > 0);
+    const durationBenefit = durationEligible && (
+      [SHIELD, BARRIER, REFLECT, BLINK, ZONE_T, BUFF].includes(eff.type)
+      || (eff.type === HEX && !!eff.status)
+    );
+    const empowered = (spell.charges || 0) === 0 && w.charges >= 1 && (damageBenefit || durationBenefit);
     w.casting = {
       spellId, ticks: sToTicks(windupS), totalTicks: sToTicks(windupS),
       quality: Math.max(CAST.minPotency, Math.min(CAST.maxPotency, quality ?? 1)),
+      targetPos: Number.isFinite(targetPos) ? Math.max(-1, Math.min(1, targetPos)) : null,
+      empowered,
+      durationScale: empowered && durationBenefit ? 1.2 : 1,
     };
     w.lastActivityTick = this.tick;
     this.emit('castStart', { caster: w.id, spellId, windupTicks: w.casting.ticks });
@@ -413,6 +442,7 @@ export class Sim {
     const cost = Math.round(this.effectiveCost(w, spell));
     w.aether = Math.max(0, w.aether - cost);
     if (spell.charges) w.charges = Math.max(0, w.charges - spell.charges);
+    else if (c.empowered) w.charges = Math.max(0, w.charges - 1);
     w.cooldowns[c.spellId] = this.cooldownTicks(c.spellId);
     w.recoveryTicks = sToTicks(0.15 * (1 + Math.max(0, this.moveSlow(w))));
     w.castsResolved += 1;
@@ -424,44 +454,48 @@ export class Sim {
       if (w.resonance.length > 2) w.resonance.shift();
     }
 
-    this.emit('cast', { caster: w.id, spellId: c.spellId, quality: c.quality });
+    this.emit('cast', {
+      caster: w.id, spellId: c.spellId, quality: c.quality,
+      empowered: !!c.empowered, durationScale: c.durationScale,
+    });
 
     const opp = this.opponentOf(w.id);
     switch (eff.type) {
       case PROJECTILE: {
         this.projectiles.push({
-          id: _projId++, owner: w.id, spellId: c.spellId, eff,
+          id: this.nextProjectileId++, owner: w.id, spellId: c.spellId, eff,
           ticks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
-          totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale), quality: c.quality,
+          totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
+          quality: c.quality * (c.empowered ? 1.1 : 1),
           originPos: w.arcPos,
-          targetPos: opp.arcPos, // aimed at defender's position at release
+          targetPos: c.targetPos ?? (opp.invisibleTicks > 0 ? this.rng.next() * 2 - 1 : opp.arcPos),
         });
         break;
       }
       case SHIELD: {
         let absorb = eff.absorb;
         if (this.timeS >= MATCH.lateRoundS) absorb *= 0.8; // §3 shields lose 20%
-        w.shield = { absorb, ticks: sToTicks(eff.durationS), frontal: eff.frontal };
+        w.shield = { absorb, ticks: sToTicks(eff.durationS * c.durationScale), frontal: eff.frontal };
         this.emit('shield', { caster: w.id, absorb });
         break;
       }
       case BARRIER: {
         let absorb = eff.absorb;
         if (this.timeS >= MATCH.lateRoundS) absorb *= 0.8;
-        w.barrier = { absorb, ticks: sToTicks(eff.durationS) };
+        w.barrier = { absorb, ticks: sToTicks(eff.durationS * c.durationScale) };
         this.emit('barrier', { caster: w.id, absorb });
         break;
       }
       case REFLECT: {
-        w.reflectTicks = sToTicks(eff.windowS);
+        w.reflectTicks = sToTicks(eff.windowS * c.durationScale);
         this.emit('reflectWindow', { caster: w.id });
         break;
       }
-      case HEX:     this.resolveHex(w, opp, eff, c.spellId); break;
-      case BUFF:    this.resolveBuff(w, eff); break;
-      case ZONE_T:  this.resolveZone(w, eff); break;
+      case HEX:     this.resolveHex(w, opp, eff, c.spellId, c.durationScale); break;
+      case BUFF:    this.resolveBuff(w, eff, c.durationScale); break;
+      case ZONE_T:  this.resolveZone(w, eff, c.durationScale); break;
       case DISPEL:  this.resolveDispel(w, opp, eff); break;
-      case BLINK:   this.resolveBlink(w, opp, eff); break;
+      case BLINK:   this.resolveBlink(w, opp, eff, c.durationScale); break;
       case MIRROR:
         w.mirrorTicks = sToTicks(eff.durationS);
         this.emit('mirror', { caster: w.id });
@@ -476,9 +510,8 @@ export class Sim {
   }
 
   // ------------------------------------------------------------- cast handlers
-  resolveHex(w, opp, eff, spellId) {
+  resolveHex(w, opp, eff, spellId, durationScale = 1) {
     if (eff.drain) {
-      // Aether Leech: drain, respecting the protected final 12 Aether.
       const drainable = Math.max(0, opp.aether - AETHER.protectedFloor);
       const drained = Math.min(eff.drain, drainable);
       opp.aether = Math.max(AETHER.protectedFloor, opp.aether - drained);
@@ -506,24 +539,29 @@ export class Sim {
       return;
     }
     if (eff.status) {
-      this.applyStatus(opp, eff.status.name, eff.status.stacks || 1);
+      const baseDuration = STATUSES[eff.status.name]?.durationS;
+      this.applyStatus(opp, eff.status.name, eff.status.stacks || 1, {
+        durationS: baseDuration ? baseDuration * durationScale : undefined,
+      });
       this.emit('hex', { caster: w.id, target: opp.id, status: eff.status.name });
     }
   }
 
-  resolveBuff(w, eff) {
+  resolveBuff(w, eff, durationScale = 1) {
     if (eff.cleanses) {
       for (const name of eff.cleanses) {
         if (w.statuses[name]) { delete w.statuses[name]; this.emit('statusEnd', { target: w.id, status: name }); }
       }
     }
     if (eff.self) {
-      this.applyStatus(w, eff.self, 1);
+      this.applyStatus(w, eff.self, 1, {
+        durationS: STATUSES[eff.self].durationS * durationScale,
+      });
       this.emit('buff', { caster: w.id, status: eff.self });
     }
   }
 
-  resolveZone(w, eff) {
+  resolveZone(w, eff, durationScale = 1) {
     const opponent = this.opponentOf(w.id);
     let zoneOpts = {};
     if (eff.zoneKind === 'Snare') {
@@ -532,6 +570,7 @@ export class Sim {
         center: Math.max(-1, Math.min(1, opponent.arcPos + direction * (ZONE.radius + 0.13))),
       };
     }
+    zoneOpts.durationS = (ZONE.durations[eff.zoneKind] || 5) * durationScale;
     const zone = this.addZone(w.id, eff.zoneKind, zoneOpts);
     // Incoming water (Rain Glyph) immediately douses Burning + fire zones.
     let incoming = null;
@@ -540,7 +579,10 @@ export class Sim {
       incoming = 'gust';
       // Gust Wall raises a brief window that blows away LIGHT projectiles aimed
       // at the caster (heavy shots punch through — see resolveProjectile).
-      if (eff.deflect) { w.deflectTicks = sToTicks(eff.deflectWindowS || 0); this.emit('gustWall', { caster: w.id }); }
+      if (eff.deflect) {
+        w.deflectTicks = sToTicks((eff.deflectWindowS || 0) * durationScale);
+        this.emit('gustWall', { caster: w.id });
+      }
     }
     if (incoming) this.triggerReactions({ casterId: w.id, targetId: this.opponentOf(w.id).id, incoming, center: zone.center });
   }
@@ -548,9 +590,22 @@ export class Sim {
   resolveDispel(w, opp, eff) {
     // Priority: strip harmful statuses from self first (DISPELLABLE order).
     let removed = 0;
+    let preserveWet = false;
     for (const name of DISPELLABLE) {
       if (removed >= eff.statuses) break;
+      if (name === 'Wet' && preserveWet) continue;
       if (w.statuses[name]) {
+        if (name === 'Soaked') {
+          delete w.statuses.Soaked;
+          this.emit('statusEnd', { target: w.id, status: 'Soaked' });
+          this.applyStatus(w, 'Wet', 1);
+          w.wetExposureTicks = 0;
+          this.emit('dispel', { caster: w.id, removed: 'Soaked', downgradedTo: 'Wet' });
+          removed++;
+          preserveWet = true;
+          continue;
+        }
+        if (name === 'Wet') w.wetExposureTicks = 0;
         delete w.statuses[name];
         this.emit('statusEnd', { target: w.id, status: name });
         this.emit('dispel', { caster: w.id, removed: name });
@@ -569,7 +624,7 @@ export class Sim {
     if (removed === 0) this.emit('dispel', { caster: w.id, removed: null });
   }
 
-  resolveBlink(w, opp, eff) {
+  resolveBlink(w, opp, eff, durationScale = 1) {
     if (eff.escapesRoot && w.statuses.Rooted) {
       delete w.statuses.Rooted;
       this.emit('statusEnd', { target: w.id, status: 'Rooted' });
@@ -577,8 +632,8 @@ export class Sim {
     const dir = w.arcPos >= opp.arcPos ? 1 : -1; // blink away from the opponent
     const limit = Math.max(0.1, 1 - this.pressureLevel * 0.12);
     w.arcPos = Math.max(-limit, Math.min(limit, w.arcPos + dir * eff.arcDelta));
-    w.evadeTicks = sToTicks(eff.evadeS);
-    w.invisibleTicks = sToTicks(eff.invisibleS);
+    w.evadeTicks = sToTicks(eff.evadeS * durationScale);
+    w.invisibleTicks = sToTicks(eff.invisibleS * durationScale);
     this.emit('blink', { caster: w.id });
   }
 
@@ -720,9 +775,28 @@ export class Sim {
     for (const p of this.projectiles) {
       p.ticks -= hgSlow;
       const defender = this.opponentOf(p.owner);
-      // Homing re-aims toward the live defender position.
-      if (p.eff.homing > 0) {
+      // Blink invisibility breaks homing updates until the target reappears.
+      if (p.eff.homing > 0 && defender.invisibleTicks <= 0) {
         p.targetPos += (defender.arcPos - p.targetPos) * p.eff.homing;
+      }
+      const progress = 1 - Math.max(0, p.ticks) / Math.max(1, p.totalTicks || 1);
+      const projectilePos = p.originPos + (p.targetPos - p.originPos) * progress;
+      const cover = this.zones.find((z) =>
+        z.kind === 'Cover' && z.owner === defender.id && z.ticks > 0 && z.hp > 0
+        && Math.abs(projectilePos - z.center) <= z.radius);
+      if (cover && !p.eff.piercing && !p.eff.area && progress >= 0.84) {
+        const blocked = (p.eff.damage || 0) * p.quality;
+        cover.hp -= blocked;
+        this.emit('coverBlock', {
+          target: defender.id, spellId: p.spellId, zone: cover.id,
+          center: cover.center, blocked,
+        });
+        if (cover.hp <= 0) this.removeZones((z) => z === cover, 'shattered');
+        continue;
+      }
+      if ((defender.barrier || defender.shield) && progress >= 0.9) {
+        this.resolveProjectile(p, defender);
+        continue;
       }
       if (p.ticks > 0) { remaining.push(p); continue; }
       this.resolveProjectile(p, defender);
@@ -741,7 +815,7 @@ export class Sim {
       defender.countersLanded += 1;
       this.emit('reflect', { by: defender.id, spellId: p.spellId });
       this.projectiles.push({
-        id: _projId++, owner: defender.id, spellId: p.spellId, eff,
+        id: this.nextProjectileId++, owner: defender.id, spellId: p.spellId, eff,
         ticks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
         totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale), quality: p.quality,
         originPos: defender.arcPos,
@@ -808,12 +882,15 @@ export class Sim {
     if (eff.status && dealt > 0) this.applyStatus(defender, eff.status.name, eff.status.stacks);
 
     // Conditional stun (Chain Lightning, Thunderclap): only on Soaked or Static 3.
-    if (eff.conditionalStun) {
+    if (eff.conditionalStun && dealt > 0) {
       const cs = eff.conditionalStun;
       const primed = this.hasStatus(defender, 'Soaked') || this.statusStacks(defender, 'Static') >= 3;
       if (primed) {
         if (cs.consumeStatic && defender.statuses.Static) { delete defender.statuses.Static; this.emit('statusEnd', { target: defender.id, status: 'Static' }); }
-        const ok = this.applyStatus(defender, 'Stunned', 1, { durationS: cs.durationS });
+        const ok = this.applyStatus(defender, 'Stunned', 1, {
+          durationS: cs.durationS,
+          ignoreHardCap: !!cs.ignoreHardCap,
+        });
         if (ok) { attacker.countersLanded += 1; this.emit('hardControl', { target: defender.id, status: 'Stunned' }); }
       }
     }
@@ -917,22 +994,59 @@ export class Sim {
     this.zones = kept;
   }
 
+  updateWeatherExposure() {
+    const raining = this.zones.some((zone) => zone.kind === 'Wet' && zone.ticks > 0);
+    const threshold = sToTicks(ZONE.soakAfterS);
+    for (const wizard of this.wizards) {
+      if (!raining) {
+        wizard.wetExposureTicks = 0;
+        continue;
+      }
+      if (wizard.statuses.Burning) {
+        delete wizard.statuses.Burning;
+        this.emit('statusEnd', { target: wizard.id, status: 'Burning' });
+      }
+      if (this.hasStatus(wizard, 'Soaked')) {
+        wizard.wetExposureTicks = threshold;
+        wizard.statuses.Soaked.ticks = Math.max(wizard.statuses.Soaked.ticks, sToTicks(STATUSES.Soaked.durationS));
+        continue;
+      }
+      wizard.wetExposureTicks += 1;
+      if (wizard.wetExposureTicks >= threshold) {
+        if (wizard.statuses.Wet) {
+          delete wizard.statuses.Wet;
+          this.emit('statusEnd', { target: wizard.id, status: 'Wet' });
+        }
+        this.applyStatus(wizard, 'Soaked', 1);
+        this.emit('weatherSoaked', { target: wizard.id });
+      } else if (wizard.statuses.Wet) {
+        wizard.statuses.Wet.ticks = Math.max(wizard.statuses.Wet.ticks, sToTicks(STATUSES.Wet.durationS));
+      } else {
+        this.applyStatus(wizard, 'Wet', 1);
+      }
+    }
+  }
+
   applyIntent(w, intent) {
     if (!intent) return;
     const canAct = this.canAct(w);
     const rooted = this.hasStatus(w, 'Rooted') || this.hasStatus(w, 'Frozen');
-    // Any deliberate non-focus action interrupts the vulnerable Focus channel.
-    const wantsOther = !!(intent.move || intent.sidestep || intent.brace || intent.cast != null);
+    const wantsOther = !!(intent.sidestep || intent.brace || intent.cast != null);
 
     // --- Focus (hold to gain a Sigil Charge) ---
     if (intent.focus && !wantsOther && canAct && !w.casting && w.recoveryTicks <= 0 && !rooted) {
-      if (!w.focusing) { w.focusing = true; w.focusTicks = 0; this.emit('focusStart', { caster: w.id }); }
-      w.focusTicks += 1;
-      w.lastActivityTick = this.tick;
-      if (w.focusTicks >= sToTicks(FOCUS.channelS)) {
-        w.charges = Math.min(SIGIL.max, w.charges + 1);
+      if (this.spendStamina(w, STAMINA.focusPerS * DT)) {
+        if (!w.focusing) { w.focusing = true; w.focusTicks = 0; this.emit('focusStart', { caster: w.id }); }
+        w.focusTicks += 1;
+        w.lastActivityTick = this.tick;
+        if (w.focusTicks >= sToTicks(FOCUS.channelS)) {
+          w.charges = Math.min(SIGIL.max, w.charges + 1);
+          w.focusing = false; w.focusTicks = 0;
+          this.emit('focusComplete', { caster: w.id, charges: w.charges });
+        }
+      } else if (w.focusing) {
         w.focusing = false; w.focusTicks = 0;
-        this.emit('focusComplete', { caster: w.id, charges: w.charges });
+        this.emit('focusCancel', { caster: w.id, reason: 'stamina' });
       }
     } else if (w.focusing) {
       // Any other action interrupts the focus channel.
@@ -942,22 +1056,27 @@ export class Sim {
 
     // --- Brace ---
     if (intent.brace && canAct && !w.focusing) {
-      if (w.braceTicks <= 0 && w.aether >= BRACE.aetherCost) {
-        w.aether -= BRACE.aetherCost;
-        w.braceTicks = sToTicks(BRACE.durationS);
-        this.emit('brace', { caster: w.id });
+      const wasBracing = w.braceTicks > 0;
+      if (this.spendStamina(w, STAMINA.bracePerS * DT)) {
+        w.braceTicks = Math.max(2, sToTicks(BRACE.durationS));
+        if (!wasBracing) this.emit('brace', { caster: w.id });
+      } else {
+        w.braceTicks = 0;
       }
     }
 
     // --- Movement ---
-    if (!rooted && canAct && !w.focusing) {
+    if (!rooted && canAct && !w.focusing && !intent.focus) {
       const speed = MOVE.speedPerS * (1 - this.moveSlow(w)) * DT;
-      if (intent.move) w.arcPos += Math.sign(intent.move) * speed;
-      // Sidestep: quick burst that consumes a charge.
-      if (intent.sidestep && w.sidestepCharges > 0) {
+      if (intent.move && this.spendStamina(w, STAMINA.movePerS * DT)) {
+        w.arcPos += Math.sign(intent.move) * speed;
+        w.movedThisTick = true;
+      }
+      if (intent.sidestep && w.sidestepCharges > 0 && this.spendStamina(w, STAMINA.dodgeCost)) {
         w.sidestepCharges -= 1;
         w.sidestepTimers.push(sToTicks(SIDESTEP.rechargeS));
         w.arcPos += Math.sign(intent.sidestep) * SIDESTEP.arcDelta;
+        w.movedThisTick = true;
         this.emit('sidestep', { caster: w.id });
       }
       // Arcane Pressure narrows the safe arc; clamp within the shrinking window.
@@ -968,7 +1087,7 @@ export class Sim {
     // --- Cast (edge-triggered) ---
     if (intent.cast != null && canAct) {
       const cooldownTicks = Math.max(0, w.cooldowns[intent.cast] || 0);
-      const ok = this.beginCast(w, intent.cast, intent.castQuality);
+      const ok = this.beginCast(w, intent.cast, intent.castQuality, intent.targetPos);
       if (!ok && intent.castWasGesture) {
         // A rejected deliberate trace incurs recovery but no Aether cost.
         w.recoveryTicks = Math.max(w.recoveryTicks, sToTicks(CAST.rejectRecoveryS));
@@ -1043,6 +1162,7 @@ export class Sim {
     for (const w of this.wizards) {
       w.health = MATCH.startHealth;
       w.aether = AETHER.max;
+      w.stamina = STAMINA.max;
       w.charges = SIGIL.max;
       w.sidestepCharges = SIDESTEP.charges;
       if (!this.rules.sandboxCooldowns) {
@@ -1076,14 +1196,19 @@ export class Sim {
       this.tickStatuses(w);
     }
     this.updateZones();
+    this.updateWeatherExposure();
     if (this.ended) return this.events.splice(0);
 
     // 2. Pressure state.
     this.updatePressure();
 
     // 3. Intents (deterministic wizard order).
+    this.wizards[0].movedThisTick = false;
+    this.wizards[1].movedThisTick = false;
     this.applyIntent(this.wizards[0], intents[0]);
     this.applyIntent(this.wizards[1], intents[1]);
+    this.regenerateStamina(this.wizards[0]);
+    this.regenerateStamina(this.wizards[1]);
 
     // 4. Advance casts + channels.
     this.advanceCasting(this.wizards[0]);
@@ -1117,11 +1242,15 @@ export class Sim {
       })),
       zones: this.zones.map((z) => ({
         id: z.id, owner: z.owner, kind: z.kind, center: z.center, radius: z.radius,
-        ticks: z.ticks, totalTicks: z.totalTicks,
+        ticks: z.ticks, totalTicks: z.totalTicks, hp: z.hp,
       })),
       wizards: this.wizards.map((w) => ({
-        id: w.id, health: w.health, aether: w.aether, charges: w.charges,
-        arcPos: w.arcPos, casting: w.casting ? { spellId: w.casting.spellId, ticks: w.casting.ticks, totalTicks: w.casting.totalTicks } : null,
+        id: w.id, health: w.health, aether: w.aether, stamina: w.stamina, charges: w.charges,
+        arcPos: w.arcPos, casting: w.casting ? {
+          spellId: w.casting.spellId, ticks: w.casting.ticks,
+          totalTicks: w.casting.totalTicks, targetPos: w.casting.targetPos,
+          empowered: !!w.casting.empowered, durationScale: w.casting.durationScale,
+        } : null,
         channel: w.channel ? { spellId: w.channel.spellId, ticks: w.channel.ticks, totalTicks: w.channel.totalTicks } : null,
         focusing: w.focusing, focusTicks: w.focusTicks, braceTicks: w.braceTicks,
         shield: w.shield ? { absorb: w.shield.absorb, ticks: w.shield.ticks } : null,
@@ -1129,6 +1258,7 @@ export class Sim {
         reflectTicks: w.reflectTicks, tenacityTicks: w.tenacityTicks,
         deflectTicks: w.deflectTicks,
         evadeTicks: w.evadeTicks, invisibleTicks: w.invisibleTicks, mirrorTicks: w.mirrorTicks,
+        wetExposureTicks: w.wetExposureTicks,
         sidestepCharges: w.sidestepCharges, recoveryTicks: w.recoveryTicks,
         statuses: Object.fromEntries(Object.entries(w.statuses).map(([k, v]) => [k, { stacks: v.stacks, ticks: v.ticks }])),
         cooldowns: { ...w.cooldowns }, resonance: w.resonance.map((r) => r.school),
@@ -1140,23 +1270,51 @@ export class Sim {
   // Stable FNV-1a hash of quantized state for divergence checks / replay tests.
   hash() {
     const q = (x, s) => Math.round(x * s);
-    const parts = [this.tick, this.ended ? 1 : 0, this.winner ?? 'n', this.pressureLevel];
+    const parts = [
+      this.tick, this.ended ? 1 : 0, this.winner ?? 'n',
+      this.timerTicks, this.pressureLevel,
+      this.healingDisabled ? 1 : 0, this.nextProjectileId, this.nextZoneId,
+    ];
     for (const w of this.wizards) {
       parts.push(
-        q(w.health, 100), q(w.aether, 100), q(w.charges, 2), q(w.arcPos, 1000),
+        q(w.health, 100), q(w.aether, 100), q(w.stamina, 10000), q(w.charges, 2), q(w.arcPos, 1000),
         w.casting ? w.casting.spellId : 0, w.casting ? w.casting.ticks : 0,
+        w.casting ? w.casting.totalTicks : 0,
+        w.casting ? q(w.casting.quality, 1000) : 0,
+        w.casting && w.casting.targetPos != null ? 1 : 0,
+        w.casting && w.casting.targetPos != null ? q(w.casting.targetPos, 1000) : 0,
+        w.casting?.empowered ? 1 : 0,
+        w.casting ? q(w.casting.durationScale || 1, 100) : 0,
         w.channel ? w.channel.spellId : 0, w.channel ? w.channel.ticks : 0,
-        w.focusing ? 1 : 0, w.braceTicks, w.reflectTicks, w.tenacityTicks,
+        w.channel ? w.channel.totalTicks : 0, w.channel ? q(w.channel.perTick, 10000) : 0,
+        w.channel?.staticApplied ? 1 : 0,
+        w.focusing ? 1 : 0, w.focusTicks, w.braceTicks, w.reflectTicks, w.tenacityTicks,
         w.deflectTicks, w.evadeTicks, w.invisibleTicks, w.mirrorTicks,
-        w.shield ? q(w.shield.absorb, 100) : 0, w.barrier ? q(w.barrier.absorb, 100) : 0,
-        w.sidestepCharges, w.recoveryTicks,
+        w.wetExposureTicks,
+        w.shield ? q(w.shield.absorb, 100) : 0, w.shield ? w.shield.ticks : 0,
+        w.barrier ? q(w.barrier.absorb, 100) : 0, w.barrier ? w.barrier.ticks : 0,
+        w.sidestepCharges, w.recoveryTicks, w.lastActivityTick, w.phoenixUsed ? 1 : 0,
+        q(w.damageDealt, 100), w.castsResolved,
       );
+      if (w.channel) {
+        for (const [k, v] of Object.entries(w.channel.utility || {}).sort()) parts.push('cu', k, v);
+      }
       for (const [k, v] of Object.entries(w.statuses).sort()) parts.push(k, v.stacks, v.ticks);
       for (const [k, v] of Object.entries(w.cooldowns).sort()) if (v > 0) parts.push('cd', k, v);
+      for (const r of w.resonance) parts.push('res', r.school, r.ticks);
+      for (const t of w.sidestepTimers) parts.push('side', t);
+      for (const t of w.knockbackTimes) parts.push('knock', t);
+      for (const id of [...w.snaredZones].sort((a, b) => a - b)) parts.push('snare', id);
     }
-    for (const p of this.projectiles) parts.push('p', p.owner, p.spellId, q(p.ticks, 100), q(p.targetPos, 1000));
+    for (const [k, v] of Object.entries(this.reactionCooldowns).sort()) parts.push('rc', k, v);
+    parts.push('rng', this.rng.getState ? this.rng.getState() : this.rng.seed);
+    for (const p of this.projectiles) {
+      parts.push('p', p.id, p.owner, p.spellId, q(p.ticks, 100), p.totalTicks,
+        q(p.originPos, 1000), q(p.targetPos, 1000), q(p.quality, 1000));
+    }
     for (const z of this.zones.slice().sort((a, b) => a.id - b.id)) {
-      parts.push('z', z.owner, z.kind, z.ticks, q(z.center, 1000));
+      parts.push('z', z.id, z.owner, z.kind, z.ticks, z.totalTicks,
+        q(z.center, 1000), q(z.radius, 1000), q(z.hp || 0, 100));
     }
     const str = parts.join('|');
     let h = 2166136261 >>> 0;
