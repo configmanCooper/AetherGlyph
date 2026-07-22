@@ -36,36 +36,47 @@ import { qualityFromScore, ACCEPT_THRESHOLD } from '../gesture/quality.js';
 
 const ms2ticks = (ms) => Math.max(1, Math.round((ms / 1000) * TICK_HZ));
 
-// The three public practice difficulties. perceptionMs/replanMs/horizonMs and the
+// The four public practice difficulties. perceptionMs/replanMs/horizonMs and the
 // score distribution come straight from the §14 profile table; aggression/defends/
 // dodge/focusBias are DECISION likelihoods (how often the bot chooses to act), not
 // combat stats. flubRate is a floor gross-miss chance so Medium/Hard keep a small
 // but non-zero gesture-miss rate the score tail alone would not produce.
 export const PRACTICE_PROFILES = {
+  'very-easy': {
+    key: 'very-easy', label: 'Very Easy',
+    perceptionMs: 700, replanMs: 1000, horizonMs: 0,
+    scoreMean: 0.60, scoreSpread: 0.14, flubRate: 0.08, mistakeRate: 0.35,
+    counter: 'basic', combo: 'one-step', adapt: 'none', loadout: 'beginner',
+    aggression: 0.40, defends: 0.20, dodge: 0.12, focusBias: 0.15,
+    defenseReserve: 0, staminaReserve: 0, moveChance: 0.25, castIntervalMs: 10000,
+  },
   easy: {
     key: 'easy', label: 'Easy',
     perceptionMs: 450, replanMs: 500, horizonMs: 0,
     scoreMean: 0.68, scoreSpread: 0.12, flubRate: 0.03, mistakeRate: 0.22,
     counter: 'basic', combo: 'one-step', adapt: 'none', loadout: 'beginner',
-    aggression: 0.55, defends: 0.35, dodge: 0.45, focusBias: 0.25, defenseReserve: 0, staminaReserve: 0,
+    aggression: 0.55, defends: 0.35, dodge: 0.45, focusBias: 0.25,
+    defenseReserve: 0, staminaReserve: 0, moveChance: 1, castIntervalMs: 0,
   },
   medium: {
     key: 'medium', label: 'Medium',
     perceptionMs: 280, replanMs: 267, horizonMs: 1000,
     scoreMean: 0.82, scoreSpread: 0.08, flubRate: 0.06, mistakeRate: 0.10,
     counter: 'common', combo: 'two-step', adapt: 'cast-frequency', loadout: 'soft-counter',
-    aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40, defenseReserve: 0.4, staminaReserve: 5,
+    aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40,
+    defenseReserve: 0.4, staminaReserve: 5, moveChance: 1, castIntervalMs: 0,
   },
   hard: {
     key: 'hard', label: 'Hard',
     perceptionMs: 150, replanMs: 133, horizonMs: 2500,
     scoreMean: 0.93, scoreSpread: 0.05, flubRate: 0.03, mistakeRate: 0.03,
     counter: 'complete', combo: 'expert', adapt: 'timing-school', loadout: 'counter-build',
-    aggression: 0.85, defends: 0.90, dodge: 0.90, focusBias: 0.55, defenseReserve: 0.6, staminaReserve: 25,
+    aggression: 0.87, defends: 0.90, dodge: 0.90, focusBias: 0.55,
+    defenseReserve: 0.6, staminaReserve: 25, moveChance: 1, castIntervalMs: 0,
   },
 };
 
-export const PRACTICE_DIFFICULTIES = ['easy', 'medium', 'hard'];
+export const PRACTICE_DIFFICULTIES = ['very-easy', 'easy', 'medium', 'hard'];
 
 // Beginner-safe archetypes Easy may pick from WITHOUT inspecting the player.
 export const BEGINNER_PRESET_KEYS = ['ember-rush', 'stone-warden', 'tide-control'];
@@ -169,7 +180,7 @@ export function counterBuild(playerIds, rng) {
 export function chooseOpponentLoadout(difficulty, playerIds, seedOrRng = 1) {
   const rng = (seedOrRng && typeof seedOrRng.next === 'function') ? seedOrRng : makeRng((seedOrRng >>> 0) || 1);
   let ids;
-  if (difficulty === 'easy') ids = beginnerLoadout(rng);
+  if (difficulty === 'very-easy' || difficulty === 'easy') ids = beginnerLoadout(rng);
   else if (difficulty === 'medium') ids = bestPresetAgainst(playerIds, rng);
   else ids = counterBuild(playerIds, rng) || bestPresetAgainst(playerIds, rng);
   // Final safety net: never emit an illegal loadout.
@@ -188,11 +199,14 @@ export class PracticeBot {
 
     this.perceptionTicks = ms2ticks(this.profile.perceptionMs);
     this.replanTicks = ms2ticks(this.profile.replanMs);
+    this.castIntervalTicks = Math.max(0, Math.round((this.profile.castIntervalMs / 1000) * TICK_HZ));
     this.planLevel = this.profile.horizonMs === 0 ? 0 : (this.profile.horizonMs <= 1200 ? 1 : 2);
     this.combos = combosForTier(this.profile.combo);
     this.counter = this.profile.counter;
 
     this.lastPlanTick = -999;
+    this.nextCastTick = 0;
+    this.currentTick = 0;
     this.moveDir = playerId === 0 ? 1 : -1;
     this.nextStrafeFlip = 0;
 
@@ -327,8 +341,10 @@ export class PracticeBot {
   // Route EVERY committed cast through gesture execution so misses are possible
   // at every tier and accepted casts use the identical potency mapping (§16).
   _commitCast(spellId, base = {}) {
+    if (this.castIntervalTicks > 0 && this.currentTick < this.nextCastTick) return base;
     const g = this._sampleGesture();
     if (g.rejected) return { ...base, castReject: spellId };
+    if (this.castIntervalTicks > 0) this.nextCastTick = this.currentTick + this.castIntervalTicks;
     return { ...base, cast: spellId, castQuality: g.quality };
   }
 
@@ -402,7 +418,8 @@ export class PracticeBot {
   _defend(sim, w, o, b, threat, intent, mistake) {
     const heavy = isHeavyProjectile(threat.eff);
     // Plausible mistake: waste a defensive answer on a feint / dodge the wrong way.
-    if (mistake && w.sidestepCharges > 0 && this.rng.next() < 0.5) {
+    const mistakeDodgeChance = this.difficulty === 'very-easy' ? this.profile.dodge * 0.5 : 0.5;
+    if (mistake && w.sidestepCharges > 0 && this.rng.next() < mistakeDodgeChance) {
       return { ...intent, sidestep: this.moveDir };
     }
     const near = threat.ticks <= Math.round(0.5 * TICK_HZ);
@@ -473,6 +490,8 @@ export class PracticeBot {
 
   // ------------------------------------------------------------------- act
   act(sim) {
+    if (sim.tick < this.currentTick) this.nextCastTick = 0;
+    this.currentTick = sim.tick;
     this.observe(sim);
     const w = sim.wizards[this.id];
     const o = sim.opponentOf(this.id);
@@ -483,7 +502,8 @@ export class PracticeBot {
       this.moveDir *= -1;
       this.nextStrafeFlip = sim.tick + this.rng.int(18, 42);
     }
-    intent.move = w.stamina > this.profile.staminaReserve ? this.moveDir : 0;
+    const choosesMovement = this.profile.moveChance >= 1 || this.rng.next() < this.profile.moveChance;
+    intent.move = w.stamina > this.profile.staminaReserve && choosesMovement ? this.moveDir : 0;
     if (sim.hasStatus(w, 'Blinded')) return intent;
 
     const b = this.categorize(sim);

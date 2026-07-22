@@ -27,7 +27,7 @@ export const RANKED_UNLOCK_LESSON = 'L12';
 const GUIDE_STAGE_MIN = 0;
 const GUIDE_STAGE_MAX = 3;
 const HANDS = new Set(['right', 'left']);
-const DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+const DIFFICULTIES = new Set(['very-easy', 'easy', 'medium', 'hard']);
 const COACHING = new Set(['summary', 'detailed']);
 
 // --- storage adapter -------------------------------------------------------
@@ -108,13 +108,13 @@ function countMap(src) {
   return out;
 }
 
-// Practice difficulty-comparison stats: { easy|medium|hard -> { played, won } }.
+// Practice difficulty-comparison stats: { very-easy|easy|medium|hard -> { played, won } }.
 // Assisted (template) rounds are never recorded here, so the comparison reflects
 // only unassisted play (SOLO-MODES-PLAN §3 templates note).
 function practiceResultsMap(src) {
   const out = {};
   if (isPlainObject(src)) {
-    for (const key of ['easy', 'medium', 'hard']) {
+    for (const key of ['very-easy', 'easy', 'medium', 'hard']) {
       const v = src[key];
       if (isPlainObject(v)) {
         const played = Math.max(0, Math.round(Number(v.played) || 0));
@@ -337,7 +337,7 @@ export function setPractice(profile, practice) {
 // comparison, SOLO-MODES-PLAN §3).
 export function recordPracticeResult(profile, difficulty, won, assisted = false) {
   if (assisted) return profile;
-  if (!['easy', 'medium', 'hard'].includes(difficulty)) return profile;
+  if (!['very-easy', 'easy', 'medium', 'hard'].includes(difficulty)) return profile;
   if (!profile.stats.practiceResults) profile.stats.practiceResults = {};
   const cur = profile.stats.practiceResults[difficulty] || { played: 0, won: 0 };
   cur.played += 1;

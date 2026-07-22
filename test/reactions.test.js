@@ -229,6 +229,29 @@ export function run() {
   ok(!sim.hasStatus(sim.wizards[1], 'Stunned'),
     'a fully barrier-absorbed Thunderclap does not apply Stun');
 
+  sim = mk([3], [1]);
+  fire(sim, 3);
+  ok((sim.wizards[1].statuses.Static?.ticks || 0) > 42 * TICK_HZ,
+    'Spark Dart Static lasts about 45 seconds');
+
+  sim = mk([30], [1]);
+  sim.applyStatus(sim.wizards[1], 'Static', 2);
+  fire(sim, 30, 0, 90);
+  ok(sim.hasStatus(sim.wizards[1], 'Stunned'),
+    'two Static stacks prime Thunderclap Stun');
+
+  sim = mk([7], [1]);
+  sim.applyStatus(sim.wizards[1], 'Static', 2);
+  fire(sim, 7, 0, 90);
+  ok(sim.hasStatus(sim.wizards[1], 'Stunned'),
+    'two Static stacks prime Chain Lightning Stun');
+
+  sim = mk([7], [1]);
+  sim.applyStatus(sim.wizards[1], 'Static', 1);
+  fire(sim, 7, 0, 90);
+  ok(!sim.hasStatus(sim.wizards[1], 'Stunned'),
+    'one Static stack does not prime a Storm Stun');
+
   // Two zones per player: a third owned zone replaces the oldest.
   sim = mk([31, 32, 35], [1]);
   fire(sim, 31); fire(sim, 32); fire(sim, 35);

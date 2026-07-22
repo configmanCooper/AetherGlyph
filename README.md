@@ -4,7 +4,7 @@ An Android-first, real-time 1v1 wizard dueling game built around drawing spell g
 
 ## Project status
 
-**Version 1.6.1 — feature complete.** The final solo phase (Practice vs AI +
+**Version 1.6.2 — feature complete.** The final solo phase (Practice vs AI +
 coaching) is implemented on top of the offline campaign, the authoritative online
 service, and the deterministic shared simulation. Version 1.6.0 adds authoritative
 100-point Stamina bars and costs for movement, Dodge, Brace, and Focus; Haste
@@ -94,7 +94,7 @@ bump `BALANCE_VERSION`; the rendering itself does not touch the deterministic
 simulation or wire protocol.
 
 **Practice vs AI (Solo Phase B) is implemented.** A fully offline single-player
-mode offers exactly **Easy, Medium, Hard** against a *fair* AI: every tier drives
+mode offers **Very Easy, Easy, Medium, and Hard** against a *fair* AI: every tier drives
 the same `Sim` intent path, spends the same resources, obeys the same cooldowns,
 charges, Tenacity, zone limits, and loadout rules, draws glyphs through the same
 gesture-execution model (a sampled score → the shared `qualityFromScore` potency
@@ -141,8 +141,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10601 /
-versionName 1.6.1). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10602 /
+versionName 1.6.2). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -197,7 +197,7 @@ Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT
   Stone Shard (V), Spark Dart (zigzag), Concussive Blast (arc), Ward (bracket),
   Barrier Dome (circle), Reflect (check mark).
 - Modes: **Tutorial** (guided glyph lessons + first-run calibration), **Practice
-  vs AI** (single offline round vs a fair Easy/Medium/Hard AI with post-round
+  vs AI** (single offline round vs a fair Very Easy/Easy/Medium/Hard AI with post-round
   coaching), **Glyph Laboratory** (free draw + recognizer diagnostics, no
   opponent), **Online Duel** (best-of-three vs another device: Quick Match, Create
   Private Duel, or Join Code).
@@ -393,7 +393,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10601` / `versionName 1.6.1`, no cleartext production traffic,
+  `versionCode 10602` / `versionName 1.6.2`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.
@@ -423,7 +423,7 @@ Build/sign/publish: see `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.
 
 The final feature phase adds the fair Practice AI, post-round coaching, interactive
 calibration, best-of-three exams, and the real Gust Wall deflection. New shared
-modules: `shared/src/bot/practiceBot.js` (Easy/Medium/Hard), `shared/src/bot/combos.js`
+modules: `shared/src/bot/practiceBot.js` (Very Easy/Easy/Medium/Hard), `shared/src/bot/combos.js`
 (tier-gated combo/counter knowledge), `shared/src/gesture/quality.js` (the single
 `qualityFromScore` mapping reused by player, server, and AI), and
 `shared/src/analytics/coach.js` (pure coaching reducer). New client modules:

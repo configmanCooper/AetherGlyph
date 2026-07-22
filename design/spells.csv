@@ -1,15 +1,15 @@
 id,name,school,category,gesture,aether,charges,cooldown_s,min_cast_s,loadout_points,effect,setup_or_payoff,counters,secret
 1,Ember Bolt,Ember,Offensive,right flick,12,0,18,0.25,1,"8 damage; apply Burning for 9 sec","Build Ember resonance; ignites Oil","Ward; Gust; Reflect",false
 2,Frost Lance,Tide,Offensive,straight up line,16,0,18,0.38,1,"10 damage; apply Chilled for 9 sec","Primes Frost Bind and Shatter","Ward; Blink; Dispel",false
-3,Spark Dart,Storm,Offensive,short zigzag,10,0,18,0.30,1,"6 damage; apply Static for 9 sec (max 3)","Primes Thunderclap; gains on Wet target","Gust; Ward; Grounding Mantle",false
+3,Spark Dart,Storm,Offensive,short zigzag,10,0,14,0.30,1,"6 damage; apply Static for 45 sec (max 3)","Two stacks prime Chain Lightning and Thunderclap","Gust; Ward; Grounding Mantle",false
 4,Stone Shard,Stone,Offensive,V shape,18,0,5,0.48,1,"14 piercing damage","Extra cover damage","Blink; Stone Wall; Brace",false
 5,Arcane Missile,Arcane,Offensive,upward arc,20,0,5,0.55,2,"12 damage; mild homing","Consumes Mark for bonus damage","Blink; Barrier; Reflect",false
 6,Flame Wave,Ember,Offensive,wide rising arc,28,0,18,0.70,2,"16 cone damage; apply Burning for 9 sec","Ignites Oil and disperses light Fog","Sidestep backward; Barrier; Rain",false
-7,Chain Lightning,Storm,Offensive,long zigzag,34,1,18,0.85,3,"18 damage; jumps through Wet zones","Stuns only when target is Soaked or has Static 3","Dispel setup; Grounding Mantle; Blink",false
+7,Chain Lightning,Storm,Offensive,long zigzag,34,1,18,0.85,3,"18 damage; jumps through Wet zones","Stuns only when target is Soaked or has Static 2","Dispel setup; Grounding Mantle; Blink",false
 8,Fireball,Ember,Offensive,clockwise triangle,45,1,24,1.05,3,"30 slow area damage; destroys cover","Oil causes a capped secondary burst","Sidestep; Barrier; interrupt windup",false
 9,Ice Comet,Tide,Offensive,inward spiral,40,1,24,1.10,3,"26 area damage; apply Chilled for 9 sec","Freezes Wet ground briefly","Blink; Barrier; interrupt windup",false
 10,Ward,Arcane,Defensive,open right bracket,15,0,26,0.32,1,"30 health frontal shield for 12.6 sec","Efficient only when facing threat","Flank angle; Quake; sustained pressure",false
-11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,18,0.72,2,"360 degree barrier for 9 sec","Caster cannot use offense while active","Wait; Sunder; Quake",false
+11,Barrier Dome,Arcane,Defensive,clockwise circle,30,0,18,0.72,2,"360 degree barrier for 9 sec; blocks hostile statuses, Aether Leech, and weather exposure","Caster cannot use offense while active","Wait; Sunder; Quake",false
 12,Reflect,Gale,Defensive,check mark,20,0,8,0.30,2,"Reflect projectile during 3.6 sec window","Perfect timing grants half Sigil Charge","Area spell; feint; delayed projectile",false
 13,Dispel,Arcane,Defensive,counterclockwise circle,22,0,10,0.55,1,"Remove two harmful statuses or one zone edge","Destroys Mark and setup investment","Bait it; reapply later; direct damage",false
 14,Blink,Arcane,Defensive,wide Z: right then diagonal down-left then right,18,0,9,0.30,2,"Short movement burst; invisible for 3 sec with brief evade; breaks homing","Escapes Root and makes Practice AI aim randomly","Track landing; area zone; delay release",false
@@ -28,7 +28,7 @@ id,name,school,category,gesture,aether,charges,cooldown_s,min_cast_s,loadout_poi
 27,Frost Bind,Tide,Control,two linked loops,28,0,20,0.82,2,"Freeze for 3 sec only if target is Chilled; target cannot move or cast","Consumes Chilled; earned hard-control payoff","Preemptive Dispel; Tenacity; Blink before resolve",false
 28,Concussive Blast,Gale,Control,pushing arc,20,0,6,0.45,1,"6 damage; knockback; interrupt channel","Punishes Focus and Aether Surge","Ward; spacing; bait",false
 29,Eclipse Glare,Umbra,Control,five point burst,26,0,40,0.68,2,"White out the opponent area for 4 sec while controls, guides, HUD, and spells remain visible","Removes Practice AI opponent awareness for the duration","Dispel; wait; use guides and visible spells",false
-30,Thunderclap,Storm,Control,two inward lines,30,1,20,0.78,3,"8 damage; stun 2 sec only on Soaked or Static 3; target cannot move or cast","Consumes Static setup but leaves Soaked; grants Tenacity afterward","Dispel setup; Grounding Mantle; distance",false
+30,Thunderclap,Storm,Control,two inward lines,30,1,20,0.78,3,"8 damage; stun 2 sec only on Soaked or Static 2; target cannot move or cast","Consumes Static setup but leaves Soaked; grants Tenacity afterward","Dispel setup; Grounding Mantle; distance",false
 31,Oil Script,Ember,Environmental,wavy horizontal line,16,0,42,0.58,1,"Place shared Oil zone for 21 sec","Ember ignites it for capped burst","Rain; Gust; avoid",false
 32,Rain Glyph,Tide,Environmental,cloud arc then down stroke,20,0,42,0.72,1,"Create shared Rain for 21 sec; both duelists become Wet and become Soaked after 5 sec","Douses Burning; enables lightning and frost reactions","Dispel; wait out weather; Grounding mitigates Storm",false
 33,Gust Wall,Gale,Environmental,three fan strokes,22,0,8,0.62,1,"Create 1.8 sec Gust zone and 1.2 sec light-projectile deflect window","Spreads fire but disperses Fog","Stone Shard; heavy projectile; reposition",false

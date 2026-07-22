@@ -225,7 +225,7 @@ Decision: become efficient but predictable, or switch schools to create a reacti
 | Burning | 2 damage/sec for 3 sec; maximum 2 stacks | Rain, Dispel |
 | Chilled | 18 percent movement and cast recovery slow for 3 sec | Haste, Dispel |
 | Soaked | Lightning deals 25 percent more; removes Burning | leave water, Dispel |
-| Static | next channel is interrupted; 3 stacks prime stun | Dispel, wait 3 sec |
+| Static | next channel is interrupted; 2 stacks prime stun; Spark Dart Static lasts 45 sec | Dispel |
 | Sundered | 20 percent more direct damage for 4 sec | Dispel, defensive play |
 | Weakened | 22 percent less outgoing damage for 4 sec | Dispel |
 | Marked | next direct hit gains 35 percent damage, then consumes mark | Dispel, Brace |

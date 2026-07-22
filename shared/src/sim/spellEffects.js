@@ -52,7 +52,7 @@ export const SPELL_EFFECTS = {
     frostReaction: true,
   },
   3: { // Spark Dart
-    type: PROJECTILE, damage: 6, status: { name: 'Static', stacks: 1 },
+    type: PROJECTILE, damage: 6, status: { name: 'Static', stacks: 1, durationS: 45 },
     travelS: 0.32, homing: 0.15, dodgeRadius: 0.30, school: 'Storm', reflectable: true,
     conductReaction: true,
   },
@@ -74,7 +74,7 @@ export const SPELL_EFFECTS = {
     type: PROJECTILE, damage: 18, status: null, charges: 1,
     travelS: 0.4, homing: 0.1, dodgeRadius: 0.3, school: 'Storm', reflectable: false,
     conductReaction: true,
-    conditionalStun: { needs: 'soakedOrStatic3', durationS: 0.8, grantsTenacity: true },
+    conditionalStun: { needs: 'soakedOrStatic2', staticStacks: 2, durationS: 0.8, grantsTenacity: true },
   },
   8: { // Fireball — heavy area, destroys cover
     type: PROJECTILE, damage: 30, status: { name: 'Burning', stacks: 1 }, charges: 1,
@@ -124,7 +124,7 @@ export const SPELL_EFFECTS = {
     type: PROJECTILE, damage: 8, status: null, charges: 1,
     travelS: 0.25, homing: 0, dodgeRadius: 0.32, school: 'Storm', reflectable: false,
     conditionalStun: {
-      needs: 'soakedOrStatic3', durationS: 2, grantsTenacity: true,
+      needs: 'soakedOrStatic2', staticStacks: 2, durationS: 2, grantsTenacity: true,
       consumeStatic: true, ignoreHardCap: true,
     },
   },

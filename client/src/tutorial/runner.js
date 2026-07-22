@@ -245,7 +245,7 @@ export class TutorialRunner {
   _buildOpponent(opponent) {
     if (!opponent) return makeScriptBot(this.botId, { behavior: 'idle' });
     if (opponent.type === 'practice') {
-      // The fair Practice AI (Easy/Medium/Hard) — identical to Practice vs AI.
+      // The fair Practice AI (Very Easy/Easy/Medium/Hard) — identical to Practice vs AI.
       return new PracticeBot(this.botId, { difficulty: opponent.difficulty || 'medium', seed: (this.seed ^ 0x5a5a) >>> 0 });
     }
     if (opponent.type === 'duel') {

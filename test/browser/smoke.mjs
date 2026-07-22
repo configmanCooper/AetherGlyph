@@ -624,12 +624,14 @@ try {
   await page.click('[data-action="save-loadout"]');
   await page.waitForSelector('#panel-practice:not(.hidden)', { timeout: 5000 });
 
-  // Practice vs AI: exactly Easy/Medium/Hard. Start a round on EACH difficulty,
+  // Practice vs AI: exactly Very Easy/Easy/Medium/Hard. Start a round on EACH difficulty,
   // confirm the AI opponent is active, force the round to end, and see coaching.
   const diffOptions = await page.evaluate(() => Array.from(document.querySelectorAll('#prac-diff option')).map((o) => o.value));
-  if (diffOptions.join(',') !== 'easy,medium,hard') fail('Practice must offer exactly easy,medium,hard: ' + diffOptions.join(','));
+  if (diffOptions.join(',') !== 'very-easy,easy,medium,hard') {
+    fail('Practice must offer exactly very-easy,easy,medium,hard: ' + diffOptions.join(','));
+  }
 
-  for (const diff of ['easy', 'medium', 'hard']) {
+  for (const diff of ['very-easy', 'easy', 'medium', 'hard']) {
     await page.select('#prac-diff', diff);
     await page.click('[data-action="start-practice"]');
     await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });

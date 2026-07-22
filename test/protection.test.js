@@ -83,5 +83,44 @@ export function run() {
   sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
   ok(!sim.wizards[0].casting, 'Barrier still blocks the caster from starting an offensive cast (intentional)');
 
+  // ---- 6. Barrier blocks hostile resource/status/weather effects ------------
+  let guarded = new Sim({
+    seed: 8,
+    loadouts: [[spellWithGesture(24), spellWithGesture(21)], [spellWithGesture(1)]],
+  });
+  guarded.wizards[0].aether = 100;
+  guarded.wizards[1].aether = 100;
+  guarded.wizards[1].barrier = { absorb: 60, ticks: 600 };
+  guarded.step({ 0: { cast: 24, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 120 && guarded.wizards[0].casting; t++) guarded.step({ 0: {}, 1: {} });
+  eq(guarded.wizards[1].aether, 100, 'Barrier blocks Aether Leech');
+
+  guarded.wizards[0].recoveryTicks = 0;
+  guarded.step({ 0: { cast: 21, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 120 && guarded.wizards[0].casting; t++) guarded.step({ 0: {}, 1: {} });
+  ok(!guarded.hasStatus(guarded.wizards[1], 'Weakened'), 'Barrier blocks hostile hex statuses');
+
+  guarded = new Sim({
+    seed: 9,
+    loadouts: [[spellWithGesture(3)], [spellWithGesture(1)]],
+  });
+  guarded.wizards[0].aether = 100;
+  guarded.wizards[0].arcPos = 0;
+  guarded.wizards[1].arcPos = 0;
+  guarded.wizards[1].barrier = { absorb: 1, ticks: 600 };
+  guarded.step({ 0: { cast: 3, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 120 && !guarded.ended; t++) guarded.step({ 0: {}, 1: {} });
+  ok(guarded.wizards[1].health < 100, 'projectile overflow can damage through a broken Barrier');
+  ok(!guarded.hasStatus(guarded.wizards[1], 'Static'),
+    'a projectile that collided with Barrier cannot deliver its status rider');
+
+  guarded = new Sim({ seed: 10, loadouts: [[spellWithGesture(32)], [spellWithGesture(1)]] });
+  guarded.wizards[0].aether = 100;
+  guarded.wizards[1].barrier = { absorb: 60, ticks: 600 };
+  guarded.addZone(0, 'Wet', { durationS: 6 });
+  for (let t = 0; t < 5 * TICK_HZ; t++) guarded.step({ 0: {}, 1: {} });
+  ok(!guarded.hasStatus(guarded.wizards[1], 'Wet') && !guarded.hasStatus(guarded.wizards[1], 'Soaked'),
+    'Barrier blocks Wet and Soaked weather exposure');
+
   return report('protection');
 }

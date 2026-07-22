@@ -92,6 +92,21 @@ export function run() {
   sim.step({ 0: {}, 1: {} });
   ok(missile.targetPos > hiddenAim, 'homing resumes after the target becomes visible');
 
+  sim = freshSim(45);
+  sim.wizards[0].aether = 100;
+  sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
+  const blindedMissile = sim.projectiles[0];
+  const blindedAim = blindedMissile.targetPos;
+  sim.wizards[1].arcPos = 0.8;
+  sim.applyStatus(sim.wizards[0], 'Blinded', 1);
+  sim.step({ 0: {}, 1: {} });
+  near(blindedMissile.targetPos, blindedAim, 1e-6,
+    'a caster blinded by Eclipse Glare receives no projectile homing assistance');
+  delete sim.wizards[0].statuses.Blinded;
+  sim.step({ 0: {}, 1: {} });
+  ok(blindedMissile.targetPos > blindedAim, 'homing resumes when Eclipse Glare ends');
+
   sim = freshSim(44);
   sim.wizards[0].aether = 100;
   sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });

@@ -34,6 +34,12 @@ export function run() {
   eq(loaded.currentLessonId, 'L01', 'current lesson advanced');
   eq(loaded.stats.rejectionReasons['below-threshold'], 1, 'rejection stats persist');
 
+  const practiceProfile = P.defaultProfile();
+  P.setPractice(practiceProfile, { ...practiceProfile.practice, difficulty: 'very-easy' });
+  eq(practiceProfile.practice.difficulty, 'very-easy', 'Very Easy Practice preference persists validation');
+  P.recordPracticeResult(practiceProfile, 'very-easy', true);
+  eq(practiceProfile.stats.practiceResults['very-easy'].won, 1, 'Very Easy Practice results are recorded');
+
   // --- ranked readiness only via Lesson 12 ------------------------------
   const p2 = P.defaultProfile();
   P.completeLesson(p2, 'L11', 'L12');

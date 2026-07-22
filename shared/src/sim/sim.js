@@ -157,6 +157,10 @@ export class Sim {
 
   hasStatus(w, name) { return !!w.statuses[name] && w.statuses[name].ticks > 0; }
 
+  hasBarrier(w) {
+    return !!w.barrier && w.barrier.ticks > 0 && w.barrier.absorb > 0;
+  }
+
   statusStacks(w, name) { return this.hasStatus(w, name) ? w.statuses[name].stacks : 0; }
 
   isHardControlled(w) {
@@ -557,6 +561,10 @@ export class Sim {
 
   // ------------------------------------------------------------- cast handlers
   resolveHex(w, opp, eff, spellId, durationScale = 1) {
+    if (this.hasBarrier(opp)) {
+      this.emit('barrierNegate', { caster: w.id, target: opp.id, spellId });
+      return;
+    }
     if (eff.drain) {
       const drainable = Math.max(0, opp.aether - AETHER.protectedFloor);
       const drained = Math.min(eff.drain, drainable);
@@ -706,7 +714,8 @@ export class Sim {
       this.dealDamage(w, opp, w.channel.perTick, { source: 'Prismatic Beam', school: 'Prismatic', ignoreCap: true });
       const half = w.channel.totalTicks / 2;
       // Tide+Storm utility: apply Static 1 once at least half the beam landed.
-      if (w.channel.utility.applyStatic && !w.channel.staticApplied && w.channel.ticks <= half) {
+      if (w.channel.utility.applyStatic && !w.channel.staticApplied && w.channel.ticks <= half
+          && !this.hasBarrier(opp)) {
         this.applyStatus(opp, 'Static', w.channel.utility.applyStatic);
         w.channel.staticApplied = true;
       }
@@ -757,6 +766,7 @@ export class Sim {
     switch (r.name) {
       case 'Doused':
         for (const w of this.wizards) {
+          if (this.hasBarrier(w)) continue;
           if (w.statuses.Burning) { delete w.statuses.Burning; this.emit('statusEnd', { target: w.id, status: 'Burning' }); }
         }
         this.removeZones((z) => z.kind === 'Fire', 'doused');
@@ -774,15 +784,16 @@ export class Sim {
         this.addZone(ctx.casterId, 'Fog', { durationS: 9 });
         break;
       case 'ConductiveArc':
-        if (target) this.applyStatus(target, 'Soaked', 1);
+        if (target && !this.hasBarrier(target)) this.applyStatus(target, 'Soaked', 1);
         break;
       case 'FlashFire': {
         const oil = this.zonesOfKind('Oil')[0];
         const members = this.wizards.filter((w) => oil && this.wizardInZone(w, oil));
         this.removeZones((z) => z.kind === 'Oil', 'ignited');
         for (const w of members) {
+          const barrierProtected = this.hasBarrier(w);
           this.dealDamage(this.wizards[ctx.casterId], w, REACTION.flashFireDamage, { source: 'Flash Fire', school: 'Ember' });
-          this.applyStatus(w, 'Burning', 1);
+          if (!barrierProtected) this.applyStatus(w, 'Burning', 1);
         }
         this.addZone(ctx.casterId, 'Fire', {});
         break;
@@ -820,9 +831,11 @@ export class Sim {
     const hgSlow = this.hourglassActive() ? (1 - ZONE.hourglassSlow) : 1;
     for (const p of this.projectiles) {
       p.ticks -= hgSlow;
+      const attacker = this.wizards[p.owner];
       const defender = this.opponentOf(p.owner);
-      // Blink invisibility breaks homing updates until the target reappears.
-      if (p.eff.homing > 0 && defender.invisibleTicks <= 0) {
+      // Blink invisibility hides the target; Eclipse blindness denies the caster
+      // the visual lock needed to update a homing projectile.
+      if (p.eff.homing > 0 && defender.invisibleTicks <= 0 && !this.hasStatus(attacker, 'Blinded')) {
         p.targetPos += (defender.arcPos - p.targetPos) * p.eff.homing;
       }
       const progress = 1 - Math.max(0, p.ticks) / Math.max(1, p.totalTicks || 1);
@@ -914,6 +927,7 @@ export class Sim {
     if (eff.destroysCover) this.removeZones((z) => z.kind === 'Cover' && z.owner === defender.id, 'destroyed');
 
     // Hit — apply damage.
+    const barrierProtected = this.hasBarrier(defender);
     let dmgBase = eff.damage || 0;
     if (eff.coverBonus && this.zones.some((z) => z.kind === 'Cover' && z.owner === defender.id)) dmgBase += 4;
     const dmg0 = dmgBase * p.quality;
@@ -925,12 +939,17 @@ export class Sim {
 
     // Status application — only if the projectile actually landed damage
     // (a fully-absorbed shot does not deliver its status rider).
-    if (eff.status && dealt > 0) this.applyStatus(defender, eff.status.name, eff.status.stacks);
+    if (eff.status && dealt > 0 && !barrierProtected) {
+      this.applyStatus(defender, eff.status.name, eff.status.stacks, {
+        durationS: eff.status.durationS,
+      });
+    }
 
-    // Conditional stun (Chain Lightning, Thunderclap): only on Soaked or Static 3.
-    if (eff.conditionalStun && dealt > 0) {
+    // Conditional stun (Chain Lightning, Thunderclap): only on Soaked or enough Static.
+    if (eff.conditionalStun && dealt > 0 && !barrierProtected) {
       const cs = eff.conditionalStun;
-      const primed = this.hasStatus(defender, 'Soaked') || this.statusStacks(defender, 'Static') >= 3;
+      const primed = this.hasStatus(defender, 'Soaked')
+        || this.statusStacks(defender, 'Static') >= (cs.staticStacks ?? 3);
       if (primed) {
         if (cs.consumeStatic && defender.statuses.Static) { delete defender.statuses.Static; this.emit('statusEnd', { target: defender.id, status: 'Static' }); }
         const ok = this.applyStatus(defender, 'Stunned', 1, {
@@ -1022,6 +1041,7 @@ export class Sim {
         for (const w of this.wizards) {
           if (w.id === z.owner) continue;
           const inside = this.wizardInZone(w, z);
+          if (inside && this.hasBarrier(w)) continue;
           if (inside && !w.snaredZones.has(z.id)) {
             w.snaredZones.add(z.id);
             this.applyStatus(w, 'Rooted', 1, { durationS: ZONE.snareRootS });
@@ -1045,6 +1065,10 @@ export class Sim {
     const threshold = sToTicks(ZONE.soakAfterS);
     for (const wizard of this.wizards) {
       if (!raining) {
+        wizard.wetExposureTicks = 0;
+        continue;
+      }
+      if (this.hasBarrier(wizard)) {
         wizard.wetExposureTicks = 0;
         continue;
       }

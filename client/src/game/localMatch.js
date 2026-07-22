@@ -7,7 +7,7 @@
 //
 // Modes:
 //   'practice' — single-round Practice vs AI. The opponent is the fair PracticeBot
-//                (Easy/Medium/Hard). A NON-DRAINING event history is kept so the
+//                (Very Easy/Easy/Medium/Hard). A NON-DRAINING event history is kept so the
 //                pure coaching reducer can build a post-round report (§20). It
 //                stores no raw gesture traces — only discrete Sim events.
 //   'lab'      — Glyph Laboratory: no opponent, no combat pressure.

@@ -1,6 +1,6 @@
 // practiceBot.test.js — fairness + statistical tests for the Practice AI.
 //
-// Proves the Easy/Medium/Hard bots are FAIR (identical rules, resources, legal
+// Proves the Very Easy/Easy/Medium/Hard bots are FAIR (identical rules, resources, legal
 // loadouts, non-zero gesture misses, non-zero perception delay, deterministic)
 // and that difficulty ORDERING holds across mirrored seeded matches with several
 // equal loadouts. Ordering is achieved through decision profiles — NOT stat
@@ -54,17 +54,20 @@ function mirror(dA, dB, seeds, base) {
 export function run() {
   const { ok, eq, near, report } = createHarness();
 
-  // --- exactly three public difficulties --------------------------------
-  eq(PRACTICE_DIFFICULTIES.length, 3, 'exactly three practice difficulties');
-  ok(PRACTICE_DIFFICULTIES.join(',') === 'easy,medium,hard', 'difficulties are Easy, Medium, Hard');
+  // --- exactly four public difficulties ---------------------------------
+  eq(PRACTICE_DIFFICULTIES.length, 4, 'exactly four practice difficulties');
+  ok(PRACTICE_DIFFICULTIES.join(',') === 'very-easy,easy,medium,hard',
+    'difficulties are Very Easy, Easy, Medium, Hard');
 
   // --- non-zero perception delay at every tier, ordered ------------------
   const per = (d) => new PracticeBot(1, { difficulty: d, seed: 1 }).perceptionTicks;
   ok(per('hard') >= Math.round(0.150 * TICK_HZ), 'Hard perception >= 150 ms');
   ok(per('medium') >= Math.round(0.280 * TICK_HZ), 'Medium perception >= 280 ms');
   ok(per('easy') >= Math.round(0.450 * TICK_HZ), 'Easy perception >= 450 ms');
-  ok(per('hard') > 0 && per('medium') > per('hard') && per('easy') > per('medium'),
-    'perception delay is non-zero and strictly Easy>Medium>Hard');
+  ok(per('very-easy') >= Math.round(0.700 * TICK_HZ), 'Very Easy perception >= 700 ms');
+  ok(per('hard') > 0 && per('medium') > per('hard') && per('easy') > per('medium')
+      && per('very-easy') > per('easy'),
+  'perception delay is non-zero and strictly Very Easy>Easy>Medium>Hard');
 
   {
     const sim = createMatch({ seed: 19 });
@@ -149,7 +152,7 @@ export function run() {
     eq(bot.perceivedCast(sim).school, 'Storm', 'cast tell becomes actionable after the delay');
   }
 
-  // --- gesture misses: non-zero and strictly Easy>Medium>Hard ------------
+  // --- gesture misses: non-zero and ordered by difficulty ----------------
   const missRate = (d, n) => {
     const bot = new PracticeBot(1, { difficulty: d, seed: 5 });
     let rej = 0;
@@ -157,12 +160,58 @@ export function run() {
     return rej / n;
   };
   const N = 30000;
-  const me = missRate('easy', N), mm = missRate('medium', N), mh = missRate('hard', N);
+  const mv = missRate('very-easy', N), me = missRate('easy', N);
+  const mm = missRate('medium', N), mh = missRate('hard', N);
   ok(mh > 0, `Hard gesture-miss rate is greater than zero (${mh.toFixed(3)})`);
   ok(mm > mh, `Medium miss rate materially above Hard (${mm.toFixed(3)} > ${mh.toFixed(3)})`);
   ok(me > mm, `Easy miss rate materially above Medium (${me.toFixed(3)} > ${mm.toFixed(3)})`);
+  ok(mv > me, `Very Easy miss rate materially above Easy (${mv.toFixed(3)} > ${me.toFixed(3)})`);
   ok(me - mm > 0.05, 'Easy is materially (>5pp) missier than Medium');
   ok(mm - mh > 0.005, 'Medium is materially missier than Hard');
+
+  {
+    const bot = new PracticeBot(1, {
+      difficulty: 'very-easy', seed: 41,
+      overrides: { flubRate: 0, scoreMean: 1, scoreSpread: 0 },
+    });
+    bot.currentTick = 0;
+    eq(bot._commitCast(1).cast, 1, 'Very Easy can cast immediately');
+    bot.currentTick = 10 * TICK_HZ - 1;
+    ok(bot._commitCast(2).cast == null, 'Very Easy cannot cast again before ten seconds');
+    bot.currentTick = 10 * TICK_HZ;
+    eq(bot._commitCast(2).cast, 2, 'Very Easy can cast again at the ten-second boundary');
+  }
+
+  {
+    const sim = createMatch({ seed: 42 });
+    sim.wizards[1].statuses.Blinded = { stacks: 1, ticks: 10000 };
+    const veryEasy = new PracticeBot(1, { difficulty: 'very-easy', seed: 42 });
+    const easy = new PracticeBot(1, { difficulty: 'easy', seed: 42 });
+    let veryEasyMoves = 0, easyMoves = 0;
+    for (let tick = 0; tick < 1000; tick++) {
+      sim.tick = tick;
+      if (veryEasy.act(sim).move) veryEasyMoves += 1;
+      if (easy.act(sim).move) easyMoves += 1;
+    }
+    ok(veryEasyMoves < easyMoves * 0.4,
+      `Very Easy moves substantially less often than Easy (${veryEasyMoves} < ${easyMoves})`);
+  }
+
+  {
+    const sim = createMatch({ seed: 43 });
+    const threat = { eff: effectFor(8), ticks: 2 };
+    const veryEasy = new PracticeBot(1, { difficulty: 'very-easy', seed: 43, overrides: { defends: 0 } });
+    const easy = new PracticeBot(1, { difficulty: 'easy', seed: 43, overrides: { defends: 0 } });
+    const w = sim.wizards[1], o = sim.wizards[0];
+    const bVery = veryEasy.categorize(sim), bEasy = easy.categorize(sim);
+    let veryEasyDodges = 0, easyDodges = 0;
+    for (let i = 0; i < 10000; i++) {
+      if (veryEasy._defend(sim, w, o, bVery, threat, {}, false)?.sidestep) veryEasyDodges += 1;
+      if (easy._defend(sim, w, o, bEasy, threat, {}, false)?.sidestep) easyDodges += 1;
+    }
+    ok(veryEasyDodges < easyDodges * 0.4,
+      `Very Easy dodges substantially less often than Easy (${veryEasyDodges} < ${easyDodges})`);
+  }
 
   // --- accepted casts use the SHARED potency mapping (0.90..1.05) ---------
   {
@@ -332,14 +381,17 @@ export function run() {
   const HvE = mirror('hard', 'easy', 60, 9000);
   const HvM = mirror('hard', 'medium', 60, 9000);
   const MvE = mirror('medium', 'easy', 60, 9000);
+  const EvV = mirror('easy', 'very-easy', 40, 12000);
   ok(HvE.rate > 0.70, `Hard beats Easy > 70% (${(HvE.rate * 100).toFixed(0)}%)`);
   ok(HvM.rate > 0.55, `Hard beats Medium > 55% (${(HvM.rate * 100).toFixed(0)}%)`);
   ok(MvE.rate > 0.60, `Medium beats Easy > 60% (${(MvE.rate * 100).toFixed(0)}%)`);
+  ok(EvV.rate > 0.65, `Easy beats Very Easy > 65% (${(EvV.rate * 100).toFixed(0)}%)`);
   // Side swapping does not reverse the ordering: the stronger tier wins > 50%
   // on BOTH seat assignments.
   ok(HvE.side0 > 0.5 && HvE.side1 > 0.5, 'Hard > Easy on both seats (no side reversal)');
   ok(HvM.side0 > 0.5 && HvM.side1 > 0.5, 'Hard > Medium on both seats (no side reversal)');
   ok(MvE.side0 > 0.5 && MvE.side1 > 0.5, 'Medium > Easy on both seats (no side reversal)');
+  ok(EvV.side0 > 0.5 && EvV.side1 > 0.5, 'Easy > Very Easy on both seats (no side reversal)');
 
   return report('practiceBot');
 }
