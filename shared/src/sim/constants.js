@@ -25,7 +25,7 @@ export const AETHER = {
 export const STAMINA = {
   max: 100,
   start: 100,
-  movePerS: 1,
+  movePerS: 1.5,
   dodgeCost: 5,
   bracePerS: 3,
   focusPerS: 3,

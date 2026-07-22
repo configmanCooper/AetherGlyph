@@ -127,8 +127,16 @@ export function run() {
   // Barrier prevents offensive casting while active.
   sim = freshSim();
   sim.wizards[0].barrier = { absorb: 60, ticks: Math.round(4.5 * TICK_HZ) };
-  sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
+  const barrierEvents = sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
   ok(!sim.wizards[0].casting, 'Barrier blocks offensive cast');
+  eq(barrierEvents.find((e) => e.type === 'castRejected')?.reason, 'barrier',
+    'Barrier-blocked offensive cast reports why it failed');
+
+  sim = freshSim();
+  sim.applyStatus(sim.wizards[0], 'Stunned', 1);
+  const stunnedEvents = sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
+  eq(stunnedEvents.find((e) => e.type === 'castRejected')?.reason, 'stunned',
+    'cast attempted while Stunned reports why it failed');
 
   // Concussive Blast interrupts an enemy Focus channel (counter).
   sim = freshSim();

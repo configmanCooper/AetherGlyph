@@ -190,7 +190,7 @@ Decision: spend rapidly for initiative or reserve enough to answer the opponent.
 ### Stamina
 
 - Range: 0-100, starts at 100.
-- Moving costs 1/sec; Dodge costs 5; Brace and Focus cost 3/sec.
+- Moving costs 1.5/sec; Dodge costs 5; Brace and Focus cost 3/sec.
 - Regenerates 1/sec whenever not moving.
 - Haste raises idle regeneration to 1.5/sec and reduces all Stamina costs by 25 percent.
 - Actions fail when their Stamina cost cannot be paid.

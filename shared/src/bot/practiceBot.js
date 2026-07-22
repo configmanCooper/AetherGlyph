@@ -54,7 +54,7 @@ export const PRACTICE_PROFILES = {
     perceptionMs: 280, replanMs: 267, horizonMs: 1000,
     scoreMean: 0.82, scoreSpread: 0.08, flubRate: 0.06, mistakeRate: 0.10,
     counter: 'common', combo: 'two-step', adapt: 'cast-frequency', loadout: 'soft-counter',
-    aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40, defenseReserve: 0.4, staminaReserve: 10,
+    aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40, defenseReserve: 0.4, staminaReserve: 5,
   },
   hard: {
     key: 'hard', label: 'Hard',

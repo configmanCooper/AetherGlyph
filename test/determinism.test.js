@@ -104,6 +104,7 @@ export function run() {
   assertHashChanges('Phoenix use', (sim) => { sim.wizards[0].phoenixUsed = true; });
   assertHashChanges('knockback history', (sim) => { sim.wizards[0].knockbackTimes.push(21); });
   assertHashChanges('triggered snares', (sim) => { sim.wizards[0].snaredZones.add(4); });
+  assertHashChanges('held-action rejection state', (sim) => { sim.wizards[0].actionRejectKeys.move = 'move:stamina'; });
   assertHashChanges('damage tie-break total', (sim) => { sim.wizards[0].damageDealt = 3.5; });
   assertHashChanges('resolved cast count', (sim) => { sim.wizards[0].castsResolved = 2; });
   assertHashChanges('healing lock', (sim) => { sim.healingDisabled = true; });

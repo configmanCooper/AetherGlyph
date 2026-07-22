@@ -654,11 +654,16 @@ try {
         };
         const touch = document.querySelector('#btn-focus .touch-label');
         const desktop = document.querySelector('#btn-focus .desktop-label');
+        const staminaFills = Array.from(document.querySelectorAll('.bar.stamina .fill'));
         return {
           move: rect('#move-pad'), actions: rect('.action-buttons'),
           draw: rect('#draw-pad'), spellbar: rect('#spellbar'),
-          staminaBars: document.querySelectorAll('.bar.stamina .fill').length,
-          staminaColor: getComputedStyle(document.querySelector('.bar.stamina .fill')).backgroundImage,
+          staminaBars: staminaFills.length,
+          staminaColor: getComputedStyle(staminaFills[0]).backgroundImage,
+          staminaRatios: staminaFills.map((fill) => {
+            const parentWidth = fill.parentElement.getBoundingClientRect().width;
+            return parentWidth > 0 ? fill.getBoundingClientRect().width / parentWidth : 0;
+          }),
           touchVisible: getComputedStyle(touch).display !== 'none',
           desktopHidden: getComputedStyle(desktop).display === 'none',
         };
@@ -671,8 +676,29 @@ try {
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.actions)
           || landscapeOverlap(landscapeControls.spellbar, landscapeControls.draw)
           || landscapeControls.staminaBars !== 2 || !/rgb\(66, 184, 90\)/.test(landscapeControls.staminaColor)
+          || landscapeControls.staminaRatios.some((ratio) => ratio < 0.99)
           || !landscapeControls.touchVisible || !landscapeControls.desktopHidden) {
         fail('landscape mobile controls are not compact/above joystick: ' + JSON.stringify(landscapeControls));
+      }
+      const failureMessages = await page.evaluate(() => [
+        window.__aegTest.dispatchEvents([{
+          type: 'castRejected', caster: 0, spellId: 4, reason: 'aether', required: 18, available: 5,
+        }]),
+        window.__aegTest.dispatchEvents([{
+          type: 'castRejected', caster: 0, spellId: 7, reason: 'charges', required: 1, available: 0,
+        }]),
+        window.__aegTest.dispatchEvents([{
+          type: 'castRejected', caster: 0, spellId: 1, reason: 'barrier',
+        }]),
+        window.__aegTest.dispatchEvents([{
+          type: 'actionRejected', caster: 0, action: 'move', reason: 'stamina',
+        }]),
+      ]);
+      if (!/needs 18 Aether; you have 5/.test(failureMessages[0])
+          || !/needs 1 Sigil Charge; you have 0/.test(failureMessages[1])
+          || !/Barrier Dome/.test(failureMessages[2])
+          || !/Not enough Stamina to move/.test(failureMessages[3])) {
+        fail('failure reasons are not shown to the player: ' + JSON.stringify(failureMessages));
       }
       const visibleGuideIds = await page.evaluate(() =>
         Array.from(document.querySelectorAll('#spellbar .spell-btn[data-spell]')).map((b) => Number(b.dataset.spell)));

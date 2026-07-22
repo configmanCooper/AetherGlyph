@@ -90,7 +90,7 @@ export function run() {
   // Stamina movement cost and idle regeneration.
   sim = freshSim();
   advance(sim, TICK_HZ, { move: 1 }, {});
-  near(sim.wizards[0].stamina, STAMINA.start - 1, 0.05, 'moving costs 1 stamina per second');
+  near(sim.wizards[0].stamina, STAMINA.start - 1.5, 0.05, 'moving costs 1.5 stamina per second');
   sim.wizards[0].stamina = 50;
   advance(sim, TICK_HZ, {}, {});
   near(sim.wizards[0].stamina, 51, 0.05, 'idle stamina regenerates at 1 per second');
@@ -110,18 +110,81 @@ export function run() {
   delete sim.wizards[0].statuses.Sloth;
   sim.wizards[0].stamina = 100;
   advance(sim, TICK_HZ, { move: 1 }, {});
-  near(sim.wizards[0].stamina, 99.25, 0.05, 'Haste reduces movement stamina cost by 25%');
+  near(sim.wizards[0].stamina, 98.875, 0.05, 'Haste reduces movement stamina cost by 25%');
   sim = freshSim();
   sim.wizards[0].stamina = 0;
   const exhaustedPos = sim.wizards[0].arcPos;
-  sim.step({ 0: { move: 1 }, 1: {} });
+  let rejectEvents = sim.step({ 0: { move: 1 }, 1: {} });
   eq(sim.wizards[0].arcPos, exhaustedPos, 'insufficient stamina prevents movement');
+  eq(rejectEvents.find((e) => e.type === 'actionRejected')?.reason, 'stamina',
+    'failed movement reports insufficient Stamina');
+  rejectEvents = sim.step({ 0: { move: 1 }, 1: {} });
+  ok(!rejectEvents.some((e) => e.type === 'actionRejected'),
+    'held failed movement does not spam repeated rejection events');
+  sim.step({ 0: {}, 1: {} });
+  sim.wizards[0].stamina = 0;
+  rejectEvents = sim.step({ 0: { move: 1 }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected')?.reason, 'stamina',
+    'a new movement attempt reports failure again');
+
+  sim = freshSim();
+  sim.wizards[0].stamina = 0.2;
+  let lowStaminaMoveRejects = 0;
+  for (let tick = 0; tick < TICK_HZ * 3; tick++) {
+    const events = sim.step({ 0: { move: 1 }, 1: {} });
+    lowStaminaMoveRejects += events.filter((e) =>
+      e.type === 'actionRejected' && e.action === 'move' && e.reason === 'stamina').length;
+  }
+  eq(lowStaminaMoveRejects, 1,
+    'intermittent low-Stamina movement does not repeat warnings until movement is released');
+
+  sim = freshSim();
+  sim.wizards[0].stamina = 0;
+  rejectEvents = sim.step({ 0: { brace: true }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'brace')?.reason, 'stamina',
+    'failed Brace reports insufficient Stamina');
+
+  sim = freshSim();
+  sim.wizards[0].braceTicks = 2;
+  sim.applyStatus(sim.wizards[0], 'Stunned', 1);
+  rejectEvents = sim.step({ 0: { brace: true }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'brace')?.reason, 'stunned',
+    'Brace attempted while Stunned reports why it failed');
+  eq(sim.wizards[0].braceTicks, 1, 'failed Brace input does not erase an already-active Brace window');
+
+  sim = freshSim();
+  sim.wizards[0].stamina = 0;
+  rejectEvents = sim.step({ 0: { focus: true }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'focus')?.reason, 'stamina',
+    'failed Focus reports insufficient Stamina');
+
+  sim = freshSim();
+  sim.wizards[0].sidestepCharges = 0;
+  rejectEvents = sim.step({ 0: { sidestep: 1 }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'sidestep')?.reason, 'no-dodges',
+    'failed Dodge reports that no Dodge charges are ready');
+
+  sim = freshSim();
+  sim.applyStatus(sim.wizards[0], 'Rooted', 1);
+  rejectEvents = sim.step({ 0: { move: 1 }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'move')?.reason, 'rooted',
+    'Rooted movement attempt reports why it failed');
 
   // Cannot afford a spell -> no cast starts.
   sim = freshSim();
   sim.wizards[0].aether = 5;
-  sim.step({ 0: { cast: 4, castQuality: 1 }, 1: {} }); // Stone Shard costs 18
+  rejectEvents = sim.step({ 0: { cast: 4, castQuality: 1 }, 1: {} }); // Stone Shard costs 18
   ok(!sim.wizards[0].casting, 'insufficient Aether blocks cast');
+  const aetherReject = rejectEvents.find((e) => e.type === 'castRejected');
+  eq(aetherReject?.reason, 'aether', 'failed cast reports insufficient Aether');
+  ok(aetherReject?.required > aetherReject?.available, 'Aether rejection reports required and available amounts');
+
+  sim = freshSim();
+  sim.wizards[0].aether = 100;
+  rejectEvents = sim.step({ 0: { cast: 7, castQuality: 1 }, 1: {} });
+  const chargeReject = rejectEvents.find((e) => e.type === 'castRejected');
+  eq(chargeReject?.reason, 'charges', 'failed cast reports insufficient Sigil Charges');
+  eq(chargeReject?.required, 1, 'Sigil rejection reports the required charge count');
 
   // Cooldown: after a cast resolves, the same spell is on cooldown.
   sim = freshSim();

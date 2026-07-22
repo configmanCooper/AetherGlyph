@@ -206,6 +206,7 @@ const gesture = new GestureInput($('#draw-canvas'), {
   },
   onReject: (diag) => {
     audio.unlock(); audio.reject(); hud.setDiag(diag);
+    toast('Glyph not recognized — trace the dotted guide and try again.');
     if (mode === 'tutorial' && tutorial) tutorial.noteReject(diag);
   },
 });
@@ -998,12 +999,48 @@ function handleEvents(events) {
       }
     } else if (e.type === 'damage') {
       audio.damage(); if (e.target === 0) haptic('damage');
-    } else if (e.type === 'castRejected' && e.caster === 0 && e.reason === 'cooldown') {
+    } else if (e.type === 'castRejected' && e.caster === 0) {
       const spell = SPELLS_BY_ID[e.spellId];
-      const seconds = Number(e.cooldownSeconds) || 0;
-      const remaining = seconds < 10 ? `${seconds.toFixed(1)} seconds` : `${Math.ceil(seconds)} seconds`;
       audio.reject(); haptic('reject');
-      toast(`${spell ? spell.name : 'That spell'} is on cooldown — ${remaining} remaining.`);
+      const name = spell ? spell.name : 'That spell';
+      const seconds = Number(e.cooldownSeconds || e.recoverySeconds) || 0;
+      const remaining = seconds < 10 ? `${seconds.toFixed(1)} seconds` : `${Math.ceil(seconds)} seconds`;
+      const messages = {
+        barrier: `${name} is offensive — dismiss or wait for Barrier Dome to end first.`,
+        aether: `${name} needs ${Math.ceil(e.required || 0)} Aether; you have ${Math.floor(e.available || 0)}.`,
+        charges: `${name} needs ${e.required || 1} Sigil Charge${(e.required || 1) === 1 ? '' : 's'}; you have ${e.available || 0}.`,
+        frozen: `You are Frozen and cannot cast ${name}.`,
+        stunned: `You are Stunned and cannot cast ${name}.`,
+        channeling: `You cannot cast ${name} while channeling another spell.`,
+        casting: `You are already casting another spell.`,
+        focusing: `Stop Focusing before casting ${name}.`,
+        recovery: `You are still recovering — ${remaining} remaining.`,
+        static: `Static interrupted ${name}'s channel.`,
+        unavailable: `${name} is unavailable right now.`,
+      };
+      toast(e.reason === 'cooldown'
+        ? `${name} is on cooldown — ${remaining} remaining.`
+        : (messages[e.reason] || `${name} could not be cast.`));
+    } else if (e.type === 'actionRejected' && e.caster === 0) {
+      audio.reject(); haptic('reject');
+      const action = {
+        move: 'move', sidestep: 'Dodge', brace: 'Brace', focus: 'Focus',
+      }[e.action] || 'perform that action';
+      const messages = {
+        stamina: `Not enough Stamina to ${action}.`,
+        frozen: `You are Frozen and cannot ${action}.`,
+        stunned: `You are Stunned and cannot ${action}.`,
+        rooted: `You are Rooted and cannot ${action}.`,
+        channeling: `You cannot ${action} while channeling a spell.`,
+        casting: `You cannot ${action} while casting a spell.`,
+        focusing: `You cannot ${action} while Focusing.`,
+        recovery: `You are still recovering and cannot ${action} yet.`,
+        'charges-full': 'Your Sigil Charges are already full.',
+        conflict: 'Focus cannot start while another action is being attempted.',
+        'no-dodges': 'No Dodge charges are ready yet.',
+        boundary: `You cannot ${action} farther in that direction.`,
+      };
+      toast(messages[e.reason] || `You cannot ${action} right now.`);
     } else if (e.type === 'reflect') { audio.reflect(); haptic('counter'); }
     else if (e.type === 'shield' || e.type === 'barrier') audio.shield();
     else if (e.type === 'focusComplete') audio.focus();
@@ -1011,7 +1048,7 @@ function handleEvents(events) {
     else if (e.type === 'phoenixSave') toast('Phoenix Covenant saved the wizard!');
     else if (e.type === 'interrupt' || e.type === 'controlResisted') haptic('counter');
   }
-  arena.handleEvents(events, match.sim);
+  if (match?.sim) arena.handleEvents(events, match.sim);
 }
 
 let lastT = performance.now();
@@ -1864,6 +1901,14 @@ if (typeof window !== 'undefined') {
       catch (e) { return { accepted: false, error: String(e && e.message || e) }; }
     },
     simulateOnlineStart: () => { try { onOnlineMatchStart(); return true; } catch { return false; } },
+    dispatchEvents: (events) => {
+      try {
+        handleEvents(Array.isArray(events) ? events : []);
+        return $('#toast')?.textContent || '';
+      } catch (e) {
+        return String(e && e.message || e);
+      }
+    },
     returnMenu: () => { try { returnToMainMenu(); return true; } catch { return false; } },
     nativeBack: () => { try { nativeBack(); return true; } catch { return false; } },
     backgroundChange: (hidden) => { try { onBackgroundChange(!!hidden); return true; } catch { return false; } },
@@ -1947,6 +1992,15 @@ function registerServiceWorker() {
   const loc = window.location;
   if (loc.protocol !== 'https:') return;
   if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') return;
-  navigator.serviceWorker.register('./sw.js').catch(() => { /* fallback is best-effort */ });
+  const replacingWorker = !!navigator.serviceWorker.controller;
+  let refreshing = false;
+  if (replacingWorker) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      loc.reload();
+    });
+  }
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => { /* fallback is best-effort */ });
 }
 registerServiceWorker();

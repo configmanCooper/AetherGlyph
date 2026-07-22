@@ -64,6 +64,7 @@ function makeWizard(id, loadout, spawnArc) {
     countersLanded: 0,
     castsResolved: 0,
     castsRejected: 0,
+    actionRejectKeys: {},
   };
 }
 
@@ -123,6 +124,23 @@ export class Sim {
     if (w.stamina + 1e-9 < cost) return false;
     w.stamina = Math.max(0, w.stamina - cost);
     return true;
+  }
+
+  rejectAction(w, action, reason, details = {}) {
+    const key = `${action}:${reason}`;
+    if (w.actionRejectKeys[action] === key) return;
+    w.actionRejectKeys[action] = key;
+    this.emit('actionRejected', { caster: w.id, action, reason, ...details });
+  }
+
+  clearActionReject(w, action) {
+    delete w.actionRejectKeys[action];
+  }
+
+  rejectCast(w, spellId, reason, details = {}) {
+    this.lastCastReject = { caster: w.id, spellId, reason, ...details };
+    this.emit('castRejected', this.lastCastReject);
+    return false;
   }
 
   regenerateStamina(w) {
@@ -377,29 +395,57 @@ export class Sim {
 
   // ---------------------------------------------------------------- intents
   beginCast(w, spellId, quality, targetPos = null) {
-    if (!this.canAct(w)) return false;
-    if (w.casting || w.focusing || w.recoveryTicks > 0) return false;
+    this.lastCastReject = null;
+    if (this.hasStatus(w, 'Frozen')) return this.rejectCast(w, spellId, 'frozen');
+    if (this.hasStatus(w, 'Stunned')) return this.rejectCast(w, spellId, 'stunned');
+    if (w.channel) return this.rejectCast(w, spellId, 'channeling');
+    if (w.casting) return this.rejectCast(w, spellId, 'casting');
+    if (w.focusing) return this.rejectCast(w, spellId, 'focusing');
     const spell = this.spellData(spellId);
     const eff = effectFor(spellId);
-    if (!spell || !eff) return false;
-    // Cooldown check.
-    if ((w.cooldowns[spellId] || 0) > 0) return false;
+    if (!spell || !eff) return this.rejectCast(w, spellId, 'unavailable');
     // Barrier prevents offensive casting while active.
     const offensive = eff.type === PROJECTILE || eff.type === CHANNEL;
-    if (offensive && w.barrier && w.barrier.ticks > 0) return false;
+    if (offensive && w.barrier && w.barrier.ticks > 0) {
+      return this.rejectCast(w, spellId, 'barrier');
+    }
+    // Cooldown check.
+    const cooldownTicks = Math.max(0, w.cooldowns[spellId] || 0);
+    if (cooldownTicks > 0) {
+      return this.rejectCast(w, spellId, 'cooldown', {
+        cooldownTicks,
+        cooldownSeconds: cooldownTicks / TICK_HZ,
+      });
+    }
+    if (w.recoveryTicks > 0) {
+      return this.rejectCast(w, spellId, 'recovery', {
+        recoveryTicks: w.recoveryTicks,
+        recoverySeconds: w.recoveryTicks / TICK_HZ,
+      });
+    }
     // Static interrupts the next channel (channel-type or channelled buff).
     if ((eff.type === CHANNEL || eff.channel) && this.statusStacks(w, 'Static') > 0) {
       w.statuses.Static.stacks -= 1;
       if (w.statuses.Static.stacks <= 0) delete w.statuses.Static;
       w.recoveryTicks = Math.max(w.recoveryTicks, sToTicks(CAST.rejectRecoveryS));
       this.emit('staticInterrupt', { caster: w.id, spellId });
-      return false;
+      return this.rejectCast(w, spellId, 'static');
     }
     // Aether cost (with resonance / Attunement discount).
     const cost = this.effectiveCost(w, spell);
-    if (w.aether < cost) return false;
+    if (w.aether < cost) {
+      return this.rejectCast(w, spellId, 'aether', {
+        required: cost,
+        available: w.aether,
+      });
+    }
     // Sigil charge cost.
-    if ((spell.charges || 0) > w.charges) return false;
+    if ((spell.charges || 0) > w.charges) {
+      return this.rejectCast(w, spellId, 'charges', {
+        required: spell.charges || 0,
+        available: w.charges,
+      });
+    }
 
     let windupS = spell.min_cast_s * (1 + this.castSlow(w));
     const durationEligible = ['Defensive', 'Buff', 'Debuff', 'Environmental'].includes(spell.category);
@@ -1032,10 +1078,32 @@ export class Sim {
     const canAct = this.canAct(w);
     const rooted = this.hasStatus(w, 'Rooted') || this.hasStatus(w, 'Frozen');
     const wantsOther = !!(intent.sidestep || intent.brace || intent.cast != null);
+    if (!intent.focus) this.clearActionReject(w, 'focus');
+    if (!intent.brace) this.clearActionReject(w, 'brace');
+    if (!intent.move) this.clearActionReject(w, 'move');
+    if (!intent.sidestep) this.clearActionReject(w, 'sidestep');
 
     // --- Focus (hold to gain a Sigil Charge) ---
-    if (intent.focus && !wantsOther && canAct && !w.casting && w.recoveryTicks <= 0 && !rooted) {
-      if (this.spendStamina(w, STAMINA.focusPerS * DT)) {
+    if (intent.focus) {
+      let reason = null;
+      if (wantsOther) reason = 'conflict';
+      else if (this.hasStatus(w, 'Frozen')) reason = 'frozen';
+      else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
+      else if (w.channel) reason = 'channeling';
+      else if (w.casting) reason = 'casting';
+      else if (w.recoveryTicks > 0) reason = 'recovery';
+      else if (rooted) reason = 'rooted';
+      else if (w.charges >= SIGIL.max) reason = 'charges-full';
+
+      if (reason) {
+        this.rejectAction(w, 'focus', reason, {
+          recoverySeconds: w.recoveryTicks / TICK_HZ,
+        });
+        if (w.focusing) {
+          w.focusing = false; w.focusTicks = 0;
+          this.emit('focusCancel', { caster: w.id, reason });
+        }
+      } else if (this.spendStamina(w, STAMINA.focusPerS * DT)) {
         if (!w.focusing) { w.focusing = true; w.focusTicks = 0; this.emit('focusStart', { caster: w.id }); }
         w.focusTicks += 1;
         w.lastActivityTick = this.tick;
@@ -1044,9 +1112,15 @@ export class Sim {
           w.focusing = false; w.focusTicks = 0;
           this.emit('focusComplete', { caster: w.id, charges: w.charges });
         }
-      } else if (w.focusing) {
-        w.focusing = false; w.focusTicks = 0;
-        this.emit('focusCancel', { caster: w.id, reason: 'stamina' });
+      } else {
+        this.rejectAction(w, 'focus', 'stamina', {
+          required: STAMINA.focusPerS * DT,
+          available: w.stamina,
+        });
+        if (w.focusing) {
+          w.focusing = false; w.focusTicks = 0;
+          this.emit('focusCancel', { caster: w.id, reason: 'stamina' });
+        }
       }
     } else if (w.focusing) {
       // Any other action interrupts the focus channel.
@@ -1055,50 +1129,98 @@ export class Sim {
     }
 
     // --- Brace ---
-    if (intent.brace && canAct && !w.focusing) {
-      const wasBracing = w.braceTicks > 0;
-      if (this.spendStamina(w, STAMINA.bracePerS * DT)) {
+    if (intent.brace) {
+      let reason = null;
+      if (this.hasStatus(w, 'Frozen')) reason = 'frozen';
+      else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
+      else if (w.channel) reason = 'channeling';
+      else if (w.focusing) reason = 'focusing';
+
+      if (reason) {
+        this.rejectAction(w, 'brace', reason);
+      } else if (this.spendStamina(w, STAMINA.bracePerS * DT)) {
+        const wasBracing = w.braceTicks > 0;
         w.braceTicks = Math.max(2, sToTicks(BRACE.durationS));
         if (!wasBracing) this.emit('brace', { caster: w.id });
       } else {
         w.braceTicks = 0;
+        this.rejectAction(w, 'brace', 'stamina', {
+          required: STAMINA.bracePerS * DT,
+          available: w.stamina,
+        });
       }
     }
 
     // --- Movement ---
-    if (!rooted && canAct && !w.focusing && !intent.focus) {
+    const limit = Math.max(0.1, 1 - this.pressureLevel * 0.12);
+    if (intent.move) {
+      let reason = null;
+      if (this.hasStatus(w, 'Frozen')) reason = 'frozen';
+      else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
+      else if (w.channel) reason = 'channeling';
+      else if (rooted) reason = 'rooted';
+      else if (w.focusing || intent.focus) reason = 'focusing';
+
       const speed = MOVE.speedPerS * (1 - this.moveSlow(w)) * DT;
-      if (intent.move && this.spendStamina(w, STAMINA.movePerS * DT)) {
-        w.arcPos += Math.sign(intent.move) * speed;
+      const nextPos = Math.max(-limit, Math.min(limit, w.arcPos + Math.sign(intent.move) * speed));
+      if (!reason && Math.abs(nextPos - w.arcPos) < 1e-9) reason = 'boundary';
+
+      if (reason) {
+        this.rejectAction(w, 'move', reason);
+      } else if (this.spendStamina(w, STAMINA.movePerS * DT)) {
+        w.arcPos = nextPos;
         w.movedThisTick = true;
+      } else {
+        this.rejectAction(w, 'move', 'stamina', {
+          required: STAMINA.movePerS * DT,
+          available: w.stamina,
+        });
       }
-      if (intent.sidestep && w.sidestepCharges > 0 && this.spendStamina(w, STAMINA.dodgeCost)) {
-        w.sidestepCharges -= 1;
-        w.sidestepTimers.push(sToTicks(SIDESTEP.rechargeS));
-        w.arcPos += Math.sign(intent.sidestep) * SIDESTEP.arcDelta;
-        w.movedThisTick = true;
-        this.emit('sidestep', { caster: w.id });
-      }
-      // Arcane Pressure narrows the safe arc; clamp within the shrinking window.
-      const limit = Math.max(0.1, 1 - this.pressureLevel * 0.12);
-      w.arcPos = Math.max(-limit, Math.min(limit, w.arcPos));
     }
 
+    if (intent.sidestep) {
+      let reason = null;
+      if (this.hasStatus(w, 'Frozen')) reason = 'frozen';
+      else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
+      else if (w.channel) reason = 'channeling';
+      else if (rooted) reason = 'rooted';
+      else if (w.focusing || intent.focus) reason = 'focusing';
+      else if (w.sidestepCharges <= 0) reason = 'no-dodges';
+
+      const nextPos = Math.max(-limit, Math.min(
+        limit,
+        w.arcPos + Math.sign(intent.sidestep) * SIDESTEP.arcDelta,
+      ));
+      if (!reason && Math.abs(nextPos - w.arcPos) < 1e-9) reason = 'boundary';
+
+      if (reason) {
+        this.rejectAction(w, 'sidestep', reason);
+      } else if (this.spendStamina(w, STAMINA.dodgeCost)) {
+        w.sidestepCharges -= 1;
+        w.sidestepTimers.push(sToTicks(SIDESTEP.rechargeS));
+        w.arcPos = nextPos;
+        w.movedThisTick = true;
+        this.emit('sidestep', { caster: w.id });
+      } else {
+        this.rejectAction(w, 'sidestep', 'stamina', {
+          required: STAMINA.dodgeCost,
+          available: w.stamina,
+        });
+      }
+    }
+    // Arcane Pressure narrows the safe arc; clamp within the shrinking window.
+    w.arcPos = Math.max(-limit, Math.min(limit, w.arcPos));
+
     // --- Cast (edge-triggered) ---
-    if (intent.cast != null && canAct) {
-      const cooldownTicks = Math.max(0, w.cooldowns[intent.cast] || 0);
+    if (intent.cast != null) {
       const ok = this.beginCast(w, intent.cast, intent.castQuality, intent.targetPos);
       if (!ok && intent.castWasGesture) {
-        // A rejected deliberate trace incurs recovery but no Aether cost.
-        w.recoveryTicks = Math.max(w.recoveryTicks, sToTicks(CAST.rejectRecoveryS));
+        const noPenalty = new Set(['frozen', 'stunned', 'channeling', 'casting', 'focusing', 'recovery']);
+        if (!noPenalty.has(this.lastCastReject?.reason)) {
+          // A rejected deliberate trace incurs recovery but no Aether cost.
+          w.recoveryTicks = Math.max(w.recoveryTicks, sToTicks(CAST.rejectRecoveryS));
+        }
         w.castsRejected += 1;
-        this.emit('castRejected', {
-          caster: w.id,
-          spellId: intent.cast,
-          reason: cooldownTicks > 0 ? 'cooldown' : 'unavailable',
-          cooldownTicks,
-          cooldownSeconds: cooldownTicks / TICK_HZ,
-        });
       }
     } else if (intent.castReject != null && canAct && !w.casting && !w.channel && w.recoveryTicks <= 0) {
       // A modelled failed gesture (Practice AI whose sampled gesture score fell
@@ -1301,6 +1423,7 @@ export class Sim {
       }
       for (const [k, v] of Object.entries(w.statuses).sort()) parts.push(k, v.stacks, v.ticks);
       for (const [k, v] of Object.entries(w.cooldowns).sort()) if (v > 0) parts.push('cd', k, v);
+      for (const [k, v] of Object.entries(w.actionRejectKeys).sort()) parts.push('ar', k, v);
       for (const r of w.resonance) parts.push('res', r.school, r.ticks);
       for (const t of w.sidestepTimers) parts.push('side', t);
       for (const t of w.knockbackTimes) parts.push('knock', t);
