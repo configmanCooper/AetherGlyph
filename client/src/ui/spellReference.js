@@ -37,7 +37,7 @@ const DETAILS = {
   32: ['No direct damage; shared Rain lasts 21 sec.', 'Both duelists become Wet immediately and upgrade to Soaked after 5 continuous seconds. Douses Burning and Fire and globally enables weather reactions.', 'Control the elemental state of the arena and set up Tide/Storm combos for either side.'],
   33: ['No direct damage; Gust lasts 1.8 sec with a 1.2 sec deflect window.', 'Deflects light projectiles, clears Fog, moves Oil, and spreads Fire.', 'Reactive projectile defense and environmental repositioning.'],
   34: ['10 area damage.', 'Non-reflectable ground shock; interrupts and destroys cover.', 'Punish channels, break Stone Wall, and apply immediate area disruption.'],
-  35: ['No direct damage; shared Fog zone for 18 sec.', 'Visually obscures both sides. Gust and Flame Wave clear or backlight it.', 'Hide setup timing, disrupt sight, and create symmetric uncertainty.'],
+  35: ['No direct damage; shared Fog zone for 18 sec.', 'Visually obscures both sides and disables all spell homing while active. Gust and Flame Wave clear or backlight it.', 'Hide setup timing, break homing assistance, and create symmetric uncertainty.'],
   36: ['No direct damage; visible trap lasts up to 24 sec.', 'Placed just ahead of the enemy’s current lane. It roots a non-owner for 2 sec after they step into it, then is consumed.', 'Reliable movement punishment and setup for area attacks.'],
 };
 

@@ -829,13 +829,15 @@ export class Sim {
     const remaining = [];
     // Hourglass Field slows projectile travel 25% for both players.
     const hgSlow = this.hourglassActive() ? (1 - ZONE.hourglassSlow) : 1;
+    const fogActive = this.zones.some((zone) => zone.kind === 'Fog' && zone.ticks > 0);
     for (const p of this.projectiles) {
       p.ticks -= hgSlow;
       const attacker = this.wizards[p.owner];
       const defender = this.opponentOf(p.owner);
-      // Blink invisibility hides the target; Eclipse blindness denies the caster
-      // the visual lock needed to update a homing projectile.
-      if (p.eff.homing > 0 && defender.invisibleTicks <= 0 && !this.hasStatus(attacker, 'Blinded')) {
+      // Blink invisibility hides the target; Eclipse blindness and shared Fog
+      // deny the visual lock needed to update a homing projectile.
+      if (p.eff.homing > 0 && defender.invisibleTicks <= 0
+          && !this.hasStatus(attacker, 'Blinded') && !fogActive) {
         p.targetPos += (defender.arcPos - p.targetPos) * p.eff.homing;
       }
       const progress = 1 - Math.max(0, p.ticks) / Math.max(1, p.totalTicks || 1);
@@ -1189,7 +1191,9 @@ export class Sim {
       const nextPos = Math.max(-limit, Math.min(limit, w.arcPos + Math.sign(intent.move) * speed));
       if (!reason && Math.abs(nextPos - w.arcPos) < 1e-9) reason = 'boundary';
 
-      if (reason) {
+      if (reason === 'boundary') {
+        // Holding toward the edge is normal joystick behavior, not an error.
+      } else if (reason) {
         this.rejectAction(w, 'move', reason);
       } else if (this.spendStamina(w, STAMINA.movePerS * DT)) {
         w.arcPos = nextPos;
@@ -1217,7 +1221,9 @@ export class Sim {
       ));
       if (!reason && Math.abs(nextPos - w.arcPos) < 1e-9) reason = 'boundary';
 
-      if (reason) {
+      if (reason === 'boundary') {
+        // An outward Dodge at the arena edge simply does not fire.
+      } else if (reason) {
         this.rejectAction(w, 'sidestep', reason);
       } else if (this.spendStamina(w, STAMINA.dodgeCost)) {
         w.sidestepCharges -= 1;

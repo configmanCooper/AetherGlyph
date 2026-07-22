@@ -170,6 +170,14 @@ export function run() {
   eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'move')?.reason, 'rooted',
     'Rooted movement attempt reports why it failed');
 
+  sim = freshSim();
+  sim.wizards[0].arcPos = 1;
+  const edgeStamina = sim.wizards[0].stamina;
+  rejectEvents = sim.step({ 0: { move: 1 }, 1: {} });
+  ok(!rejectEvents.some((e) => e.type === 'actionRejected'),
+    'holding movement against the arena edge fails silently');
+  eq(sim.wizards[0].stamina, edgeStamina, 'edge movement consumes no Stamina');
+
   // Cannot afford a spell -> no cast starts.
   sim = freshSim();
   sim.wizards[0].aether = 5;

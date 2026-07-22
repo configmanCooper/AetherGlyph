@@ -1038,7 +1038,6 @@ function handleEvents(events) {
         'charges-full': 'Your Sigil Charges are already full.',
         conflict: 'Focus cannot start while another action is being attempted.',
         'no-dodges': 'No Dodge charges are ready yet.',
-        boundary: `You cannot ${action} farther in that direction.`,
       };
       toast(messages[e.reason] || `You cannot ${action} right now.`);
     } else if (e.type === 'reflect') { audio.reflect(); haptic('counter'); }

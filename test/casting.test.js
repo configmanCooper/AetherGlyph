@@ -107,6 +107,20 @@ export function run() {
   sim.step({ 0: {}, 1: {} });
   ok(blindedMissile.targetPos > blindedAim, 'homing resumes when Eclipse Glare ends');
 
+  sim = freshSim(46);
+  sim.wizards[0].aether = 100;
+  sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
+  const fogMissile = sim.projectiles[0];
+  const fogAim = fogMissile.targetPos;
+  sim.wizards[1].arcPos = 0.8;
+  const fog = sim.addZone(0, 'Fog', { durationS: 3 });
+  sim.step({ 0: {}, 1: {} });
+  near(fogMissile.targetPos, fogAim, 1e-6, 'Fog Cloud disables spell homing for both duelists');
+  fog.ticks = 0;
+  sim.step({ 0: {}, 1: {} });
+  ok(fogMissile.targetPos > fogAim, 'homing resumes after Fog Cloud ends');
+
   sim = freshSim(44);
   sim.wizards[0].aether = 100;
   sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
