@@ -70,6 +70,43 @@ export function run() {
   near(sim.projectiles.find((p) => p.owner === 1).ticks, 99.75, 1e-9,
     'Hourglass reduces enemy projectile speed by 75%');
 
+  function trackedTarget(withHourglass) {
+    const trackingSim = mk([38], [5]);
+    trackingSim.wizards[0].arcPos = 1;
+    trackingSim.wizards[1].arcPos = 0;
+    if (withHourglass) trackingSim.addZone(0, 'Hourglass', { durationS: 18 });
+    trackingSim.projectiles = [{
+      id: 2001, owner: 1, spellId: 5, eff: effectFor(5), ticks: 100, totalTicks: 100,
+      quality: 1, originPos: 0, targetPos: 0,
+    }];
+    const advances = withHourglass ? 396 : 99;
+    for (let i = 0; i < advances; i++) trackingSim.advanceProjectiles();
+    return trackingSim.projectiles[0].targetPos;
+  }
+  const normalTracking = trackedTarget(false);
+  const hourglassTracking = trackedTarget(true);
+  ok(normalTracking < 0.3, 'homing projectiles make only a slight in-flight correction');
+  near(hourglassTracking, normalTracking, 0.001,
+    'Hourglass does not grant a homing projectile extra tracking time');
+
+  sim = mk([38], [5]);
+  sim.addZone(0, 'Hourglass', { durationS: 18 });
+  sim.projectiles = [{
+    id: 2002, owner: 1, spellId: 5, eff: effectFor(5), ticks: 33, totalTicks: 33,
+    quality: 1, originPos: 0, targetPos: 0,
+  }];
+  const dodgeHp = sim.wizards[0].health;
+  const dodgeEvents = [];
+  dodgeEvents.push(...sim.step({ 0: { sidestep: 1 }, 1: {} }));
+  dodgeEvents.push(...sim.step({ 0: { sidestep: 1 }, 1: {} }));
+  for (let i = 0; i < 140 && sim.projectiles.length; i++) {
+    dodgeEvents.push(...sim.step({ 0: {}, 1: {} }));
+  }
+  ok(dodgeEvents.some((event) => event.type === 'miss' && event.spellId === 5),
+    'two Dodges evade an Hourglass-slowed homing projectile');
+  eq(sim.wizards[0].health, dodgeHp,
+    'Hourglass-slowed homing projectile deals no damage after two Dodges');
+
   // Phoenix Covenant (39): a lethal hit leaves the caster at 1 health, once.
   sim = mk([39], [1]);
   resolveCastOf(sim, 39, 0, 90);

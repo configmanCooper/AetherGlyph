@@ -878,7 +878,11 @@ export class Sim {
       // deny the visual lock needed to update a homing projectile.
       if (p.eff.homing > 0 && defender.invisibleTicks <= 0
           && !this.hasStatus(attacker, 'Blinded') && !fogActive) {
-        p.targetPos += (defender.arcPos - p.targetPos) * p.eff.homing;
+        // Spread the small homing allowance over the projectile's full flight.
+        // Scaling by speed prevents Hourglass from granting extra tracking simply
+        // because the projectile remains alive for four times as many ticks.
+        const trackingStep = p.eff.homing * speed / Math.max(1, p.totalTicks || 1);
+        p.targetPos += (defender.arcPos - p.targetPos) * trackingStep;
       }
       const progress = 1 - Math.max(0, p.ticks) / Math.max(1, p.totalTicks || 1);
       const projectilePos = p.originPos + (p.targetPos - p.originPos) * progress;

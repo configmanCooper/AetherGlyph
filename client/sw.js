@@ -10,7 +10,7 @@
 // unaffected. CACHE_VERSION is tied to the app version and is asserted by
 // test/packaging.test.js; bump it in lockstep with package.json "version".
 
-const CACHE_VERSION = '1.7.5';
+const CACHE_VERSION = '1.7.6';
 const CACHE_NAME = `aetherglyph-shell-v${CACHE_VERSION}`;
 
 // Core app shell precached on install (best-effort; a miss never fails install).
@@ -18,8 +18,8 @@ const CACHE_NAME = `aetherglyph-shell-v${CACHE_VERSION}`;
 // runtime on first load.
 const SHELL = [
   './index.html',
-  './styles/style.css?v=1.7.5',
-  './src/app/main.js?v=1.7.5',
+  './styles/style.css?v=1.7.6',
+  './src/app/main.js?v=1.7.6',
   './src/game/menuDuel.js',
   './audio/music/wanderlust-menu.mp3',
   './audio/music/spell-duel.mp3',

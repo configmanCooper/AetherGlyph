@@ -76,7 +76,7 @@ export const PRACTICE_PROFILES = {
     counter: 'complete', combo: 'expert', adapt: 'timing-school', loadout: 'counter-build',
     aggression: 1.00, defends: 0.80, dodge: 0.85, focusBias: 0.30,
     defenseReserve: 0.3, staminaReserve: 25, staminaRecoveryStart: 45, staminaRecoveryTarget: 60,
-    moveChance: 0.55, castIntervalMs: 0,
+    moveChance: 0.65, castIntervalMs: 0,
   },
 };
 

@@ -36,7 +36,7 @@ export const MIRROR = 'mirror';
 export const PHOENIX = 'phoenix';
 
 // travelS: seconds for a projectile to cross the arena (before dodge check).
-// homing: 0..1 fraction it re-aims toward the defender's live position.
+// homing: small total re-aiming strength spread across the full projectile flight.
 // dodgeRadius: arc distance beyond which the projectile misses a moving target.
 // area: true = wide shot (large dodgeRadius, still sidesteppable at release).
 export const SPELL_EFFECTS = {
