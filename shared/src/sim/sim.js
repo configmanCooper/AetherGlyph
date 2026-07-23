@@ -161,6 +161,21 @@ export class Sim {
     return !!w.barrier && w.barrier.ticks > 0 && w.barrier.absorb > 0;
   }
 
+  fogActive() {
+    return this.zones.some((zone) => zone.kind === 'Fog' && zone.ticks > 0);
+  }
+
+  visionObscured(w, opponent = this.opponentOf(w.id)) {
+    return this.fogActive() || opponent.invisibleTicks > 0 || this.hasStatus(w, 'Blinded');
+  }
+
+  updateFacings() {
+    for (const w of this.wizards) {
+      const opponent = this.opponentOf(w.id);
+      w.facing = this.visionObscured(w, opponent) ? -w.arcPos : opponent.arcPos;
+    }
+  }
+
   statusStacks(w, name) { return this.hasStatus(w, name) ? w.statuses[name].stacks : 0; }
 
   isHardControlled(w) {
@@ -528,7 +543,7 @@ export class Sim {
           totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
           quality: c.quality * (c.empowered ? 1.1 : 1),
           originPos: w.arcPos,
-          targetPos: c.targetPos ?? (opp.invisibleTicks > 0 ? this.rng.next() * 2 - 1 : opp.arcPos),
+          targetPos: c.targetPos ?? w.facing,
         });
         break;
       }
@@ -842,7 +857,7 @@ export class Sim {
     const remaining = [];
     // Hourglass Field slows projectile travel 25% for both players.
     const hgSlow = this.hourglassActive() ? (1 - ZONE.hourglassSlow) : 1;
-    const fogActive = this.zones.some((zone) => zone.kind === 'Fog' && zone.ticks > 0);
+    const fogActive = this.fogActive();
     for (const p of this.projectiles) {
       p.ticks -= hgSlow;
       const attacker = this.wizards[p.owner];
@@ -1380,6 +1395,7 @@ export class Sim {
     this.applyIntent(this.wizards[1], intents[1]);
     this.regenerateStamina(this.wizards[0]);
     this.regenerateStamina(this.wizards[1]);
+    this.updateFacings();
 
     // 4. Advance casts + channels.
     this.advanceCasting(this.wizards[0]);
@@ -1417,7 +1433,7 @@ export class Sim {
       })),
       wizards: this.wizards.map((w) => ({
         id: w.id, health: w.health, aether: w.aether, stamina: w.stamina, charges: w.charges,
-        arcPos: w.arcPos, casting: w.casting ? {
+        arcPos: w.arcPos, facing: w.facing, casting: w.casting ? {
           spellId: w.casting.spellId, ticks: w.casting.ticks,
           totalTicks: w.casting.totalTicks, targetPos: w.casting.targetPos,
           empowered: !!w.casting.empowered, durationScale: w.casting.durationScale,
@@ -1448,7 +1464,8 @@ export class Sim {
     ];
     for (const w of this.wizards) {
       parts.push(
-        q(w.health, 100), q(w.aether, 100), q(w.stamina, 10000), q(w.charges, 2), q(w.arcPos, 1000),
+        q(w.health, 100), q(w.aether, 100), q(w.stamina, 10000), q(w.charges, 2),
+        q(w.arcPos, 1000), q(w.facing, 1000),
         w.casting ? w.casting.spellId : 0, w.casting ? w.casting.ticks : 0,
         w.casting ? w.casting.totalTicks : 0,
         w.casting ? q(w.casting.quality, 1000) : 0,

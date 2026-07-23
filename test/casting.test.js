@@ -123,12 +123,42 @@ export function run() {
 
   sim = freshSim(44);
   sim.wizards[0].aether = 100;
+  sim.wizards[0].arcPos = 0.42;
   sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
   sim.wizards[1].arcPos = -0.91;
   sim.wizards[1].invisibleTicks = 180;
   for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
-  ok(Math.abs(sim.projectiles[0].targetPos - sim.wizards[1].arcPos) > 1e-6,
-    'a target that Blinks during windup receives seeded random aim at release');
+  near(sim.projectiles[0].targetPos, -sim.wizards[0].arcPos, 1e-6,
+    'a target that Blinks during windup makes the caster fire opposite their own arc angle');
+
+  sim = freshSim(47);
+  sim.wizards[0].aether = 100;
+  sim.wizards[0].arcPos = 0.31;
+  sim.addZone(1, 'Fog', { durationS: 3 });
+  sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
+  near(sim.projectiles[0].targetPos, -sim.wizards[0].arcPos, 1e-6,
+    'Fog makes new projectiles travel opposite the caster arc instead of tracking the foe');
+
+  sim = freshSim(48);
+  sim.wizards[0].aether = 100;
+  sim.wizards[0].arcPos = -0.27;
+  sim.applyStatus(sim.wizards[0], 'Blinded', 1);
+  sim.step({ 0: { cast: 5, castQuality: 1 }, 1: {} });
+  for (let t = 0; t < 60 && sim.projectiles.length === 0; t++) sim.step({ 0: {}, 1: {} });
+  near(sim.projectiles[0].targetPos, -sim.wizards[0].arcPos, 1e-6,
+    'a Blinded caster fires opposite their own arc instead of tracking the foe');
+
+  sim = freshSim(49);
+  sim.wizards[0].arcPos = 0.25;
+  sim.wizards[1].arcPos = -0.72;
+  sim.step({ 0: {}, 1: {} });
+  near(sim.wizards[0].facing, -0.72, 1e-6, 'clear vision faces the opponent current arc position');
+  sim.addZone(0, 'Fog', { durationS: 2 });
+  sim.step({ 0: {}, 1: {} });
+  near(sim.wizards[0].facing, -0.25, 1e-6, 'Fog changes facing to the opposite caster arc');
+  eq(sim.snapshot().wizards[0].facing, sim.wizards[0].facing,
+    'authoritative snapshots include the current facing arc');
 
   // Piercing (Stone Shard) partially bypasses a Ward.
   sim = freshSim();

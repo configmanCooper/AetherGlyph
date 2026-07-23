@@ -1960,6 +1960,7 @@ if (typeof window !== 'undefined') {
       enemyCastsResolved: match?.sim?.wizards?.[1]?.castsResolved ?? 0,
       enemyArcPos: match?.sim?.wizards?.[1]?.arcPos ?? 0,
       tutorialTick: tutorial?.sim?.tick ?? null,
+      tutorialSeed: tutorial?.seed ?? null,
       menuDuelActive: menuDuel.active,
       menuDuelVariety: menuDuel.castVariety().size,
       music: audio.musicState(),
@@ -1998,6 +1999,10 @@ if (typeof window !== 'undefined') {
     spawnGuard: (kind) => { try { return arena.debugSpawnGuard(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     wizardState: (playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks) => {
       try { return arena.debugWizardState(playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks); }
+      catch (e) { return { error: String(e && e.message || e) }; }
+    },
+    guardVisibility: (invisibleTicks) => {
+      try { return arena.debugGuardVisibility(Number(invisibleTicks) || 0); }
       catch (e) { return { error: String(e && e.message || e) }; }
     },
     fogVeil: (strength) => { try { return arena.debugFogVeil(strength); } catch (e) { return { error: String(e && e.message || e) }; } },

@@ -105,7 +105,7 @@ export const STATUSES = {
   Haste:       { durationS: 18, maxStacks: 1, haste: 0.30, kind: 'buff' },
   Grounded:    { durationS: 15, maxStacks: 1, dmgReduction: 0.15, moveSlow: 0.15, kind: 'buff' },
   AetherSurge: { durationS: 18, maxStacks: 1, aetherPerS: 5, kind: 'buff' },
-  Attunement:  { durationS: 18, maxStacks: 1, school: 'Ember', costMul: 0.85, kind: 'buff' },
+  Attunement:  { durationS: 30, maxStacks: 1, school: 'Ember', costMul: 0.50, kind: 'buff' },
   Phoenix:     { durationS: 15, maxStacks: 1, kind: 'buff' },
 };
 

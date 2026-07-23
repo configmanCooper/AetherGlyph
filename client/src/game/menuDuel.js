@@ -10,6 +10,14 @@ import {
 
 const TICK_MS = 1000 / TICK_HZ;
 const MAX_CATCHUP = 6;
+const SHOWCASE_COMBOS = [
+  [31, 1],  // Oil -> Ember / Flash Fire
+  [32, 3],  // Rain -> Spark / Conductive Arc
+  [18, 5],  // Mark -> Arcane Missile
+  [2, 27],  // Chill -> Frost Bind
+  [35, 33], // Fog -> Gust / Cleared Air
+  [15, 34], // Stone Wall -> Quake / Rubble
+];
 
 export const MENU_PUBLIC_SPELL_IDS = SPELL_CATALOG
   .filter((spell) => !spell.secret)
@@ -60,6 +68,11 @@ export class MenuDuel {
     this.nextGlobalCastTick = 0;
     this.castIntentReserved = false;
     this.castStartTicks = [];
+    this.comboQueues = [[], []];
+    this.comboIndex = [0, 1];
+    this.nextComboTick = [180, 600];
+    this.activeComboOwner = null;
+    this.reactionCounts = new Map();
     this.arcRanges = [
       { min: this.sim.wizards[0].arcPos, max: this.sim.wizards[0].arcPos },
       { min: this.sim.wizards[1].arcPos, max: this.sim.wizards[1].arcPos },
@@ -106,6 +119,9 @@ export class MenuDuel {
         this.nextShowcaseCast[event.caster] = this.sim.tick + 75;
       }
       if (event.type === 'castStart') this.castStartTicks.push(this.sim.tick);
+      if (event.type === 'reaction') {
+        this.reactionCounts.set(event.name, (this.reactionCounts.get(event.name) || 0) + 1);
+      }
       this.events.push(event);
     }
 
@@ -123,6 +139,13 @@ export class MenuDuel {
     if (!this.sim.canAct(wizard) || wizard.casting || wizard.channel || wizard.recoveryTicks > 0) {
       return suggested;
     }
+    if (this.activeComboOwner != null && this.activeComboOwner !== id) {
+      const movementOnly = { ...suggested };
+      delete movementOnly.cast;
+      delete movementOnly.castQuality;
+      delete movementOnly.castReject;
+      return movementOnly;
+    }
     if (this.castIntentReserved || this.sim.tick < this.nextGlobalCastTick) {
       const movementOnly = { ...suggested };
       delete movementOnly.cast;
@@ -130,11 +153,19 @@ export class MenuDuel {
       delete movementOnly.castReject;
       return movementOnly;
     }
+    this._prepareCombo(id);
     const shouldShowcase = suggested.cast != null || this.sim.tick >= this.nextShowcaseCast[id];
     if (!shouldShowcase) return suggested;
 
     const selected = this._chooseSpell(id, suggested.cast);
-    if (selected == null) return suggested;
+    if (selected == null) {
+      if (!this.comboQueues[id].length) return suggested;
+      const movementOnly = { ...suggested };
+      delete movementOnly.cast;
+      delete movementOnly.castQuality;
+      delete movementOnly.castReject;
+      return movementOnly;
+    }
     const base = { ...suggested };
     delete base.cast;
     delete base.castQuality;
@@ -143,8 +174,40 @@ export class MenuDuel {
     if (committed.cast != null || committed.castReject != null) {
       this.castIntentReserved = true;
       this.nextGlobalCastTick = this.sim.tick + this.rng.int(2 * TICK_HZ, 3 * TICK_HZ);
+      if (committed.cast != null && this.comboQueues[id][0] === selected) {
+        this.comboQueues[id].shift();
+        if (!this.comboQueues[id].length) this.activeComboOwner = null;
+      }
     }
     return committed;
+  }
+
+  _prepareCombo(id) {
+    const queue = this.comboQueues[id];
+    if (!queue.length && this.activeComboOwner == null && this.sim.tick >= this.nextComboTick[id]) {
+      const combo = SHOWCASE_COMBOS[this.comboIndex[id] % SHOWCASE_COMBOS.length];
+      queue.push(...combo);
+      this.activeComboOwner = id;
+      this.comboIndex[id] += 1;
+      this.nextComboTick[id] = this.sim.tick + 30 * TICK_HZ;
+    }
+    if (!queue.length) return;
+    const payoff = queue[0];
+    const setup = ({
+      1: [31, 'Oil'],
+      3: [32, 'Wet'],
+      5: [18, 'Marked'],
+      27: [2, 'Chilled'],
+      33: [35, 'Fog'],
+      34: [15, 'Cover'],
+    })[payoff];
+    if (!setup) return;
+    const opponent = this.sim.opponentOf(id);
+    const ready = setup[1] === 'Marked' || setup[1] === 'Chilled'
+      ? this.sim.hasStatus(opponent, setup[1])
+      : this.sim.zones.some((zone) =>
+        zone.kind === setup[1] && zone.owner === id && zone.ticks > 0);
+    if (!ready && queue[0] !== setup[0]) queue.unshift(setup[0]);
   }
 
   _chooseSpell(id, suggestedId) {
@@ -161,6 +224,11 @@ export class MenuDuel {
       return true;
     });
     if (!candidates.length) return null;
+    if (this.comboQueues[id].length) {
+      const desired = this.comboQueues[id][0];
+      const comboSpell = candidates.find((spell) => spell.id === desired);
+      return comboSpell ? comboSpell.id : null;
+    }
 
     let best = candidates[0];
     let bestScore = -Infinity;

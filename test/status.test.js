@@ -28,7 +28,7 @@ export function run() {
   eq(STATUSES.KnockedDown.durationS, 2, 'Knocked Down lasts 2 seconds');
   eq(STATUSES.Haste.durationS, 18, 'Haste lasts 3x its baseline');
   eq(STATUSES.AetherSurge.durationS, 18, 'Aether Surge lasts 3x its baseline');
-  eq(STATUSES.Attunement.durationS, 18, 'Attunement lasts 3x its baseline');
+  eq(STATUSES.Attunement.durationS, 30, 'Ember Attunement lasts 30 seconds');
   eq(STATUSES.Grounded.durationS, 15, 'Grounded remains at its 3x duration');
   eq(STATUSES.Phoenix.durationS, 15, 'Phoenix remains at its 3x duration');
   eq(STATUSES.Frozen.durationS, 1, 'Freeze remains capped for anti-lock safety');

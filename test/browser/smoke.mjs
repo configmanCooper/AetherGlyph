@@ -100,7 +100,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.7\.3/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.7\.4/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -233,14 +233,15 @@ try {
   await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
   await page.waitForSelector('#coach [data-action="tut-replay"]', { timeout: 5000 });
   await new Promise((r) => setTimeout(r, 500));
-  const tutorialTickBeforeReplay = await page.evaluate(() => window.__aegTest.info().tutorialTick);
+  const tutorialBeforeReplay = await page.evaluate(() => window.__aegTest.info());
   await page.click('#coach [data-action="tut-replay"]');
   await new Promise((r) => setTimeout(r, 120));
   const replayState = await page.evaluate(() => window.__aegTest.info());
   if (replayState.mode !== 'tutorial' || !replayState.running
-      || replayState.tutorialTick == null || replayState.tutorialTick >= tutorialTickBeforeReplay) {
+      || replayState.tutorialTick == null || replayState.tutorialSeed === tutorialBeforeReplay.tutorialSeed
+      || replayState.playerCastsResolved !== 0) {
     fail('Replay lesson did not restart the active tutorial: ' + JSON.stringify({
-      before: tutorialTickBeforeReplay, after: replayState,
+      before: tutorialBeforeReplay, after: replayState,
     }));
   }
   const calibDone = await page.evaluate(() => {
@@ -1124,6 +1125,8 @@ try {
     fogBounds: window.__aegVfx.zoneBounds('Fog'),
     blind: window.__aegVfx.blindVeil(true),
     cover: window.__aegVfx.zoneBounds('Cover'),
+    guardsVisible: window.__aegVfx.guardVisibility(0),
+    guardsHidden: window.__aegVfx.guardVisibility(180),
   }));
   if (!perceptionVfx.fog.visible || perceptionVfx.fog.strength < 0.99) {
     fail('Fog Cloud screen-space haze is not intense: ' + JSON.stringify(perceptionVfx.fog));
@@ -1164,6 +1167,11 @@ try {
   if (blinkVisibility.playerModelVisible || blinkVisibility.enemyModelVisible
       || blinkVisibility.playerStatusVisible || blinkVisibility.enemyStatusVisible) {
     fail('Blink invisibility leaves wizard/status graphics visible: ' + JSON.stringify(blinkVisibility));
+  }
+  if (!perceptionVfx.guardsVisible.ward || !perceptionVfx.guardsVisible.barrier
+      || !perceptionVfx.guardsVisible.reflect || perceptionVfx.guardsHidden.ward
+      || perceptionVfx.guardsHidden.barrier || perceptionVfx.guardsHidden.reflect) {
+    fail('Blink invisibility leaves defensive spell graphics visible: ' + JSON.stringify(perceptionVfx));
   }
   // Three persistent guard visuals (Ward, Barrier Dome, Reflect) exist and are
   // visually DISTINCT — Reflect must not reuse Ward's or the Dome's kind.

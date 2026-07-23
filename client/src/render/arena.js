@@ -1041,6 +1041,7 @@ export class Arena {
       showcaseMode: !!this._showcaseMode,
       cameraZ: this.camera.position.z,
       enemyZ: this.enemy.position.z,
+      gameplayLookX: this._lastGameplayLookX ?? null,
     };
   }
 
@@ -1165,6 +1166,8 @@ export class Arena {
     const camBaseX = this.camera.position.x + (px - this.camera.position.x) * 0.3;
     const ex = wizardX(enemy);
     this.enemy.position.x += (ex - this.enemy.position.x) * 0.3;
+    const enemyFaceX = (Number.isFinite(enemy.facing) ? enemy.facing : player.arcPos) * ARC_W;
+    this.enemy.rotation.y = Math.atan2(enemyFaceX - this.enemy.position.x, PLAYER_Z - ENEMY_Z);
 
     // Camera shake decays; heavy impacts push it up.
     let shakeX = 0, shakeY = 0;
@@ -1175,7 +1178,9 @@ export class Arena {
     } else { this.shake = 0; }
     this.camera.position.x = camBaseX + shakeX;
     this.camera.position.y = 1.7 + shakeY;
-    this.camera.lookAt(this.enemy.position.x, 1.5 + shakeY * 0.5, ENEMY_Z);
+    const playerFaceX = (Number.isFinite(player.facing) ? player.facing : enemy.arcPos) * ARC_W;
+    this._lastGameplayLookX = playerFaceX;
+    this.camera.lookAt(playerFaceX, 1.5 + shakeY * 0.5, ENEMY_Z);
     this._syncBlindness(player, enemy);
 
     // Enemy idle breathing + casting tell (arm extension, aura + staff glow).
@@ -1228,20 +1233,21 @@ export class Arena {
     const figure = this._showcaseMode ? (w.id === 0 ? this.menuPlayer : this.enemy) : null;
     const x = figure ? figure.position.x : wizardX(w);
     const worldZ = figure ? figure.position.z : z;
-    ward.object3D.visible = !!w.shield;
+    const hidden = w.invisibleTicks > 0;
+    ward.object3D.visible = !!w.shield && !hidden;
     if (w.shield) {
       ward.object3D.position.set(x, 1.1, worldZ + (worldZ > 0 ? -0.6 : 0.6));
       ward.object3D.lookAt(0, 1.1, 0);
       ward.update({ dtMs: 16, strength: 1, time: this._t });
     }
-    dome.object3D.visible = !!w.barrier;
+    dome.object3D.visible = !!w.barrier && !hidden;
     if (w.barrier) {
       dome.object3D.position.set(x, 1.2, worldZ);
       dome.update({ dtMs: 16, strength: 1, time: this._t });
     }
     // Reflect is a persistent state visual tied to the live reflect window; it
     // vanishes the same tick a projectile consumes it (reflectTicks -> 0).
-    reflect.object3D.visible = w.reflectTicks > 0;
+    reflect.object3D.visible = w.reflectTicks > 0 && !hidden;
     if (w.reflectTicks > 0) {
       reflect.object3D.position.set(x, 1.15, worldZ + (worldZ > 0 ? -0.55 : 0.55));
       reflect.object3D.lookAt(0, 1.15, 0);
@@ -1689,6 +1695,26 @@ export class Arena {
     };
     this._syncWizardVisibility({ invisibleTicks: 0 }, { invisibleTicks: 0 });
     this._syncStatusIndicators({ statuses: {} }, { statuses: {}, arcPos: 0 });
+    return result;
+  }
+
+  debugGuardVisibility(invisibleTicks = 0) {
+    const wizard = {
+      id: 1, arcPos: 0, invisibleTicks: Number(invisibleTicks) || 0,
+      shield: { absorb: 30, ticks: 60 },
+      barrier: { absorb: 60, ticks: 60 },
+      reflectTicks: 60,
+    };
+    this._syncGuards(wizard, ENEMY_Z);
+    const result = {
+      ward: this.eWard.object3D.visible,
+      barrier: this.eDome.object3D.visible,
+      reflect: this.eReflect.object3D.visible,
+    };
+    this._syncGuards({
+      id: 1, arcPos: 0, invisibleTicks: 0,
+      shield: null, barrier: null, reflectTicks: 0,
+    }, ENEMY_Z);
     return result;
   }
 

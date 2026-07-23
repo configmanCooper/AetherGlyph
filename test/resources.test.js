@@ -22,6 +22,14 @@ export function run() {
   eq(sim.wizards[0].stamina, STAMINA.start, 'start Stamina 100');
   eq(sim.wizards[0].charges, SIGIL.start, 'start charges 0');
 
+  sim = freshSim();
+  sim.applyStatus(sim.wizards[0], 'Attunement', 1);
+  eq(sim.effectiveCost(sim.wizards[0], sim.spellData(1)), 6,
+    'Ember Attunement halves Ember spell Aether costs');
+  eq(sim.effectiveCost(sim.wizards[0], sim.spellData(2)), 16,
+    'Ember Attunement does not discount non-Ember spells');
+  eq(sim.spellData(17).aether, 15, 'Aether Surge costs 15 Aether');
+
   // Aether regen 4/sec when idle (not focusing).
   sim = freshSim();
   advance(sim, TICK_HZ, {}, {}); // 1 second
