@@ -32,6 +32,10 @@ export const STAMINA = {
   regenPerS: 1,
   hasteRegenPerS: 1.5,
   hasteCostMul: 0.75,
+  restedAfterS: 2,
+  restedRegenMul: 1.25,
+  deepRestAfterS: 5,
+  deepRestRegenMul: 1.75,
 };
 
 // --- Sigil charges (MASTERPLAN §6) ---------------------------------------
@@ -124,7 +128,7 @@ export const DISPELLABLE = [
 export const ZONE = {
   maxPerPlayer: 2,        // §10 two active zones per player
   radius: 0.55,           // arc half-width a zone covers
-  hourglassSlow: 0.25,    // Hourglass Field slows movement + projectiles 25%
+  hourglassProjectileSpeedMul: 0.25, // hostile projectiles travel at 25% speed
   frozenSlow: 0.22,       // Frozen Ground slows movement while standing on it
   coverHp: 26,
   snareRootS: 2,

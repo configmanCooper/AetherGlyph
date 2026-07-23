@@ -102,6 +102,20 @@ export function run() {
   sim.wizards[0].stamina = 50;
   advance(sim, TICK_HZ, {}, {});
   near(sim.wizards[0].stamina, 51, 0.05, 'idle stamina regenerates at 1 per second');
+
+  sim = freshSim();
+  sim.wizards[0].stamina = 40;
+  advance(sim, 2 * TICK_HZ, {}, {});
+  near(sim.wizards[0].stamina, 42, 0.05, 'the first two stationary seconds use baseline Stamina regeneration');
+  advance(sim, 3 * TICK_HZ, {}, {});
+  near(sim.wizards[0].stamina, 45.75, 0.06,
+    'after two stationary seconds Stamina regeneration is 25 percent faster');
+  advance(sim, TICK_HZ, {}, {});
+  near(sim.wizards[0].stamina, 47.5, 0.06,
+    'after five stationary seconds Stamina regeneration is 75 percent faster');
+  sim.step({ 0: { move: 1 }, 1: {} });
+  eq(sim.wizards[0].staminaIdleTicks, 0, 'movement resets the rested Stamina timer');
+
   sim.applyStatus(sim.wizards[0], 'Haste', 1);
   sim.wizards[0].stamina = 50;
   advance(sim, TICK_HZ, {}, {});

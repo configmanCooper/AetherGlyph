@@ -6,7 +6,7 @@ import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
 import { effectFor } from '../shared/src/sim/spellEffects.js';
-import { TICK_HZ, ZONE } from '../shared/src/sim/constants.js';
+import { TICK_HZ, ZONE, MOVE } from '../shared/src/sim/constants.js';
 
 function mk(ids0, ids1 = [1]) {
   const sim = new Sim({ seed: 8, loadouts: [ids0.map(spellWithGesture), ids1.map(spellWithGesture)] });
@@ -41,10 +41,34 @@ export function run() {
   eq(sim.wizards[0].health, hpBefore, 'decoy soaks the first shot (no damage)');
   ok(sim.wizards[0].mirrorTicks === 0, 'decoy is consumed after eating a shot');
 
-  // Hourglass Field (38): slows both movement and projectiles 25%.
-  sim = mk([38], [1]);
+  // Hourglass Field (38): slows only hostile projectiles by 75%.
+  sim = mk([38, 1], [1]);
   resolveCastOf(sim, 38, 0, 90);
   ok(sim.zonesOfKind('Hourglass').length >= 1 && sim.hourglassActive(), 'Hourglass Field creates a slowing zone');
+  const start0 = sim.wizards[0].arcPos;
+  const start1 = sim.wizards[1].arcPos;
+  sim.step({ 0: { move: 1 }, 1: { move: 1 } });
+  near(sim.wizards[0].arcPos - start0, MOVE.speedPerS / TICK_HZ, 1e-9,
+    'Hourglass does not slow its caster movement');
+  near(sim.wizards[1].arcPos - start1, MOVE.speedPerS / TICK_HZ, 1e-9,
+    'Hourglass does not slow enemy movement');
+
+  const ember = effectFor(1);
+  sim.projectiles = [
+    {
+      id: 1001, owner: 0, spellId: 1, eff: ember, ticks: 100, totalTicks: 100,
+      quality: 1, originPos: -0.5, targetPos: 0.5,
+    },
+    {
+      id: 1002, owner: 1, spellId: 1, eff: ember, ticks: 100, totalTicks: 100,
+      quality: 1, originPos: 0.5, targetPos: -0.5,
+    },
+  ];
+  sim.advanceProjectiles();
+  near(sim.projectiles.find((p) => p.owner === 0).ticks, 99, 1e-9,
+    'Hourglass leaves the caster projectile at full speed');
+  near(sim.projectiles.find((p) => p.owner === 1).ticks, 99.75, 1e-9,
+    'Hourglass reduces enemy projectile speed by 75%');
 
   // Phoenix Covenant (39): a lethal hit leaves the caster at 1 health, once.
   sim = mk([39], [1]);

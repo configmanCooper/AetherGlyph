@@ -497,7 +497,13 @@ export class TutorialRunner {
   }
 
   _emitGuide() {
-    if (this.onGuide) this.onGuide({ spellId: this.focusSpell ? this.focusSpell.id : null, stage: this.guideStage });
+    if (this.onGuide) {
+      this.onGuide({
+        spellId: this.focusSpell ? this.focusSpell.id : null,
+        stage: this.guideStage,
+        fraction: this.lesson.guideFraction || 1,
+      });
+    }
   }
 
   // Advance the accumulator by real elapsed ms and step fixed ticks (UI loop).

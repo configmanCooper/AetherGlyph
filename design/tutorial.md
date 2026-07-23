@@ -219,7 +219,7 @@ Trial:
 
 - Draw the figure eight, then tap the mirrored rune before the timer ends.
 
-### Hourglass Field - "The sand slows all, including its keeper"
+### Hourglass Field - "The sand catches hostile magic, never its keeper"
 
 Clues:
 
@@ -228,7 +228,7 @@ Clues:
 
 Trial:
 
-- Defeat a fast projectile sequence by changing shared timing rather than blocking.
+- Defeat a fast projectile sequence by slowing hostile shots rather than blocking.
 
 ### Phoenix Covenant - "A flame survives only when the enemy knows it burns"
 

@@ -136,6 +136,7 @@ export const GESTURE_TEMPLATES = {
   ],
   longZigzag: [ // 7 Chain Lightning — tall multi-peak zigzag
     [{ x: 5, y: 18 }, { x: 23, y: 84 }, { x: 41, y: 18 }, { x: 59, y: 84 }, { x: 77, y: 18 }, { x: 95, y: 72 }],
+    [{ x: 5, y: 18 }, { x: 20, y: 84 }, { x: 35, y: 18 }, { x: 50, y: 84 }, { x: 65, y: 18 }, { x: 80, y: 84 }, { x: 95, y: 18 }],
   ],
   triangleCW: [ // 8 Fireball — closed triangle, apex up, clockwise
     densifyPolyline(TRIANGLE_PRIMARY),

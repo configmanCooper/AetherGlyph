@@ -320,6 +320,51 @@ export function run() {
       ok(resting.cast == null && resting.move === 0,
         'low-Stamina AI rests while protected by its Stone Wall');
     }
+
+    {
+      const sim = new Sim({
+        seed: 35,
+        loadouts: [presetLoadout('ember-rush'), [spellWithGesture(1)]],
+        rules: { timer: false, pressure: false },
+      });
+      sim.zones.push({
+        id: 701, kind: 'Cover', owner: 1, ticks: 1200, totalTicks: 1200,
+        center: sim.wizards[1].arcPos, radius: 0.12, hp: 20,
+      });
+      const medium = new PracticeBot(1, { difficulty: 'medium', seed: 35 });
+      sim.wizards[1].stamina = 34;
+      eq(medium.act(sim).move, 0, 'Medium begins a strategic rest before reaching its emergency reserve');
+      sim.wizards[1].stamina = 45;
+      sim.wizards[1].staminaIdleTicks = 5 * TICK_HZ + 1;
+      eq(medium.act(sim).move, 0, 'Medium keeps resting through the accelerated regeneration window');
+      sim.wizards[1].stamina = 51;
+      ok(medium.act(sim).move !== 0, 'Medium resumes movement after reaching its recovery target');
+
+      const easy = new PracticeBot(1, { difficulty: 'easy', seed: 35 });
+      sim.wizards[1].stamina = 44;
+      ok(easy.act(sim).move !== 0, 'Easy does not use the Medium/Hard strategic rest threshold');
+    }
+
+    {
+      const sim = new Sim({
+        seed: 36,
+        loadouts: [presetLoadout('ember-rush'), [spellWithGesture(1)]],
+        rules: { timer: false, pressure: false },
+      });
+      sim.zones.push({
+        id: 702, kind: 'Cover', owner: 1, ticks: 1200, totalTicks: 1200,
+        center: sim.wizards[1].arcPos, radius: 0.12, hp: 20,
+      });
+      const hard = new PracticeBot(1, { difficulty: 'hard', seed: 36 });
+      sim.wizards[1].stamina = 44;
+      eq(hard.act(sim).move, 0, 'Hard begins strategic recovery at a higher Stamina threshold');
+      sim.wizards[1].stamina = 55;
+      sim.wizards[1].staminaIdleTicks = 5 * TICK_HZ + 1;
+      eq(hard.act(sim).move, 0, 'Hard exploits deep-rest regeneration until its higher recovery target');
+      sim.wizards[1].stamina = 61;
+      hard.act(sim);
+      ok(!hard.recoveringStamina, 'Hard resumes pressure after its strategic recovery target');
+    }
   }
 
   // --- equal rules: resources never leave legal bounds, matches end ------

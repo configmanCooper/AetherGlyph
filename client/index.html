@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.7.4" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.7.5" />
   <script type="importmap">
   {
     "imports": {
@@ -115,7 +115,7 @@
   <div id="overlay" class="overlay">
     <div class="panel" id="panel-main">
       <div class="title-runes" aria-hidden="true"><span>✦</span><span>◇</span><span>✦</span></div>
-      <h1>Aetherglyph</h1>
+      <h1 class="title-wordmark">Aetherglyph</h1>
       <p class="title-epithet">Arcane Duels</p>
       <p class="tagline">Enter the academy. Draw living glyphs. Master the eight schools.</p>
       <div class="menu-list">
@@ -129,7 +129,7 @@
       </div>
       <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
       <p class="links">
-        <span id="menu-version">Version 1.7.4</span> ·
+        <span id="menu-version">Version 1.7.5</span> ·
         <button class="link-button" data-action="spell-roster">Spell roster</button>
       </p>
     </div>
@@ -226,11 +226,20 @@
           <input type="text" id="online-code" maxlength="5" placeholder="CODE" autocomplete="off" />
           <button class="menu-btn" data-action="online-join">Join Code</button>
         </div>
+
         <button class="menu-btn ghost" data-action="loadout">Edit my guides</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
       <p id="online-error" class="ls-err-line"></p>
       <p class="offline-note"><span id="conn-quality" class="conn-badge">connecting…</span></p>
+    </div>
+
+    <div class="panel hidden" id="panel-demo-online">
+      <h2>Online Duel</h2>
+      <p id="demo-online-message"></p>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="back">Back</button>
+      </div>
     </div>
 
     <div class="panel hidden" id="panel-online-wait">
@@ -292,7 +301,7 @@
         </div>
       </div>
 
-      <div class="settings-section">
+      <div class="settings-section" id="online-service-settings">
         <label class="field">Online service URL
           <input type="text" id="set-server-url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Default" />
         </label>
@@ -322,9 +331,18 @@
       <div id="tut-summary" class="tut-summary"></div>
       <div class="menu-list compact">
         <button class="menu-btn" data-action="tut-continue">Continue</button>
+        <button id="btn-secret-hints" class="menu-btn ghost hidden" data-action="secret-hints">Hints</button>
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
       <div id="tut-chapters" class="tut-chapters"></div>
+    </div>
+
+    <div class="panel hidden" id="panel-secret-hints">
+      <h2>Secret Hints</h2>
+      <div id="secret-hints-list" class="secret-hints-list"></div>
+      <div class="menu-list">
+        <button class="menu-btn ghost" data-action="tutorial">Back to chapters</button>
+      </div>
     </div>
 
     <div class="panel hidden" id="panel-lesson-intro">
@@ -366,6 +384,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.7.4"></script>
+  <script type="module" src="./src/app/main.js?v=1.7.5"></script>
 </body>
 </html>

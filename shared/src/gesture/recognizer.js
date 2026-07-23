@@ -242,6 +242,9 @@ export class Recognizer {
     if (scores[0].spellId === 5 && scores[0].score >= 0.80 && rival?.spellId !== 39) {
       diag.requiredMargin = Math.min(diag.requiredMargin, 0.01);
     }
+    if (scores[0].spellId === 7 && scores[0].score >= 0.80) {
+      diag.requiredMargin = Math.min(diag.requiredMargin, 0.02);
+    }
     if (scores[0].spellId === 30 && scores[0].score >= 0.78) {
       diag.requiredMargin = Math.min(diag.requiredMargin, 0.015);
     }

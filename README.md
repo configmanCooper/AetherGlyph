@@ -2,9 +2,12 @@
 
 An Android-first, real-time 1v1 wizard dueling game built around drawing spell glyphs on a touch screen.
 
+The separate free, offline-only Google Play demo is built with
+`.\build-demo-android.ps1`; see `DEMO-ANDROID.md`.
+
 ## Project status
 
-**Version 1.7.4 — feature complete.** The castle-styled title page now stages an
+**Version 1.7.5 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
@@ -145,8 +148,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10704 /
-versionName 1.7.4). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10705 /
+versionName 1.7.5). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -289,7 +292,7 @@ Phase 1 basic modes (Tutorial, Practice, starter smoke path) intact.
   Tenacity on hard-control reactions, and no recursive chains are enforced.
 - **Statuses & buffs for real play.** Soaked, Static, Sundered, Weakened, Marked,
   Rooted, Frozen, Stunned, Sloth, Haste, Aether Surge, Attunement, Grounding,
-  Veil, Blinded, Phoenix protection, Hourglass shared slow, and the Mirror decoy
+  Veil, Blinded, Phoenix protection, Hourglass hostile-projectile slow, and the Mirror decoy
   are all simulated.
 - **Guide shortcut builder.** `validateLoadout` requires eight distinct known
   spells only. Point, heavy, school, and defensive-coverage restrictions no
@@ -397,7 +400,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10704` / `versionName 1.7.4`, no cleartext production traffic,
+  `versionCode 10705` / `versionName 1.7.5`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.

@@ -48,7 +48,8 @@ export const PRACTICE_PROFILES = {
     scoreMean: 0.60, scoreSpread: 0.14, flubRate: 0.08, mistakeRate: 0.35,
     counter: 'basic', combo: 'one-step', adapt: 'none', loadout: 'beginner',
     aggression: 0.40, defends: 0.20, dodge: 0.12, focusBias: 0.15,
-    defenseReserve: 0, staminaReserve: 0, moveChance: 0.25, castIntervalMs: 10000,
+    defenseReserve: 0, staminaReserve: 0, staminaRecoveryStart: 0, staminaRecoveryTarget: 0,
+    moveChance: 0.25, castIntervalMs: 10000,
   },
   easy: {
     key: 'easy', label: 'Easy',
@@ -56,7 +57,8 @@ export const PRACTICE_PROFILES = {
     scoreMean: 0.68, scoreSpread: 0.12, flubRate: 0.03, mistakeRate: 0.22,
     counter: 'basic', combo: 'one-step', adapt: 'none', loadout: 'beginner',
     aggression: 0.55, defends: 0.35, dodge: 0.45, focusBias: 0.25,
-    defenseReserve: 0, staminaReserve: 0, moveChance: 1, castIntervalMs: 0,
+    defenseReserve: 0, staminaReserve: 0, staminaRecoveryStart: 0, staminaRecoveryTarget: 0,
+    moveChance: 1, castIntervalMs: 0,
   },
   medium: {
     key: 'medium', label: 'Medium',
@@ -64,15 +66,17 @@ export const PRACTICE_PROFILES = {
     scoreMean: 0.82, scoreSpread: 0.08, flubRate: 0.06, mistakeRate: 0.10,
     counter: 'common', combo: 'two-step', adapt: 'cast-frequency', loadout: 'soft-counter',
     aggression: 0.72, defends: 0.65, dodge: 0.70, focusBias: 0.40,
-    defenseReserve: 0.4, staminaReserve: 5, moveChance: 1, castIntervalMs: 0,
+    defenseReserve: 0.4, staminaReserve: 5, staminaRecoveryStart: 35, staminaRecoveryTarget: 50,
+    moveChance: 1, castIntervalMs: 0,
   },
   hard: {
     key: 'hard', label: 'Hard',
     perceptionMs: 150, replanMs: 133, horizonMs: 2500,
-    scoreMean: 0.93, scoreSpread: 0.05, flubRate: 0.03, mistakeRate: 0.03,
+    scoreMean: 0.98, scoreSpread: 0.03, flubRate: 0.01, mistakeRate: 0.01,
     counter: 'complete', combo: 'expert', adapt: 'timing-school', loadout: 'counter-build',
-    aggression: 0.87, defends: 0.90, dodge: 0.90, focusBias: 0.55,
-    defenseReserve: 0.6, staminaReserve: 25, moveChance: 1, castIntervalMs: 0,
+    aggression: 1.00, defends: 0.80, dodge: 0.85, focusBias: 0.30,
+    defenseReserve: 0.3, staminaReserve: 25, staminaRecoveryStart: 45, staminaRecoveryTarget: 60,
+    moveChance: 0.55, castIntervalMs: 0,
   },
 };
 
@@ -205,6 +209,7 @@ export class PracticeBot {
     this.counter = this.profile.counter;
 
     this.lastPlanTick = -999;
+    this.recoveringStamina = false;
     this.nextCastTick = 0;
     this.currentTick = 0;
     this.moveDir = playerId === 0 ? 1 : -1;
@@ -507,17 +512,35 @@ export class PracticeBot {
     if (sim.hasStatus(w, 'Blinded')) return intent;
 
     const b = this.categorize(sim);
-    if (w.stamina <= this.profile.staminaReserve) {
+    const threat = this.noticedThreat(sim);
+    const mistake = this.rng.next() < this.profile.mistakeRate;
+
+    // React before committing to a long rest window.
+    if (threat) {
+      const decision = this._defend(sim, w, o, b, threat, intent, mistake);
+      if (decision) return decision;
+    }
+
+    const recoveryStart = Math.max(this.profile.staminaReserve, this.profile.staminaRecoveryStart || 0);
+    const recoveryTarget = Math.max(recoveryStart, this.profile.staminaRecoveryTarget || recoveryStart);
+    if (!this.recoveringStamina && w.stamina <= recoveryStart) this.recoveringStamina = true;
+    if (this.recoveringStamina && w.stamina >= recoveryTarget) this.recoveringStamina = false;
+    if ((this.recoveringStamina || w.stamina <= this.profile.staminaReserve) && !threat) {
       intent.move = 0;
+      const emergencyRest = w.stamina <= this.profile.staminaReserve;
       const protectedRest = (w.barrier && w.barrier.ticks > 0)
         || sim.zones.some((z) => z.kind === 'Cover' && z.owner === w.id && z.ticks > 0 && z.hp > 0);
       if (protectedRest) return intent;
 
-      for (const name of ['Haste', 'Stone Wall', 'Barrier Dome']) {
-        const recoverySpell = w.loadout.find((spell) => spell.name === name && this.canCast(sim, w, spell));
-        if (recoverySpell) return this._commitCast(recoverySpell.id, intent);
+      if (emergencyRest) {
+        for (const name of ['Haste', 'Stone Wall', 'Barrier Dome']) {
+          const recoverySpell = w.loadout.find((spell) => spell.name === name && this.canCast(sim, w, spell));
+          if (recoverySpell) return this._commitCast(recoverySpell.id, intent);
+        }
+        return intent;
       }
-      return intent;
+      this.recoveringStamina = false;
+      intent.move = choosesMovement ? this.moveDir : 0;
     }
 
     if (o.invisibleTicks > 0) {
@@ -532,14 +555,6 @@ export class PracticeBot {
       return this._commitCast(shot.id, intent);
     }
 
-    const threat = this.noticedThreat(sim);
-    const mistake = this.rng.next() < this.profile.mistakeRate;
-
-    // 1. React to a NOTICED incoming projectile.
-    if (threat) {
-      const dec = this._defend(sim, w, o, b, threat, intent, mistake);
-      if (dec) return dec;
-    }
     // Focus is a held action. Keep channeling unless a noticed threat caused a
     // defensive response above; returning a neutral intent would cancel it.
     if (w.focusing && !threat) return { focus: true };

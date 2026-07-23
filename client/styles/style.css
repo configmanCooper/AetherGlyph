@@ -206,6 +206,13 @@ body.title-showcase #panel-main h1 {
   color: #f5eaff;
   text-shadow: 0 0 10px #8b6bff, 0 0 28px rgba(79,214,201,0.55);
 }
+.title-wordmark {
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
 .title-runes {
   display: flex;
   justify-content: center;
@@ -536,6 +543,20 @@ body.reduced .spinner { animation: none; }
   display: flex; justify-content: space-between; align-items: center; gap: 6px;
   text-align: left; padding: 10px 12px; border-radius: 10px; cursor: pointer;
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--ink); font-size: 13px;
+}
+.secret-hints-list { display: grid; gap: 10px; }
+.secret-hint-card {
+  padding: 12px 14px;
+  border: 1px solid rgba(139,107,255,0.4);
+  border-radius: 12px;
+  background: rgba(30,22,52,0.72);
+}
+.secret-hint-card h3 { margin: 0 0 4px; color: var(--accent2); font-size: 16px; }
+.secret-hint-card p { margin: 0; color: var(--ink); line-height: 1.45; }
+.secret-hint-card .secret-hint-guide-note {
+  margin-top: 7px;
+  color: var(--accent2);
+  font-size: 12px;
 }
 .tut-lesson.next { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .tut-lesson.done { color: var(--muted); }

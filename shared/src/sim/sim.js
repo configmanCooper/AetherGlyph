@@ -58,6 +58,7 @@ function makeWizard(id, loadout, spawnArc) {
     lastActivityTick: 0,        // for sigil decay
     snaredZones: new Set(),     // snare zone ids already triggered on this wizard
     wetExposureTicks: 0,        // continuous shared Rain exposure before Soaked
+    staminaIdleTicks: 0,        // continuous time stationary for rested regeneration
     movedThisTick: false,
     // rolling counters
     damageDealt: 0,
@@ -144,8 +145,14 @@ export class Sim {
   }
 
   regenerateStamina(w) {
-    if (w.movedThisTick) return;
+    if (w.movedThisTick) {
+      w.staminaIdleTicks = 0;
+      return;
+    }
+    w.staminaIdleTicks += 1;
     let rate = this.hasStatus(w, 'Haste') ? STAMINA.hasteRegenPerS : STAMINA.regenPerS;
+    if (w.staminaIdleTicks > sToTicks(STAMINA.deepRestAfterS)) rate *= STAMINA.deepRestRegenMul;
+    else if (w.staminaIdleTicks > sToTicks(STAMINA.restedAfterS)) rate *= STAMINA.restedRegenMul;
     if (this.hasStatus(w, 'Sloth')) rate *= 0.7;
     w.stamina = Math.min(STAMINA.max, w.stamina + rate * DT);
   }
@@ -187,14 +194,13 @@ export class Sim {
   }
 
   // Slow that affects MOVEMENT and post-cast recovery. Haste can push this
-  // slightly negative (a speed-up); statuses and shared slow zones add to it.
+  // slightly negative (a speed-up); statuses and Frozen Ground add to it.
   moveSlow(w) {
     let s = 0;
     if (this.hasStatus(w, 'Chilled')) s += STATUSES.Chilled.slow;
     if (this.hasStatus(w, 'Sloth')) s += STATUSES.Sloth.slow;
     if (this.hasStatus(w, 'Grounded')) s += STATUSES.Grounded.moveSlow;
     if (this.hasStatus(w, 'Haste')) s -= STATUSES.Haste.haste;
-    if (this.hourglassActive()) s += ZONE.hourglassSlow;
     if (this.zones.some((z) => z.kind === 'Frozen' && z.ticks > 0 && this.wizardInZone(w, z))) {
       s += ZONE.frozenSlow;
     }
@@ -216,6 +222,11 @@ export class Sim {
   // ------------------------------------------------------------------- zones
   hourglassActive() {
     return this.zones.some((z) => z.kind === 'Hourglass' && z.ticks > 0);
+  }
+
+  hostileHourglassActive(projectileOwner) {
+    return this.zones.some((z) =>
+      z.kind === 'Hourglass' && z.ticks > 0 && z.owner !== projectileOwner);
   }
 
   zonesOfKind(kind) { return this.zones.filter((z) => z.kind === kind && z.ticks > 0); }
@@ -855,11 +866,12 @@ export class Sim {
   // -------------------------------------------------------------- projectiles
   advanceProjectiles() {
     const remaining = [];
-    // Hourglass Field slows projectile travel 25% for both players.
-    const hgSlow = this.hourglassActive() ? (1 - ZONE.hourglassSlow) : 1;
     const fogActive = this.fogActive();
     for (const p of this.projectiles) {
-      p.ticks -= hgSlow;
+      const speed = this.hostileHourglassActive(p.owner)
+        ? ZONE.hourglassProjectileSpeedMul
+        : 1;
+      p.ticks -= speed;
       const attacker = this.wizards[p.owner];
       const defender = this.opponentOf(p.owner);
       // Blink invisibility hides the target; Eclipse blindness and shared Fog
@@ -1446,6 +1458,7 @@ export class Sim {
         deflectTicks: w.deflectTicks,
         evadeTicks: w.evadeTicks, invisibleTicks: w.invisibleTicks, mirrorTicks: w.mirrorTicks,
         wetExposureTicks: w.wetExposureTicks,
+        staminaIdleTicks: w.staminaIdleTicks,
         sidestepCharges: w.sidestepCharges, recoveryTicks: w.recoveryTicks,
         statuses: Object.fromEntries(Object.entries(w.statuses).map(([k, v]) => [k, { stacks: v.stacks, ticks: v.ticks }])),
         cooldowns: { ...w.cooldowns }, resonance: w.resonance.map((r) => r.school),
@@ -1478,7 +1491,7 @@ export class Sim {
         w.channel?.staticApplied ? 1 : 0,
         w.focusing ? 1 : 0, w.focusTicks, w.braceTicks, w.reflectTicks, w.tenacityTicks,
         w.deflectTicks, w.evadeTicks, w.invisibleTicks, w.mirrorTicks,
-        w.wetExposureTicks,
+        w.wetExposureTicks, w.staminaIdleTicks,
         w.shield ? q(w.shield.absorb, 100) : 0, w.shield ? w.shield.ticks : 0,
         w.barrier ? q(w.barrier.absorb, 100) : 0, w.barrier ? w.barrier.ticks : 0,
         w.sidestepCharges, w.recoveryTicks, w.lastActivityTick, w.phoenixUsed ? 1 : 0,

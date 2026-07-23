@@ -100,7 +100,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.7\.4/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.7\.5/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -112,8 +112,18 @@ try {
   }
   const titlePanelBounds = await page.evaluate(() => {
     const rect = document.querySelector('#panel-main').getBoundingClientRect();
-    return { left: rect.left, right: rect.right };
+    const wordmark = document.querySelector('.title-wordmark').getBoundingClientRect();
+    return {
+      left: rect.left, right: rect.right,
+      panelCenter: rect.left + rect.width / 2,
+      wordmarkCenter: wordmark.left + wordmark.width / 2,
+      miniGlyphs: document.querySelectorAll('.title-mini-glyph').length,
+    };
   });
+  if (Math.abs(titlePanelBounds.panelCenter - titlePanelBounds.wordmarkCenter) > 1
+      || titlePanelBounds.miniGlyphs !== 0) {
+    fail('title wordmark/glyph decoration is incomplete: ' + JSON.stringify(titlePanelBounds));
+  }
   if (!(titleState.showcase.enemyScreenX < titlePanelBounds.left
       && titleState.showcase.playerScreenX > titlePanelBounds.right)) {
     fail('landscape title wizards are covered by the menu: ' + JSON.stringify({
@@ -306,6 +316,64 @@ try {
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
+  // Secret hints stay behind a single hub button. Once a clue is earned, its
+  // trial reveals only the starting point and first quarter of the glyph.
+  await page.evaluate(() => {
+    const key = 'aeg.solo.v1';
+    let profile = {};
+    try { profile = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+    profile.clues = {
+      ...(profile.clues || {}),
+      mirrorEight: true,
+      hourglassMovement: true,
+      phoenixOil: true,
+      prismaticReactions: true,
+    };
+    localStorage.setItem(key, JSON.stringify(profile));
+  });
+  await page.click('[data-action="tutorial"]');
+  await page.waitForSelector('#panel-tutorial:not(.hidden)', { timeout: 5000 });
+  const hintHub = await page.evaluate(() => ({
+    button: document.querySelector('#btn-secret-hints')?.textContent || '',
+    hidden: document.querySelector('#btn-secret-hints')?.classList.contains('hidden'),
+    inlineCards: document.querySelectorAll('#panel-tutorial .secret-hint-card').length,
+  }));
+  if (hintHub.button !== 'Hints (4)' || hintHub.hidden || hintHub.inlineCards !== 0) {
+    fail('secret hints should be collapsed behind the Hints button: ' + JSON.stringify(hintHub));
+  }
+  await page.click('#btn-secret-hints');
+  await page.waitForSelector('#panel-secret-hints:not(.hidden)', { timeout: 5000 });
+  const hintPanel = await page.evaluate(() => ({
+    names: Array.from(document.querySelectorAll('#secret-hints-list h3')).map((el) => el.textContent),
+    notes: Array.from(document.querySelectorAll('.secret-hint-guide-note')).map((el) => el.textContent),
+  }));
+  if (hintPanel.names.join(',') !== 'Mirror Twin,Hourglass Field,Phoenix Covenant,Prismatic Beam'
+      || hintPanel.notes.length !== 4
+      || hintPanel.notes.some((note) => !/first quarter/i.test(note))) {
+    fail('secret hints panel did not list all earned hints: ' + JSON.stringify(hintPanel));
+  }
+  await page.click('#panel-secret-hints [data-action="tutorial"]');
+  await page.waitForSelector('#panel-tutorial:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-lesson="T37"]');
+  await page.waitForSelector('#panel-lesson-intro:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="tut-begin"]');
+  await page.waitForSelector('#coach:not(.hidden)', { timeout: 5000 });
+  const secretGuide = await page.evaluate(() => {
+    const canvas = document.querySelector('#draw-canvas');
+    return {
+      spell: canvas?.dataset.guideSpell,
+      stage: canvas?.dataset.guideStage,
+      fraction: Number(canvas?.dataset.guideFraction || 0),
+      hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+    };
+  });
+  if (secretGuide.spell !== '37' || secretGuide.stage !== 'dotted'
+      || secretGuide.fraction !== 0.25 || !/dotted first quarter/i.test(secretGuide.hint)) {
+    fail('secret trial did not show its quarter-glyph starting guide: ' + JSON.stringify(secretGuide));
+  }
+  await page.click('#btn-menu');
+  await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
+
   // Final exam hub: locking/unlocking via seeded profile manipulation, then one
   // real no-guide Gesture Gauntlet draw. The solo profile is DOM-free and reloads
   // from localStorage on every hub render, so seeding + re-opening re-renders it.
@@ -465,8 +533,8 @@ try {
         arrows: Number(document.querySelector('#draw-canvas')?.dataset.guideArrows || 0),
         labels: document.querySelector('#draw-canvas')?.dataset.guideCueLabels || '',
       }));
-      if (gustCues.arrows !== 6 || gustCues.labels !== '1,2,3') {
-        fail('Gust Wall should show three numbered bidirectional blades: ' + JSON.stringify(gustCues));
+      if (gustCues.arrows !== 5 || gustCues.labels !== '1,2,3') {
+        fail('Gust Wall should omit the downward arrow on blade 3: ' + JSON.stringify(gustCues));
       }
     }
     if (i === 1) {

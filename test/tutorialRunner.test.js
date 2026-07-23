@@ -205,6 +205,12 @@ export function run() {
   rL09.arm();
   eq(l09Guides.at(-1).spellId, 2, 'L09 starts with Frost Lance before Frost Bind');
 
+  const secretGuides = [];
+  const rSecret = new TutorialRunner('T37', { seed: 2, onGuide: (g) => secretGuides.push(g) });
+  rSecret.arm();
+  eq(secretGuides.at(-1).spellId, 37, 'Mirror Twin trial starts with its secret spell guide');
+  eq(secretGuides.at(-1).fraction, 0.25, 'secret trial emits only the first quarter of its glyph guide');
+
   // --- 9. best-of-three flow + checkpoints (Academy 16 / Final Exam) --------
   {
     const a16 = CAMPAIGN_BY_ID.A16;

@@ -16,7 +16,7 @@ export const SECRETS = [
     tagline: 'Two hands write one intention.',
     clues: ['mirrorEight'] },
   { spellId: 38, name: 'Hourglass Field', trialId: 'T38',
-    tagline: 'The sand slows all, including its keeper.',
+    tagline: 'The sand catches hostile magic, never its keeper.',
     clues: ['hourglassMovement'] },
   { spellId: 39, name: 'Phoenix Covenant', trialId: 'T39',
     tagline: 'A flame survives only when the enemy knows it burns.',

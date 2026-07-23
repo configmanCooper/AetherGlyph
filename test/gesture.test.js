@@ -172,6 +172,24 @@ export function run() {
   eq(phoenixMissileMiscasts, 0, 'Phoenix Covenant wings do not become Arcane Missile');
   eq(full.recognize(GESTURE_TEMPLATES.arcUp[0]).requiredMargin, 0.01,
     'high-confidence Arcane Missile uses the forgiving ambiguity margin');
+  const chainNearMiss = [
+    { x: -5.1, y: 23.1 }, { x: 33.4, y: 77.5 }, { x: 37.8, y: 28.4 },
+    { x: 59.6, y: 78.1 }, { x: 81.4, y: 27.0 }, { x: 94.4, y: 77.4 },
+  ];
+  const forgivingChain = full.recognize(chainNearMiss);
+  ok(forgivingChain.accepted && forgivingChain.spellId === 7,
+    `0.82-style long zigzag casts Chain Lightning (${forgivingChain.best.score.toFixed(2)})`);
+  eq(forgivingChain.requiredMargin, 0.02,
+    'high-confidence Chain Lightning uses the forgiving ambiguity margin');
+  let chainCorrect = 0, sparkChainMiscasts = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const chain = full.recognize(jitter(GESTURE_TEMPLATES.longZigzag[0], 25, seed * 193));
+    const spark = full.recognize(jitter(GESTURE_TEMPLATES.zigzag[0], 16, seed * 193));
+    if (chain.accepted && chain.spellId === 7) chainCorrect++;
+    if (spark.accepted && spark.spellId === 7) sparkChainMiscasts++;
+  }
+  ok(chainCorrect >= 165, `rough Chain Lightning zigzags remain recognizable (${chainCorrect}/200)`);
+  eq(sparkChainMiscasts, 0, 'rough Spark Dart zigzags never cross-cast as Chain Lightning');
   let thunderclapCorrect = 0;
   for (let seed = 1; seed <= 200; seed++) {
     const thunder = full.recognize(jitter(GESTURE_TEMPLATES.twinLines[0], 12, seed * 241));

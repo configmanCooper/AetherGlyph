@@ -8,6 +8,11 @@ def keystoreProps = new Properties()
 if (keystorePropsFile.exists()) {
     keystoreProps.load(new FileInputStream(keystorePropsFile))
 }
+def demoKeystorePropsFile = rootProject.file("demo-keystore.properties")
+def demoKeystoreProps = new Properties()
+if (demoKeystorePropsFile.exists()) {
+    demoKeystoreProps.load(new FileInputStream(demoKeystorePropsFile))
+}
 
 android {
     namespace "com.configmancooper.aetherglyph"
@@ -16,8 +21,8 @@ android {
         applicationId "com.configmancooper.aetherglyph"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10704
-        versionName "1.7.4"
+        versionCode 10705
+        versionName "1.7.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -34,6 +39,14 @@ android {
                 keyPassword keystoreProps.getProperty("keyPassword")
             }
         }
+        demoRelease {
+            if (demoKeystoreProps.getProperty("storeFile")) {
+                storeFile rootProject.file(demoKeystoreProps.getProperty("storeFile"))
+                storePassword demoKeystoreProps.getProperty("storePassword")
+                keyAlias demoKeystoreProps.getProperty("keyAlias")
+                keyPassword demoKeystoreProps.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         release {
@@ -41,6 +54,15 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (keystoreProps.getProperty("storeFile")) {
                 signingConfig signingConfigs.release
+            }
+        }
+        demo {
+            initWith release
+            applicationIdSuffix ".demo"
+            versionNameSuffix "-demo"
+            matchingFallbacks = ['release']
+            if (demoKeystoreProps.getProperty("storeFile")) {
+                signingConfig signingConfigs.demoRelease
             }
         }
     }

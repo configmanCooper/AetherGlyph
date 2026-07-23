@@ -3,6 +3,7 @@
 // cast bar, and a best-of-three series into a playable offline slice.
 
 import { Arena } from '../render/arena.js';
+import { DEMO_BUILD, DEMO_ONLINE_MESSAGE } from './edition.js';
 import { HUD } from '../ui/hud.js';
 import { Audio } from '../audio/audio.js';
 import { GestureInput } from '../input/gestureInput.js';
@@ -110,6 +111,35 @@ function guideTemplateFor(spellId) {
   return variants ? variants[0] : null;
 }
 
+function guidePrefix(points, fraction) {
+  if (!points?.length || fraction >= 1) return points;
+  const lengths = [];
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const length = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    lengths.push(length);
+    total += length;
+  }
+  const target = total * Math.max(0.05, fraction);
+  const result = [{ ...points[0] }];
+  let walked = 0;
+  for (let i = 0; i < lengths.length; i++) {
+    const length = lengths[i];
+    if (walked + length <= target) {
+      result.push({ ...points[i + 1] });
+      walked += length;
+      continue;
+    }
+    const t = length > 0 ? (target - walked) / length : 0;
+    result.push({
+      x: points[i].x + (points[i + 1].x - points[i].x) * t,
+      y: points[i].y + (points[i + 1].y - points[i].y) * t,
+    });
+    break;
+  }
+  return result;
+}
+
 const GUIDE_CUES = Object.freeze({
   27: [
     { from: { x: 32, y: 66 }, to: { x: 20, y: 60 } },
@@ -120,7 +150,7 @@ const GUIDE_CUES = Object.freeze({
   33: [
     { from: { x: 50, y: 86 }, to: { x: 24, y: 26 }, bidirectional: true, label: '1', labelDx: -9 },
     { from: { x: 50, y: 86 }, to: { x: 50, y: 20 }, bidirectional: true, label: '2', labelDx: 10 },
-    { from: { x: 50, y: 86 }, to: { x: 76, y: 26 }, bidirectional: true, label: '3', labelDx: 9 },
+    { from: { x: 50, y: 86 }, to: { x: 76, y: 26 }, label: '3', labelDx: 9 },
   ],
 });
 
@@ -590,12 +620,12 @@ function renderTutorialHub() {
       `<div class="tut-stat"><span class="k">Secrets</span><span class="v">${secretCount}/4</span></div>` +
       `<div class="tut-stat ranked ${p.rankedReady ? 'on' : ''}"><span class="k">Ranked</span>` +
       `<span class="v">${p.rankedReady ? 'Ready ✓' : 'Locked (win Lesson 12)'}</span></div>` +
-      (grandmaster ? '<div class="tut-stat ranked on"><span class="k">Title</span><span class="v">Grandmaster ★</span></div>' : '') +
-      (revealedSecretHints.length
-        ? `<div class="tut-stat ranked on"><span class="k">Secret hints</span><span class="v">${
-          revealedSecretHints.map((secret) => `${secret.name}: ${secret.tagline}`).join(' · ')
-        }</span></div>`
-        : '');
+      (grandmaster ? '<div class="tut-stat ranked on"><span class="k">Title</span><span class="v">Grandmaster ★</span></div>' : '');
+  }
+  const hintsButton = $('#btn-secret-hints');
+  if (hintsButton) {
+    hintsButton.classList.toggle('hidden', revealedSecretHints.length === 0);
+    hintsButton.textContent = `Hints (${revealedSecretHints.length})`;
   }
 
   const list = $('#tut-chapters');
@@ -613,9 +643,28 @@ function renderTutorialHub() {
         for (const l of ch.lessons) row.appendChild(lessonButton(l, p));
         sec.appendChild(row);
       }
+
       list.appendChild(sec);
     }
+
   }
+}
+
+function openSecretHints() {
+  const profile = soloProfile();
+  const hints = SECRETS.filter((secret) =>
+    secret.clues.every((clue) => profile.clues && profile.clues[clue]));
+  const list = $('#secret-hints-list');
+  list.innerHTML = '';
+  for (const secret of hints) {
+    const card = document.createElement('article');
+    card.className = 'secret-hint-card';
+    card.innerHTML = `<h3>${secret.name}</h3><p>${secret.tagline}</p>` +
+      '<p class="secret-hint-guide-note">Its trial reveals the starting point and first quarter of the glyph.</p>';
+    list.appendChild(card);
+  }
+  if (!hints.length) list.textContent = 'No secret hints have been revealed yet.';
+  showPanel('panel-secret-hints');
 }
 
 // The final exam renders as locked/unlockable sub-groups with progress counters
@@ -858,7 +907,11 @@ function armTutorialLesson() {
   // the lesson guide only after revealing it, otherwise the correct template is
   // rendered into a 1x1 transparent canvas.
   gesture.resize();
-  onTutorialGuide({ spellId: tutorial.focusSpell ? tutorial.focusSpell.id : null, stage: tutorial.guideStage });
+  onTutorialGuide({
+    spellId: tutorial.focusSpell ? tutorial.focusSpell.id : null,
+    stage: tutorial.guideStage,
+    fraction: tutorial.lesson.guideFraction || 1,
+  });
   updateCoachState();
   toast(tutorialLesson.bestOfThree ? 'Best-of-three — win two rounds.' : (tutorialLesson.formal ? 'Formal duel — win the round.' : 'Draw to cast.'));
 }
@@ -951,12 +1004,22 @@ function onTutorialGuide(g) {
   } else {
     // Every instructional spell keeps a visible dotted template. Exam gauntlets
     // remain guide-free because they intentionally provide no focus spell.
-    setSpellGuide(g.spellId, { stage: 1, showGhost: false });
+    const fraction = Number(g.fraction) || 1;
+    if (fraction < 1) {
+      gesture.setGuide(guidePrefix(guideTemplateFor(g.spellId), fraction), {
+        stage: 1, showGhost: false, cues: GUIDE_CUES[g.spellId] || [],
+      });
+    } else {
+      setSpellGuide(g.spellId, { stage: 1, showGhost: false });
+    }
     const spell = SPELLS_BY_ID[g.spellId];
-    setDrawHint(`draw ${spell ? spell.name : 'spell'} — follow the dotted line`);
+    setDrawHint(fraction < 1
+      ? `secret hint — start ${spell ? spell.name : 'the glyph'} along the dotted first quarter`
+      : `draw ${spell ? spell.name : 'spell'} — follow the dotted line`);
     if (canvas) {
       canvas.dataset.guideSpell = String(g.spellId);
       canvas.dataset.guideStage = 'dotted';
+      canvas.dataset.guideFraction = String(fraction);
     }
   }
   updateCoachState();
@@ -1529,6 +1592,18 @@ function showPanel(id) {
   audio.setMusicScene(titleActive ? 'menu' : (['tutorial', 'practice', 'lab', 'online'].includes(mode) ? 'duel' : 'menu'));
 }
 
+function applyEditionUi() {
+  document.body.classList.toggle('demo-build', DEMO_BUILD);
+  $('#online-service-settings')?.classList.toggle('hidden', DEMO_BUILD);
+  if (DEMO_BUILD) {
+    $('#menu-version').textContent = `Version ${APP_VERSION} · Demo`;
+    const note = $('#panel-main .offline-note');
+    if (note) {
+      note.textContent = 'Demo edition: Tutorial, Practice vs AI, Glyph Laboratory, and all other offline features are available.';
+    }
+  }
+}
+
 document.querySelectorAll('[data-action]').forEach((btn) => {
   btn.addEventListener('click', () => {
     audio.unlock();
@@ -1537,7 +1612,14 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'lab') startLab();
     else if (a === 'practice-ai') openPractice();
     else if (a === 'start-practice') startPractice();
-    else if (a === 'online') openOnline();
+    else if (a === 'online') {
+      if (DEMO_BUILD) {
+        $('#demo-online-message').textContent = DEMO_ONLINE_MESSAGE;
+        showPanel('panel-demo-online');
+      } else {
+        openOnline();
+      }
+    }
     else if (a === 'online-quick') startOnlineAction('quick');
     else if (a === 'online-create') startOnlineAction('create');
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
@@ -1561,6 +1643,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'tut-showme') tutorialShowMe();
     else if (a === 'tut-tryagain') tutorialTryAgain();
     else if (a === 'tut-replay') replayTutorialLesson();
+    else if (a === 'secret-hints') openSecretHints();
     else if (a === 'calib-skip') skipCalibration();
     else if (a === 'save-loadout') saveLoadout();
     else if (a === 'clear-loadout') { draftIds = []; renderCatalog(); renderLoadoutState(); }
@@ -1931,6 +2014,7 @@ initPractice();
 rebuildForLoadout();
 console.log('Aetherglyph client', versionTag());
 $('#menu-version').textContent = `Version ${APP_VERSION}`;
+applyEditionUi();
 showOverlay(true);
 showPanel('panel-main');
 
@@ -1964,6 +2048,7 @@ if (typeof window !== 'undefined') {
       menuDuelActive: menuDuel.active,
       menuDuelVariety: menuDuel.castVariety().size,
       music: audio.musicState(),
+      demoBuild: DEMO_BUILD,
     }),
     recognize: (points) => {
       try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }

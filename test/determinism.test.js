@@ -91,6 +91,7 @@ export function run() {
     ok(base.hash() !== changed.hash(), `hash includes ${label}`);
   };
   assertHashChanges('focus duration', (sim) => { sim.wizards[0].focusTicks = 9; });
+  assertHashChanges('stationary Stamina timer', (sim) => { sim.wizards[0].staminaIdleTicks = 121; });
   assertHashChanges('facing direction', (sim) => { sim.wizards[0].facing = 0.42; });
   assertHashChanges('channel state', (sim) => {
     sim.wizards[0].channel = {
