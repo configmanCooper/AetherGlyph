@@ -166,7 +166,7 @@ body.title-showcase #panel-main {
   overflow: visible;
   text-align: center;
   background:
-    linear-gradient(180deg, rgba(28,19,52,0.9), rgba(9,8,23,0.9)),
+    linear-gradient(180deg, rgba(28,19,52,0.76), rgba(9,8,23,0.8)),
     repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,255,255,0.025) 39px 40px);
   border: 1px solid rgba(201,174,255,0.72);
   border-radius: 130px 130px 22px 22px / 46px 46px 22px 22px;
@@ -186,7 +186,7 @@ body.title-showcase #panel-main::after {
   height: 76%;
   z-index: -1;
   background:
-    linear-gradient(90deg, rgba(17,13,34,0.96), rgba(46,29,74,0.92));
+    linear-gradient(90deg, rgba(17,13,34,0.8), rgba(46,29,74,0.74));
   border: 1px solid rgba(167,130,235,0.55);
   box-shadow: 0 0 24px rgba(81,53,151,0.45);
 }

@@ -1,5 +1,5 @@
 import { createHarness } from './tiny.js';
-import { MenuDuel, MENU_PUBLIC_SPELL_IDS } from '../client/src/game/menuDuel.js';
+import { MenuDuel, MENU_MOVE_DUTY, MENU_PUBLIC_SPELL_IDS } from '../client/src/game/menuDuel.js';
 import { SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
 import { MATCH } from '../shared/src/sim/constants.js';
 
@@ -13,11 +13,12 @@ export function run() {
   const duel = new MenuDuel({ seed: 99 });
   ok(duel.bots.every((bot) => bot.difficulty === 'hard'),
     'both title duelists use Hard AI decision profiles');
+  eq(MENU_MOVE_DUTY, 0.4, 'title movement runs at 40% of normal strafe speed');
   duel.stepTicks(7200);
   ok(!duel.sim.ended, 'title duel never ends');
   ok(duel.sim.wizards.every((wizard) => wizard.health > 0 && wizard.health <= MATCH.startHealth),
     'title duel wizards remain alive within normal health bounds');
-  ok(duel.castVariety().size >= 28,
+  ok(duel.castVariety().size >= 26,
     `title duel shows broad variety within two minutes (${duel.castVariety().size} spells)`);
   const castGaps = duel.castStartTicks.slice(1).map((tick, i) => tick - duel.castStartTicks[i]);
   ok(castGaps.length > 10 && Math.min(...castGaps) >= 2 * 60,

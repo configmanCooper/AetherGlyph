@@ -13,6 +13,7 @@
 
 import * as THREE from 'three';
 import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
+import { MOVE } from '@shared/sim/constants.js';
 import { effectFor, PROJECTILE, CHANNEL, ZONE, SHIELD, BARRIER } from '@shared/sim/spellEffects.js';
 import { getSpellVfx, getReactionVfx } from './spellVfxProfiles.js';
 import {
@@ -963,8 +964,23 @@ export class Arena {
       && this.canvas.clientHeight <= 620;
     const enemyBaseX = landscapePhone ? -9.5 : -6.8;
     const playerBaseX = landscapePhone ? 8.5 : 4.2;
-    this.enemy.position.set(enemyBaseX + (enemy.arcPos + 0.6) * 3, 0, 0);
-    this.menuPlayer.position.set(playerBaseX + (player.arcPos - 0.6) * 3, 0, 2.2);
+    const arcOutward = landscapePhone ? 0.95 : 0.72;
+    const arcDepth = landscapePhone ? 1.8 : 1.5;
+    const halfArc = MOVE.arcHalfDeg * Math.PI / 180;
+    const playerT = Math.max(-1, Math.min(1, (player.arcPos - 0.6) / 0.32));
+    const enemyT = Math.max(-1, Math.min(1, (enemy.arcPos + 0.6) / 0.32));
+    const playerAngle = playerT * halfArc;
+    const enemyAngle = enemyT * halfArc;
+    this.enemy.position.set(
+      enemyBaseX - (1 - Math.cos(enemyAngle)) * arcOutward,
+      0,
+      Math.sin(enemyAngle) * arcDepth,
+    );
+    this.menuPlayer.position.set(
+      playerBaseX + (1 - Math.cos(playerAngle)) * arcOutward,
+      0,
+      2.2 + Math.sin(playerAngle) * arcDepth,
+    );
 
     const dx = this.menuPlayer.position.x - this.enemy.position.x;
     const dz = this.menuPlayer.position.z - this.enemy.position.z;

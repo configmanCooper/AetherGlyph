@@ -14,6 +14,7 @@ const MAX_CATCHUP = 6;
 export const MENU_PUBLIC_SPELL_IDS = SPELL_CATALOG
   .filter((spell) => !spell.secret)
   .map((spell) => spell.id);
+export const MENU_MOVE_DUTY = 0.4;
 
 function activeZone(sim, kind) {
   return sim.zones.some((zone) => zone.kind === kind && zone.ticks > 0);
@@ -92,6 +93,8 @@ export class MenuDuel {
     for (const id of [first, 1 - first]) {
       const suggested = this.bots[id].act(this.sim);
       intents[id] = this._variedIntent(id, suggested);
+      // Title movement is intentionally medium/slow: 2 of every 5 ticks.
+      if (intents[id].move && (this.sim.tick + id * 2) % 5 >= 2) intents[id].move = 0;
     }
 
     const events = this.sim.step(intents);
