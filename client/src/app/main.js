@@ -21,7 +21,7 @@ import {
   loadProfile, saveProfile, deleteProfile, completionPercent,
   setPractice, recordPracticeResult, setCalibration,
 } from '../tutorial/progress.js';
-import { SECRETS } from '../tutorial/secrets.js';
+import { SECRETS, playableSpellIds } from '../tutorial/secrets.js';
 import { Calibration } from '../tutorial/calibration.js';
 
 import { Recognizer } from '@shared/gesture/recognizer.js';
@@ -64,8 +64,8 @@ const settings = {
   orientation: storedOrientation(),
 };
 
-// Guide-set + practice state. These eight spells control the visible guide
-// shortcuts only; duel recognition always covers the full 40-spell roster.
+// Guide-set + practice state. These eight public spells control visible guide
+// shortcuts only; recognition also includes every discovered secret spell.
 let playerIds = STARTER_SPELL_IDS.slice();
 let playerLoadout = makeLoadout(playerIds);
 let recognizer = null;
@@ -252,7 +252,9 @@ const gesture = new GestureInput($('#draw-canvas'), {
 
 function rebuildForLoadout() {
   playerLoadout = makeLoadout(playerIds);
-  recognizer = new Recognizer(buildTemplates());
+  recognizer = new Recognizer(buildTemplates()).forLoadout(
+    makeLoadout(playableSpellIds(soloProfile())),
+  );
   gesture.recognizer = recognizer;
   activeGuideLoadout = playerLoadout;
   selectedGuideId = null;
@@ -329,8 +331,10 @@ function labPageIds() {
 function selectLabSpell(id) {
   labSelectedId = id;
   // A guide is visual help only. Recognition always compares against the full
-  // public laboratory catalog, exactly like Blank mode.
-  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(LAB_PUBLIC_IDS));
+  // public catalog plus every secret spell the player has discovered.
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(
+    makeLoadout(playableSpellIds(soloProfile())),
+  );
   setSpellGuide(id, { stage: 1, showGhost: false });
   setDrawHint(`draw ${SPELLS_BY_ID[id].name} — follow the dotted line`);
   const canvas = $('#draw-canvas');
@@ -343,9 +347,15 @@ function selectLabSpell(id) {
 
 function selectLabBlank() {
   labSelectedId = null;
-  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(LAB_PUBLIC_IDS));
+  const profile = soloProfile();
+  const knownSecretCount = Object.values(profile.secretsFound || {}).filter(Boolean).length;
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(
+    makeLoadout(playableSpellIds(profile)),
+  );
   gesture.setGuide(null);
-  setDrawHint('blank guide — draw any public spell from memory');
+  setDrawHint(knownSecretCount > 0
+    ? 'blank guide — draw any public or discovered secret spell from memory'
+    : 'blank guide — draw any public spell from memory');
   const canvas = $('#draw-canvas');
   if (canvas) {
     delete canvas.dataset.guideSpell;
@@ -528,8 +538,10 @@ function startPractice() {
   const oppIds = resolveOpponentPracticeIds(playerPracticeIds, seed);
   const pLoadout = makeLoadout(playerPracticeIds);
   const bLoadout = makeLoadout(oppIds);
-  // Practice recognizes the full roster; this set only controls visible guides.
-  gesture.recognizer = new Recognizer(buildTemplates());
+  // Guides remain public shortcuts; recognition also includes discovered secrets.
+  gesture.recognizer = new Recognizer(buildTemplates()).forLoadout(
+    makeLoadout(playableSpellIds(soloProfile())),
+  );
   activeGuideLoadout = pLoadout;
   selectedGuideId = practice.templates ? pLoadout[0].id : null;
   renderEquippedGuideBar();
@@ -732,7 +744,7 @@ function chapterLabel(chapter) {
 }
 
 // Build the scoped production recognizer + runner for a lesson and show its intro.
-function startTutorialLesson(lessonId) {
+function startTutorialLesson(lessonId, options = {}) {
   abandonPausedGameForNewMode();
   const lesson = CAMPAIGN_BY_ID[lessonId];
   if (!lesson) return;
@@ -744,16 +756,24 @@ function startTutorialLesson(lessonId) {
     openTutorialHub();
     return;
   }
-  tutorialLesson = lesson;
+  if (lesson.chooseGuides && !options.guidesChosen) {
+    pendingTutorialLessonId = lesson.id;
+    openLoadoutBuilder('final-duel');
+    return;
+  }
+  const runtimeLesson = lesson.chooseGuides
+    ? { ...lesson, playerLoadout: playerIds.slice() }
+    : lesson;
+  tutorialLesson = runtimeLesson;
   mode = 'tutorial';
   series = null;
-  const recognitionIds = lesson.fullRoster
-    ? SPELL_CATALOG.map((spell) => spell.id)
-    : lesson.playerLoadout;
+  const recognitionIds = runtimeLesson.fullRoster
+    ? playableSpellIds(profile)
+    : runtimeLesson.playerLoadout;
   const recognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(recognitionIds));
   gesture.recognizer = recognizer;
 
-  tutorial = new TutorialRunner(lesson, {
+  tutorial = new TutorialRunner(runtimeLesson, {
     recognizer, profile, storage: localStorage,
     reduced: settings.reduced, seed: (Date.now() & 0x7fffffff) >>> 0,
     onState: (s) => onTutorialState(s),
@@ -764,7 +784,7 @@ function startTutorialLesson(lessonId) {
     onSeriesRound: (info) => onTutorialSeriesRound(info),
   });
 
-  showLessonIntro(lesson);
+  showLessonIntro(runtimeLesson);
 }
 
 // Best-of-three round result (Academy 16 / Final Exam): update the series score
@@ -899,7 +919,17 @@ function armTutorialLesson() {
   buildCoachPanel(tutorialLesson);
   showOverlay(false);
   $('#hud').classList.remove('hidden');
-  $('#spellbar').classList.add('hidden'); // tutorial casts by drawing only
+  const showGuideShortcuts = !!tutorialLesson?.chooseGuides && !tutorialLesson?.noGuides;
+  if (showGuideShortcuts) {
+    activeGuideLoadout = makeLoadout(playerIds);
+    selectedGuideId = null;
+    renderEquippedGuideBar();
+    $('#spellbar').classList.remove('hidden');
+  } else {
+    activeGuideLoadout = [];
+    selectedGuideId = null;
+    $('#spellbar').classList.add('hidden');
+  }
   $('#devcast').classList.add('hidden');
   $('#coach').classList.remove('hidden');
   document.body.classList.add('mode-tutorial');
@@ -1189,6 +1219,8 @@ requestAnimationFrame(frame);
 
 // ------------------------------------------------------------------ loadout builder
 let draftIds = [];
+let loadoutDestination = 'practice';
+let pendingTutorialLessonId = null;
 
 // ------------------------------------------------------------------ practice vs AI
 // Fill the player + opponent selects (once) and reflect saved settings.
@@ -1280,8 +1312,21 @@ function updatePracticeSummaries() {
   }
 }
 
-function openLoadoutBuilder() {
-  draftIds = playerIds.slice();
+function openLoadoutBuilder(destination = 'practice') {
+  loadoutDestination = destination;
+  draftIds = playerIds.filter((id) => !SPELLS_BY_ID[id]?.secret).slice(0, 8);
+  const finalDuel = destination === 'final-duel';
+  const panel = $('#panel-loadout');
+  const title = panel?.querySelector('h2');
+  const rules = $('#loadout-rules');
+  const save = panel?.querySelector('[data-action="save-loadout"]');
+  if (title) title.textContent = finalDuel ? 'Final Duel Guide Shortcuts' : 'Guide Shortcuts';
+  if (rules) {
+    rules.textContent = finalDuel
+      ? 'Choose 8 public spell guides for the Final Duel. These are visual shortcuts only: every public spell and each secret spell you have discovered remains castable.'
+      : 'Choose any 8 public spell guides for quick reference. Every public spell and each secret spell you have discovered can still be drawn and cast.';
+  }
+  if (save) save.textContent = finalDuel ? 'Use guides and begin Final Duel' : 'Save guide shortcuts';
   renderPresetButtons();
   renderCatalog();
   renderLoadoutState();
@@ -1300,7 +1345,7 @@ function renderPresetButtons() {
   }
 }
 
-const CATEGORY_ORDER = ['Offensive', 'Defensive', 'Buff', 'Debuff', 'Control', 'Environmental', 'Secret'];
+const CATEGORY_ORDER = ['Offensive', 'Defensive', 'Buff', 'Debuff', 'Control', 'Environmental'];
 
 function renderCatalog() {
   const wrap = $('#loadout-catalog');
@@ -1311,10 +1356,10 @@ function renderCatalog() {
     group.innerHTML = `<h4>${cat}</h4>`;
     const row = document.createElement('div');
     row.className = 'cat-row';
-    for (const s of SPELL_CATALOG.filter((x) => x.category === cat)) {
+    for (const s of SPELL_CATALOG.filter((x) => x.category === cat && !x.secret)) {
       const chip = document.createElement('button');
       const picked = draftIds.includes(s.id);
-      chip.className = 'spell-chip' + (picked ? ' picked' : '') + (s.secret ? ' secret' : '');
+      chip.className = 'spell-chip' + (picked ? ' picked' : '');
       chip.innerHTML = `<span class="chip-name">${s.name}</span>` +
         `<span class="chip-meta">${s.school}${s.charges ? ' · ' + '#'.repeat(s.charges) : ''}</span>`;
       chip.title = s.effect;
@@ -1344,7 +1389,8 @@ function renderLoadoutState() {
   }).join('') || '<span class="muted">No spells selected.</span>';
 
   const status = $('#loadout-status');
-  let html = `<div class="ls-line">${draftIds.length}/8 guide shortcuts · all 40 spells castable</div>`;
+  const playableCount = playableSpellIds(soloProfile()).length;
+  let html = `<div class="ls-line">${draftIds.length}/8 public guide shortcuts · ${playableCount} known spells castable</div>`;
   for (const err of v.errors) html += `<div class="ls-err">✗ ${err}</div>`;
   for (const warn of v.warnings) html += `<div class="ls-warn">! ${warn}</div>`;
   if (v.valid) html += '<div class="ls-ok">✓ Guide set ready</div>';
@@ -1355,11 +1401,22 @@ function renderLoadoutState() {
 
 function saveLoadout() {
   const v = validateLoadout(draftIds);
-  if (!v.valid) { toast('Choose 8 different spell guides first.'); return; }
+  if (!v.valid || draftIds.some((id) => SPELLS_BY_ID[id]?.secret)) {
+    toast('Choose 8 different public spell guides first.');
+    return;
+  }
   playerIds = draftIds.slice();
   rebuildForLoadout();
   toast('Guide shortcuts saved.');
-  openPractice();
+  if (loadoutDestination === 'final-duel' && pendingTutorialLessonId) {
+    const lessonId = pendingTutorialLessonId;
+    pendingTutorialLessonId = null;
+    loadoutDestination = 'practice';
+    startTutorialLesson(lessonId, { guidesChosen: true });
+  } else {
+    loadoutDestination = 'practice';
+    openPractice();
+  }
 }
 
 // ------------------------------------------------------------------ online duel
@@ -1367,7 +1424,8 @@ function updateOnlineSummary() {
   const el = $('#online-loadout-summary');
   if (!el) return;
   const names = playerLoadout.map((s) => s.name).join(', ');
-  el.textContent = `Your guides: ${names}. All 40 spells remain castable.`;
+  const playableCount = playableSpellIds(soloProfile()).length;
+  el.textContent = `Your guides: ${names}. All ${playableCount} known spells remain castable.`;
 }
 
 function openOnline() {
@@ -1687,6 +1745,10 @@ function backFromSubpanel() {
     updateResumeGameButton();
     showPanel('panel-main');
     showOverlay(true);
+  } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'final-duel') {
+    pendingTutorialLessonId = null;
+    loadoutDestination = 'practice';
+    openTutorialHub();
   } else {
     returnToMainMenu();
   }
@@ -2043,6 +2105,9 @@ if (typeof window !== 'undefined') {
       labEnemy: { ...labEnemy },
       enemyCastsResolved: match?.sim?.wizards?.[1]?.castsResolved ?? 0,
       enemyArcPos: match?.sim?.wizards?.[1]?.arcPos ?? 0,
+      playerMirrorTicks: match?.sim?.wizards?.[0]?.mirrorTicks ?? 0,
+      playerMirrorPos: match?.sim?.wizards?.[0]?.mirrorPos ?? null,
+      enemyFacing: match?.sim?.wizards?.[1]?.facing ?? null,
       tutorialTick: tutorial?.sim?.tick ?? null,
       tutorialSeed: tutorial?.seed ?? null,
       menuDuelActive: menuDuel.active,
@@ -2082,6 +2147,7 @@ if (typeof window !== 'undefined') {
     spawnZone: (kind) => { try { return arena.debugSpawnZone(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     zoneBounds: (kind) => { try { return arena.debugZoneBounds(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnGuard: (kind) => { try { return arena.debugSpawnGuard(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    decoyState: () => { try { return arena.debugDecoyState(); } catch (e) { return { error: String(e && e.message || e) }; } },
     wizardState: (playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks) => {
       try { return arena.debugWizardState(playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks); }
       catch (e) { return { error: String(e && e.message || e) }; }

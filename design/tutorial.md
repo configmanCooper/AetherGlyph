@@ -217,7 +217,7 @@ Clues:
 
 Trial:
 
-- Draw the figure eight, then tap the mirrored rune before the timer ends.
+- Draw the figure eight, then move away from the roaming decoy so it can absorb the shot.
 
 ### Hourglass Field - "The sand catches hostile magic, never its keeper"
 

@@ -824,7 +824,8 @@ export const CAMPAIGN = [
   // Unlocked only after the gauntlet (10/12) and scenario (4/5) thresholds.
   {
     id: 'EXAM', chapter: 'exam', title: 'Final Duel', order: 50,
-    optional: true, formal: true, bestOfThree: true, group: 'exam-duel',
+    optional: true, formal: true, bestOfThree: true, fullRoster: true,
+    chooseGuides: true, group: 'exam-duel',
     requires: [{ group: 'exam-gauntlet', count: 10 }, { group: 'exam-scenarios', count: 4 }],
     narration: [
       'The Final Duel: a best-of-three against the fair Magus examiner.',
@@ -851,7 +852,8 @@ export const CAMPAIGN = [
   // medal/title. Never gates ranked readiness.
   {
     id: 'EXAM_GM', chapter: 'exam', title: 'Grandmaster Trial', order: 51,
-    optional: true, formal: true, bestOfThree: true, group: 'exam-grandmaster',
+    optional: true, formal: true, bestOfThree: true, fullRoster: true,
+    noGuides: true, group: 'exam-grandmaster',
     requires: [{ lesson: 'EXAM' }],
     narration: [
       'Optional mastery: a best-of-three against the fair Hard AI.',
@@ -879,7 +881,8 @@ export const CAMPAIGN = [
     optional: true, secret: 37, clue: 'mirrorEight',
     narration: [
       'Two hands write one intention. A decoy matches your next windup.',
-      'Draw Mirror Twin, then let the decoy absorb the intended shot.',
+      'The decoy travels left, then right, and enemies aim toward it.',
+      'Move away from the decoy before impact so it can absorb the intended shot.',
     ],
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [37], opponentLoadout: [1],

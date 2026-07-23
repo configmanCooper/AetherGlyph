@@ -128,6 +128,10 @@ export function run() {
   ok(CAMPAIGN_BY_ID.EXAM.bestOfThree && CAMPAIGN_BY_ID.EXAM_GM.bestOfThree, 'both duels are best-of-three');
   eq(CAMPAIGN_BY_ID.EXAM.opponent.difficulty, 'medium', 'the Final Duel faces the fair Medium AI');
   eq(CAMPAIGN_BY_ID.EXAM_GM.opponent.difficulty, 'hard', 'the Grandmaster faces the fair Hard AI');
+  ok(CAMPAIGN_BY_ID.EXAM.fullRoster && CAMPAIGN_BY_ID.EXAM.chooseGuides,
+    'the Final Duel recognizes all known spells and prompts for eight public guides');
+  ok(CAMPAIGN_BY_ID.EXAM_GM.fullRoster && CAMPAIGN_BY_ID.EXAM_GM.noGuides,
+    'the Grandmaster Trial recognizes all known spells but provides no guides');
 
   // Threshold progression: complete lessons step by step on a fresh profile.
   const prof = defaultProfile();

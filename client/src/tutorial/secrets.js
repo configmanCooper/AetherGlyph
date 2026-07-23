@@ -50,6 +50,16 @@ export function isSecretHinted(profile, spellId) {
   return !!s && s.clues.every((c) => hasClue(profile, c));
 }
 
+export function playableSpellIds(profile) {
+  const publicIds = Object.values(SPELLS_BY_ID)
+    .filter((spell) => !spell.secret)
+    .map((spell) => spell.id);
+  const discovered = SECRETS
+    .filter((secret) => isSecretFound(profile, secret.spellId))
+    .map((secret) => secret.spellId);
+  return [...publicIds, ...discovered];
+}
+
 // Apply any clues a lesson grants on completion (mutates + returns the profile).
 export function grantLessonClues(profile, lesson) {
   for (const c of (lesson && lesson.clues) || []) setClue(profile, c);

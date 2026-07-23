@@ -17,7 +17,8 @@ import { effectFor, PROJECTILE, CHANNEL, ZONE, SHIELD, BARRIER } from '@shared/s
 import { getSpellVfx, getReactionVfx } from './spellVfxProfiles.js';
 import {
   makeProjectileVfx, makeImpactVfx, makeZoneVfx, makeReleaseVfx,
-  makeWardVfx, makeDomeVfx, makeReflectGuardVfx, makeBeamVfx, makeCastCueVfx, makeReactionVfx,
+  makeWardVfx, makeDomeVfx, makeMirrorDecoyVfx, makeReflectGuardVfx,
+  makeBeamVfx, makeCastCueVfx, makeReactionVfx,
 } from './spellVfx.js';
 
 const ARC_W = 3.2;
@@ -89,6 +90,7 @@ export class Arena {
 
     // Ward / Barrier Dome visuals (spell-specific, per wizard).
     this._buildGuards();
+    this._buildDecoys();
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -99,6 +101,8 @@ export class Arena {
     // Rebuild persistent visuals so the motion setting takes effect immediately.
     this._disposeGuards();
     this._buildGuards();
+    this._disposeDecoys();
+    this._buildDecoys();
     for (const [, c] of this.castCues) { this.scene.remove(c.handle.object3D); c.handle.dispose(); }
     this.castCues.clear();
     for (const [, b] of this.beams) { this.scene.remove(b.handle.object3D); b.handle.dispose(); }
@@ -864,6 +868,23 @@ export class Arena {
     }
   }
 
+  _buildDecoys() {
+    this.pDecoy = makeMirrorDecoyVfx(this.reduced);
+    this.eDecoy = makeMirrorDecoyVfx(this.reduced);
+    this.pDecoy.object3D.visible = false;
+    this.eDecoy.object3D.visible = false;
+    this.scene.add(this.pDecoy.object3D, this.eDecoy.object3D);
+  }
+
+  _disposeDecoys() {
+    for (const decoy of [this.pDecoy, this.eDecoy]) {
+      if (decoy) {
+        this.scene.remove(decoy.object3D);
+        decoy.dispose();
+      }
+    }
+  }
+
   reset() {
     for (const [, p] of this.projMeshes) { this.scene.remove(p.handle.object3D); p.handle.dispose(); }
     this.projMeshes.clear();
@@ -877,6 +898,8 @@ export class Arena {
     this.beams.clear();
     this._updateFogVeil(0);
     if (this.blindVeil) this.blindVeil.visible = false;
+    if (this.pDecoy) this.pDecoy.object3D.visible = false;
+    if (this.eDecoy) this.eDecoy.object3D.visible = false;
     this.shake = 0;
   }
 
@@ -995,6 +1018,7 @@ export class Arena {
     this._syncCastCues(sim);
     this._syncGuards(player, PLAYER_Z);
     this._syncGuards(enemy, ENEMY_Z);
+    this._syncDecoys(player, enemy);
     this._syncBeams(sim);
     this._syncProjectiles(sim, alpha);
     this._syncZones(sim);
@@ -1205,6 +1229,7 @@ export class Arena {
     // Shields / barriers as Ward + Barrier Dome visuals.
     this._syncGuards(player, PLAYER_Z);
     this._syncGuards(enemy, ENEMY_Z);
+    this._syncDecoys(player, enemy);
 
     // Prismatic Beam channel visuals.
     this._syncBeams(sim);
@@ -1224,6 +1249,25 @@ export class Arena {
     this.keyLight.intensity += (0.6 - this.keyLight.intensity) * 0.05;
 
     this._renderScene();
+  }
+
+  _syncDecoys(player, enemy) {
+    for (const [wizard, decoy, z, otherZ] of [
+      [player, this.pDecoy, PLAYER_Z, ENEMY_Z],
+      [enemy, this.eDecoy, ENEMY_Z, PLAYER_Z],
+    ]) {
+      const active = !!wizard && wizard.mirrorTicks > 0 && Number.isFinite(wizard.mirrorPos);
+      decoy.object3D.visible = active;
+      if (!active) continue;
+      const x = wizard.mirrorPos * ARC_W;
+      decoy.object3D.position.set(x, 0, z);
+      const facingX = (Number.isFinite(wizard.facing) ? wizard.facing : 0) * ARC_W;
+      decoy.object3D.rotation.y = Math.atan2(facingX - x, otherZ - z);
+      decoy.update({
+        time: this._t,
+        strength: 1,
+      });
+    }
   }
 
   _syncGuards(w, z) {
@@ -1417,7 +1461,11 @@ export class Arena {
         const h = makeReleaseVfx(39, this.reduced);
         if (h) this._pushEffect(h, new THREE.Vector3(w ? wizardX(w) : 0, (h.anchorHeight ?? 0.9), id === 0 ? PLAYER_Z : ENEMY_Z));
       } else if (e.type === 'decoyHit') {
-        this._impactAt(5, new THREE.Vector3(0, 1.4, ENEMY_Z + 0.4));
+        const x = Number.isFinite(e.decoyPos)
+          ? e.decoyPos * ARC_W
+          : wizardX(sim.wizards[e.target] || { arcPos: 0 });
+        const z = e.target === 0 ? PLAYER_Z : ENEMY_Z;
+        this._impactAt(5, new THREE.Vector3(x, 1.4, z));
       } else if (e.type === 'shield' || e.type === 'barrier' || e.type === 'zone' || e.type === 'mirror') {
         this.keyLight.intensity = 1.2;
       } else if (e.type === 'roundEnd') {
@@ -1671,6 +1719,21 @@ export class Arena {
     while (this._debug.length >= 16) { const old = this._debug.shift(); this.scene.remove(old.handle.object3D); old.handle.dispose(); }
     this._debug.push(entry);
     return entry.kind;
+  }
+
+  debugDecoyState() {
+    return {
+      player: {
+        visible: !!this.pDecoy?.object3D.visible,
+        x: this.pDecoy?.object3D.position.x ?? null,
+        kind: this.pDecoy?.kind || null,
+      },
+      enemy: {
+        visible: !!this.eDecoy?.object3D.visible,
+        x: this.eDecoy?.object3D.position.x ?? null,
+        kind: this.eDecoy?.kind || null,
+      },
+    };
   }
 
   debugWizardState(playerStatuses = [], enemyStatuses = [], playerInvisibleTicks = 0, enemyInvisibleTicks = 0) {

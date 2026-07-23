@@ -10,7 +10,7 @@
 
 import {
   DT, TICK_HZ, MATCH, AETHER, STAMINA, SIGIL, FOCUS, SIDESTEP, BRACE, MOVE, CONTROL,
-  CAST, STATUSES, HARD_CONTROL, DISPELLABLE, ZONE, REACTION,
+  CAST, STATUSES, HARD_CONTROL, DISPELLABLE, ZONE, REACTION, MIRROR_DECOY,
 } from './constants.js';
 import { SPELLS_BY_ID } from '../balance/spellData.generated.js';
 import {
@@ -51,6 +51,8 @@ function makeWizard(id, loadout, spawnArc) {
     evadeTicks: 0,              // brief post-Blink evade window
     invisibleTicks: 0,          // post-Blink visual invisibility window
     mirrorTicks: 0,             // Mirror Twin decoy still up
+    mirrorPos: spawnArc,        // decoy position along the caster's movement arc
+    mirrorDir: 0,               // -1 toward left, +1 toward right, 0 stopped
     phoenixUsed: false,         // Phoenix save spent this round
     recoveryTicks: 0,           // post-cast / reject recovery lockout
     resonance: [],              // [{ school, ticks }]
@@ -176,10 +178,19 @@ export class Sim {
     return this.fogActive() || opponent.invisibleTicks > 0 || this.hasStatus(w, 'Blinded');
   }
 
+  targetArcPos(w) {
+    return w.mirrorTicks > 0 ? w.mirrorPos : w.arcPos;
+  }
+
+  mirrorSeparated(w) {
+    return w.mirrorTicks > 0
+      && Math.abs(w.arcPos - w.mirrorPos) > MIRROR_DECOY.touchRadius;
+  }
+
   updateFacings() {
     for (const w of this.wizards) {
       const opponent = this.opponentOf(w.id);
-      w.facing = this.visionObscured(w, opponent) ? -w.arcPos : opponent.arcPos;
+      w.facing = this.visionObscured(w, opponent) ? -w.arcPos : this.targetArcPos(opponent);
     }
   }
 
@@ -584,7 +595,9 @@ export class Sim {
       case BLINK:   this.resolveBlink(w, opp, eff, c.durationScale); break;
       case MIRROR:
         w.mirrorTicks = sToTicks(eff.durationS);
-        this.emit('mirror', { caster: w.id });
+        w.mirrorPos = w.arcPos;
+        w.mirrorDir = -1;
+        this.emit('mirror', { caster: w.id, decoyPos: w.mirrorPos });
         break;
       case PHOENIX:
         this.applyStatus(w, 'Phoenix', 1, { durationS: eff.durationS });
@@ -882,7 +895,7 @@ export class Sim {
         // Scaling by speed prevents Hourglass from granting extra tracking simply
         // because the projectile remains alive for four times as many ticks.
         const trackingStep = p.eff.homing * speed / Math.max(1, p.totalTicks || 1);
-        p.targetPos += (defender.arcPos - p.targetPos) * trackingStep;
+        p.targetPos += (this.targetArcPos(defender) - p.targetPos) * trackingStep;
       }
       const progress = 1 - Math.max(0, p.ticks) / Math.max(1, p.totalTicks || 1);
       const projectilePos = p.originPos + (p.targetPos - p.originPos) * progress;
@@ -924,15 +937,19 @@ export class Sim {
         ticks: sToTicks(eff.travelS * this.rules.projectileTravelScale),
         totalTicks: sToTicks(eff.travelS * this.rules.projectileTravelScale), quality: p.quality,
         originPos: defender.arcPos,
-        targetPos: attacker.arcPos,
+        targetPos: this.targetArcPos(attacker),
       });
       return;
     }
 
-    // Mirror Twin: a decoy soaks the first non-area shot aimed at the caster.
-    if (defender.mirrorTicks > 0 && !eff.area) {
+    // Mirror Twin only intercepts while its decoy is visibly separated from the
+    // caster. When their silhouettes overlap, the incoming shot reaches the real
+    // wizard and the decoy remains active.
+    if (this.mirrorSeparated(defender) && !eff.area) {
+      const decoyPos = defender.mirrorPos;
       defender.mirrorTicks = 0;
-      this.emit('decoyHit', { target: defender.id, spellId: p.spellId });
+      defender.mirrorDir = 0;
+      this.emit('decoyHit', { target: defender.id, spellId: p.spellId, decoyPos });
       return;
     }
 
@@ -1067,7 +1084,23 @@ export class Sim {
     if (w.deflectTicks > 0) w.deflectTicks -= 1;
     if (w.evadeTicks > 0) w.evadeTicks -= 1;
     if (w.invisibleTicks > 0) w.invisibleTicks -= 1;
-    if (w.mirrorTicks > 0) { w.mirrorTicks -= 1; if (w.mirrorTicks <= 0) this.emit('mirrorEnd', { caster: w.id }); }
+    if (w.mirrorTicks > 0) {
+      if (w.mirrorDir !== 0) {
+        w.mirrorPos += w.mirrorDir * MIRROR_DECOY.speedPerS * DT;
+        if (w.mirrorPos <= -1) {
+          w.mirrorPos = -1;
+          w.mirrorDir = 1;
+        } else if (w.mirrorPos >= 1 && w.mirrorDir > 0) {
+          w.mirrorPos = 1;
+          w.mirrorDir = 0;
+        }
+      }
+      w.mirrorTicks -= 1;
+      if (w.mirrorTicks <= 0) {
+        w.mirrorDir = 0;
+        this.emit('mirrorEnd', { caster: w.id });
+      }
+    }
     // Resonance expiry.
     w.resonance = w.resonance.filter((r) => (r.ticks -= 1) > 0);
 
@@ -1461,6 +1494,7 @@ export class Sim {
         reflectTicks: w.reflectTicks, tenacityTicks: w.tenacityTicks,
         deflectTicks: w.deflectTicks,
         evadeTicks: w.evadeTicks, invisibleTicks: w.invisibleTicks, mirrorTicks: w.mirrorTicks,
+        mirrorPos: w.mirrorPos, mirrorDir: w.mirrorDir,
         wetExposureTicks: w.wetExposureTicks,
         staminaIdleTicks: w.staminaIdleTicks,
         sidestepCharges: w.sidestepCharges, recoveryTicks: w.recoveryTicks,
@@ -1495,6 +1529,7 @@ export class Sim {
         w.channel?.staticApplied ? 1 : 0,
         w.focusing ? 1 : 0, w.focusTicks, w.braceTicks, w.reflectTicks, w.tenacityTicks,
         w.deflectTicks, w.evadeTicks, w.invisibleTicks, w.mirrorTicks,
+        q(w.mirrorPos, 1000), w.mirrorDir,
         w.wetExposureTicks, w.staminaIdleTicks,
         w.shield ? q(w.shield.absorb, 100) : 0, w.shield ? w.shield.ticks : 0,
         w.barrier ? q(w.barrier.absorb, 100) : 0, w.barrier ? w.barrier.ticks : 0,

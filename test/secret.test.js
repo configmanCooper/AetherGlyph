@@ -3,10 +3,14 @@
 
 import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
-import { spellWithGesture } from '../shared/src/balance/loadouts.js';
+import { makeLoadout, spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
 import { effectFor } from '../shared/src/sim/spellEffects.js';
 import { TICK_HZ, ZONE, MOVE } from '../shared/src/sim/constants.js';
+import { Recognizer } from '../shared/src/gesture/recognizer.js';
+import { buildTemplates, GESTURE_TEMPLATES } from '../shared/src/gesture/templates.js';
+import { defaultProfile, discoverSecret } from '../client/src/tutorial/progress.js';
+import { playableSpellIds } from '../client/src/tutorial/secrets.js';
 
 function mk(ids0, ids1 = [1]) {
   const sim = new Sim({ seed: 8, loadouts: [ids0.map(spellWithGesture), ids1.map(spellWithGesture)] });
@@ -32,14 +36,91 @@ export function run() {
     ok(!!effectFor(id), `${SPELLS_BY_ID[id].name} has an authored effect`);
   }
 
-  // Mirror Twin (37): a decoy eats the first non-area projectile aimed at caster.
+  const unknownProfile = defaultProfile();
+  const unknownIds = playableSpellIds(unknownProfile);
+  eq(unknownIds.length, 36, 'undiscovered secret spells are excluded from normal recognition');
+  ok(!unknownIds.some((id) => id >= 37), 'no secret spell is playable before discovery');
+  discoverSecret(unknownProfile, 37);
+  const knownIds = playableSpellIds(unknownProfile);
+  ok(knownIds.includes(37) && knownIds.length === 37,
+    'discovering Mirror Twin adds it to the normal playable spell pool');
+  const knownRecognizer = new Recognizer(buildTemplates()).forLoadout(makeLoadout(knownIds));
+  const mirrorGlyph = knownRecognizer.recognize(GESTURE_TEMPLATES.eightTap[0]);
+  ok(mirrorGlyph.accepted && mirrorGlyph.spellId === 37,
+    'a discovered secret glyph is recognized outside its tutorial trial');
+
+  // Mirror Twin (37): a moving decoy becomes the enemy's target.
   let sim = mk([37], [1]);
-  resolveCastOf(sim, 37, 0, 90);       // caster raises a decoy
-  ok(sim.wizards[0].mirrorTicks > 0, 'Mirror Twin puts up a decoy');
+  sim.step({ 0: { cast: 37, castQuality: 1 }, 1: {} });
+  for (let i = 0; i < 120 && sim.wizards[0].mirrorTicks <= 0; i++) {
+    sim.step({ 0: {}, 1: {} });
+  }
+  const mirrorCaster = sim.wizards[0];
+  ok(mirrorCaster.mirrorTicks > 0, 'Mirror Twin puts up a decoy');
+  near(mirrorCaster.mirrorPos, mirrorCaster.arcPos, 1e-9,
+    'Mirror Twin starts directly on its caster');
+  eq(mirrorCaster.mirrorDir, -1, 'Mirror Twin starts moving toward the left edge');
+  sim.updateFacings();
+  near(sim.wizards[1].facing, mirrorCaster.mirrorPos, 1e-9,
+    'the enemy faces the active decoy instead of its caster');
+
+  let mirrorMin = mirrorCaster.mirrorPos;
+  let mirrorMax = mirrorCaster.mirrorPos;
+  let crossedCaster = false;
+  let previousMirrorPos = mirrorCaster.mirrorPos;
+  while (mirrorCaster.mirrorTicks > 0 && !sim.ended) {
+    sim.step({ 0: {}, 1: {} });
+    mirrorMin = Math.min(mirrorMin, mirrorCaster.mirrorPos);
+    mirrorMax = Math.max(mirrorMax, mirrorCaster.mirrorPos);
+    if (previousMirrorPos < mirrorCaster.arcPos && mirrorCaster.mirrorPos >= mirrorCaster.arcPos) {
+      crossedCaster = true;
+    }
+    previousMirrorPos = mirrorCaster.mirrorPos;
+  }
+  ok(mirrorMin <= -0.999, 'Mirror Twin reaches the far-left edge');
+  ok(mirrorMax >= 0.999, 'Mirror Twin reverses and reaches the far-right edge');
+  ok(crossedCaster, 'Mirror Twin passes through its caster while crossing the arc');
+
+  sim = mk([37], [1]);
+  resolveCastOf(sim, 37, 0, 110);
+  ok(sim.mirrorSeparated(sim.wizards[0]), 'Mirror Twin separates from its caster before intercepting');
   const hpBefore = sim.wizards[0].health;
-  resolveCastOf(sim, 1, 1, 60);        // opponent fires Ember Bolt at the caster
+  resolveCastOf(sim, 1, 1, 60);
   eq(sim.wizards[0].health, hpBefore, 'decoy soaks the first shot (no damage)');
   ok(sim.wizards[0].mirrorTicks === 0, 'decoy is consumed after eating a shot');
+
+  sim = mk([37], [1]);
+  sim.wizards[0].mirrorTicks = 120;
+  sim.wizards[0].mirrorPos = sim.wizards[0].arcPos;
+  sim.wizards[0].mirrorDir = -1;
+  const touchingHp = sim.wizards[0].health;
+  sim.resolveProjectile({
+    id: 901, owner: 1, spellId: 1, eff: effectFor(1), quality: 1,
+    ticks: 0, totalTicks: 1, originPos: 0, targetPos: sim.wizards[0].arcPos,
+  }, sim.wizards[0]);
+  ok(sim.wizards[0].health < touchingHp,
+    'a decoy touching its caster does not absorb the incoming blow');
+  ok(sim.wizards[0].mirrorTicks > 0,
+    'a touching decoy remains active when the real wizard is hit');
+
+  sim = mk([37], [5]);
+  sim.wizards[0].mirrorTicks = 120;
+  sim.wizards[0].mirrorPos = -0.65;
+  sim.wizards[0].mirrorDir = 1;
+  sim.wizards[0].arcPos = 0.65;
+  sim.wizards[1].arcPos = 0;
+  sim.updateFacings();
+  near(sim.wizards[1].facing, -0.65, 1e-9, 'enemy facing locks onto the moving decoy');
+  sim.projectiles = [{
+    id: 902, owner: 1, spellId: 5, eff: effectFor(5), quality: 1,
+    ticks: 100, totalTicks: 100, originPos: 0, targetPos: 0,
+  }];
+  sim.advanceProjectiles();
+  ok(sim.projectiles[0].targetPos < 0,
+    'homing projectiles bend toward the decoy rather than the real wizard');
+  const mirrorSnapshot = sim.snapshot().wizards[0];
+  eq(mirrorSnapshot.mirrorPos, sim.wizards[0].mirrorPos, 'snapshot includes Mirror Twin position');
+  eq(mirrorSnapshot.mirrorDir, sim.wizards[0].mirrorDir, 'snapshot includes Mirror Twin direction');
 
   // Hourglass Field (38): slows only hostile projectiles by 75%.
   sim = mk([38, 1], [1]);

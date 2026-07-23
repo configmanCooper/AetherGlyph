@@ -139,6 +139,11 @@ export const ZONE = {
   },
 };
 
+export const MIRROR_DECOY = {
+  speedPerS: 0.34,
+  touchRadius: 0.14,
+};
+
 // --- Environmental reaction rules (environment-matrix.md) ----------------
 export const REACTION = {
   cooldownS: 1.0,          // same reaction cannot trigger more than once/sec

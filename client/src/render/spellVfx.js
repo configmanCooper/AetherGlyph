@@ -844,6 +844,28 @@ export function makeDomeVfx(reduced) {
   };
 }
 
+export function makeMirrorDecoyVfx(reduced) {
+  const c = VFX_SCHOOL_PALETTE.Arcane;
+  const g = new THREE.Group();
+  const figure = decoyFigure(c.glow, 0.38);
+  const shimmer = glow(0.72, c.core, 0.14);
+  shimmer.position.y = 1.15;
+  g.add(figure, shimmer);
+  markSpellVfx(g);
+  return {
+    object3D: g, kind: 'mirrorDecoy', family: 'mirror',
+    update(ctx) {
+      const pulse = reduced ? 1 : (0.72 + Math.sin((ctx.time || 0) * 5) * 0.18);
+      figure.traverse((part) => {
+        if (part.material) part.material.opacity = 0.38 * pulse;
+      });
+      shimmer.material.opacity = 0.1 + pulse * 0.08;
+      if (!reduced) figure.position.y = Math.sin((ctx.time || 0) * 2.2) * 0.05;
+    },
+    dispose() { disposeTree(g); },
+  };
+}
+
 // Persistent Reflect state visual — the standing counterpart to Ward, shown for
 // the whole 3.6s Reflect window (both duelists) and hidden the instant a
 // projectile consumes it. Deliberately DISTINCT from Ward's flat Arcane rune

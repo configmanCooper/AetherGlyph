@@ -22,7 +22,8 @@ function neutralWizard(id) {
     arcPos: id === 0 ? -0.35 : 0.35, facing: id === 0 ? 0.35 : -0.35,
     casting: null, channel: null, focusing: false, focusTicks: 0, braceTicks: 0,
     shield: null, barrier: null, reflectTicks: 0, tenacityTicks: 0, evadeTicks: 0, invisibleTicks: 0,
-    mirrorTicks: 0, sidestepCharges: 2, recoveryTicks: 0,
+    mirrorTicks: 0, mirrorPos: id === 0 ? -0.35 : 0.35, mirrorDir: 0,
+    sidestepCharges: 2, recoveryTicks: 0,
     statuses: {}, cooldowns: {}, resonance: [], damageDealt: 0, castsResolved: 0,
   };
 }

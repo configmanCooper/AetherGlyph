@@ -7,7 +7,7 @@ The separate free, offline-only Google Play demo is built with
 
 ## Project status
 
-**Version 1.7.6 — feature complete.** The castle-styled title page now stages an
+**Version 1.7.7 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
@@ -148,8 +148,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10706 /
-versionName 1.7.6). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10707 /
+versionName 1.7.7). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -208,9 +208,10 @@ Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT
   coaching), **Glyph Laboratory** (free draw + recognizer diagnostics, no
   opponent), **Online Duel** (best-of-three vs another device: Quick Match, Create
   Private Duel, or Join Code).
-- **Guide shortcuts**: pick any eight dotted guides from all 40 spells or use an archetype preset (Ember Rush,
+- **Guide shortcuts**: pick any eight public dotted guides or use an archetype preset (Ember Rush,
   Tide Control, Storm Tempo, Stone Warden, Gale Trickster, Arcane Combo, Umbra
-  Attrition, Prismatic Hybrid). These shortcuts never limit casting.
+  Attrition, Prismatic Hybrid). These shortcuts never limit casting; discovered
+  secret spells remain castable from memory but never receive guides.
 - In an offline duel, cast by drawing or by tapping the on-screen cast bar; the
   arena shows environmental zones and both wizards' statuses. **Online duels are
   draw-only** — the server reclassifies every gesture and is authoritative.
@@ -292,7 +293,9 @@ Phase 1 basic modes (Tutorial, Practice, starter smoke path) intact.
   Tenacity on hard-control reactions, and no recursive chains are enforced.
 - **Statuses & buffs for real play.** Soaked, Static, Sundered, Weakened, Marked,
   Rooted, Frozen, Stunned, Sloth, Haste, Aether Surge, Attunement, Grounding,
-  Veil, Blinded, Phoenix protection, Hourglass hostile-projectile slow, and the Mirror decoy
+  Veil, Blinded, Phoenix protection, Hourglass hostile-projectile slow, and the
+  roaming Mirror decoy that redirects enemy facing/homing and intercepts only
+  while separated from its caster
   are all simulated.
 - **Guide shortcut builder.** `validateLoadout` requires eight distinct known
   spells only. Point, heavy, school, and defensive-coverage restrictions no
@@ -400,7 +403,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10706` / `versionName 1.7.6`, no cleartext production traffic,
+  `versionCode 10707` / `versionName 1.7.7`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.

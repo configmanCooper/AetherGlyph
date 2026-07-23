@@ -34,8 +34,8 @@ changed to paid.) No ads. No in-app purchases.
 | --- | --- |
 | App id | `com.configmancooper.aetherglyph` |
 | App name | Aetherglyph: Arcane Duels |
-| Version code | `10706` |
-| Version name | `1.7.6` |
+| Version code | `10707` |
+| Version name | `1.7.7` |
 | Minimum Android | 7.0 / API 24 |
 | Target / compile Android | API 36 |
 | Orientation | User-selectable: Auto rotate, Portrait, or Landscape |
