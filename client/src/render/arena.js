@@ -13,7 +13,6 @@
 
 import * as THREE from 'three';
 import { SPELLS_BY_ID } from '@shared/balance/spellData.generated.js';
-import { MOVE } from '@shared/sim/constants.js';
 import { effectFor, PROJECTILE, CHANNEL, ZONE, SHIELD, BARRIER } from '@shared/sim/spellEffects.js';
 import { getSpellVfx, getReactionVfx } from './spellVfxProfiles.js';
 import {
@@ -26,6 +25,8 @@ const SEP = 11;
 const PLAYER_Z = SEP / 2;
 const ENEMY_Z = -SEP / 2;
 const MAX_EFFECTS = 26; // hard cap on live transient effects (impacts + releases)
+const SHOWCASE_ORBIT_SECONDS = 120;
+const SHOWCASE_ORBIT_RADIUS = 14;
 
 const SCHOOL_COLOR = {
   Ember: 0xff6a3d, Tide: 0x54c8ff, Storm: 0xffe14d, Stone: 0xb08a5a,
@@ -85,6 +86,7 @@ export class Arena {
     this.castCues = new Map();   // caster id -> { handle, spellId }
     this.beams = new Map();      // caster id -> { handle, spellId }
     this._t = 0;                 // seconds accumulator for animation
+    this._showcaseOrbitT = 0;
     this.shake = 0;
     this._debug = [];            // dev-only VFX gallery objects (never in normal play)
 
@@ -426,6 +428,7 @@ export class Arena {
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.02;
     this.scene.add(ring);
+    this._platformRing = ring;
 
     // Inlaid courtyard sigil-ring on the dueling floor for academy flavour.
     const inlay = new THREE.Mesh(
@@ -434,6 +437,7 @@ export class Arena {
     );
     inlay.rotation.x = -Math.PI / 2; inlay.position.y = 0.015;
     this.scene.add(inlay);
+    this._platformInlay = inlay;
 
     // Three destructible waist-high focus stones across the middle.
     this.stones = [];
@@ -898,6 +902,7 @@ export class Arena {
     this.enemy.position.z = ENEMY_Z;
     this.camera.position.y = 1.7;
     this.camera.position.z = PLAYER_Z;
+    this._setTitleArenaScale(1);
     this._idleT = (this._idleT || 0) + dtMs * 0.0002;
     this.camera.position.x = Math.sin(this._idleT) * 1.2;
     this.camera.lookAt(0, 1.5, ENEMY_Z);
@@ -949,9 +954,23 @@ export class Arena {
     ud.anim.breath = +breath.toFixed(3);
   }
 
+  showcaseArcPosition(wizardId, arcPos, landscapePhone = false) {
+    const arcRadius = landscapePhone ? 6 : 5.6;
+    const enemyOffset = landscapePhone ? 8 : 3.5;
+    const playerOffset = landscapePhone ? 7.5 : 4;
+    const halfArc = (landscapePhone ? 65 : 70) * Math.PI / 180;
+    const midpoint = wizardId === 0 ? 0.6 : -0.6;
+    const t = Math.max(-1, Math.min(1, (arcPos - midpoint) / 0.32));
+    const angle = t * halfArc;
+    return wizardId === 0
+      ? { x: playerOffset + Math.cos(angle) * arcRadius, z: Math.sin(angle) * arcRadius }
+      : { x: -enemyOffset - Math.cos(angle) * arcRadius, z: Math.sin(angle) * arcRadius };
+  }
+
   updateShowcase(sim, alpha, dtMs) {
     this._showcaseMode = true;
     this._t += dtMs * 0.001;
+    if (!this.reduced) this._showcaseOrbitT += dtMs * 0.001;
     const player = sim.wizards[0];
     const enemy = sim.wizards[1];
     this._lastPlayer = player;
@@ -962,25 +981,12 @@ export class Arena {
     this.menuPlayer.visible = player.invisibleTicks <= 0;
     const landscapePhone = this.canvas.clientWidth > this.canvas.clientHeight
       && this.canvas.clientHeight <= 620;
-    const enemyBaseX = landscapePhone ? -9.5 : -6.8;
-    const playerBaseX = landscapePhone ? 8.5 : 4.2;
-    const arcOutward = landscapePhone ? 0.95 : 0.72;
-    const arcDepth = landscapePhone ? 1.8 : 1.5;
-    const halfArc = MOVE.arcHalfDeg * Math.PI / 180;
-    const playerT = Math.max(-1, Math.min(1, (player.arcPos - 0.6) / 0.32));
-    const enemyT = Math.max(-1, Math.min(1, (enemy.arcPos + 0.6) / 0.32));
-    const playerAngle = playerT * halfArc;
-    const enemyAngle = enemyT * halfArc;
-    this.enemy.position.set(
-      enemyBaseX - (1 - Math.cos(enemyAngle)) * arcOutward,
-      0,
-      Math.sin(enemyAngle) * arcDepth,
-    );
-    this.menuPlayer.position.set(
-      playerBaseX + (1 - Math.cos(playerAngle)) * arcOutward,
-      0,
-      2.2 + Math.sin(playerAngle) * arcDepth,
-    );
+    const titleArenaScale = landscapePhone ? 2 : 1;
+    this._setTitleArenaScale(titleArenaScale);
+    const enemyArc = this.showcaseArcPosition(1, enemy.arcPos, landscapePhone);
+    const playerArc = this.showcaseArcPosition(0, player.arcPos, landscapePhone);
+    this.enemy.position.set(enemyArc.x, 0, enemyArc.z);
+    this.menuPlayer.position.set(playerArc.x, 0, playerArc.z);
 
     const dx = this.menuPlayer.position.x - this.enemy.position.x;
     const dz = this.menuPlayer.position.z - this.enemy.position.z;
@@ -989,7 +995,9 @@ export class Arena {
     this._animateShowcaseFigure(this.enemy, enemy, dtMs, 0.5, -1);
     this._animateShowcaseFigure(this.menuPlayer, player, dtMs, 2.1, 1);
 
-    this.camera.position.set(0, 3.8, 14);
+    const orbit = this.showcaseOrbitPosition(this._showcaseOrbitT);
+    const cameraScale = landscapePhone ? 1.3 : 1;
+    this.camera.position.set(orbit.x * cameraScale, 3.8, orbit.z * cameraScale);
     this.camera.lookAt(-0.4, 1.45, 0);
     this._syncCastCues(sim);
     this._syncGuards(player, PLAYER_Z);
@@ -1021,6 +1029,23 @@ export class Arena {
       enemyZ: this.enemy?.position.z ?? 0,
       playerScreenX: screenX(this.menuPlayer),
       enemyScreenX: screenX(this.enemy),
+      platformScaleX: this._platform?.scale.x ?? 1,
+      cameraRadius: Math.hypot(this.camera.position.x, this.camera.position.z),
+    };
+  }
+
+  _setTitleArenaScale(scaleX) {
+    const x = Math.max(1, Number(scaleX) || 1);
+    for (const object of [this._platform, this._platformRing, this._platformInlay]) {
+      if (object) object.scale.x = x;
+    }
+  }
+
+  showcaseOrbitPosition(timeS) {
+    const angle = ((Number(timeS) || 0) / SHOWCASE_ORBIT_SECONDS) * Math.PI * 2;
+    return {
+      x: Math.sin(angle) * SHOWCASE_ORBIT_RADIUS,
+      z: Math.cos(angle) * SHOWCASE_ORBIT_RADIUS,
     };
   }
 
@@ -1145,6 +1170,7 @@ export class Arena {
     this.enemy.rotation.y = 0;
     this.enemy.position.z = ENEMY_Z;
     this.camera.position.z = PLAYER_Z;
+    this._setTitleArenaScale(1);
     this._syncWizardVisibility(player, enemy);
 
     // Camera follows the player's strafe position; opponent under soft lock.

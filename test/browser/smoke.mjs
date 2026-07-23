@@ -100,10 +100,12 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.7\.1/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.7\.2/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
+      || titleState.showcase.platformScaleX < 1.95
+      || titleState.showcase.cameraRadius < 18
       || !(titleState.showcase.enemyX < titleState.showcase.playerX)
       || !(titleState.showcase.enemyZ < titleState.showcase.playerZ)) {
     fail('title showcase is incomplete: ' + JSON.stringify(titleState));
