@@ -2019,7 +2019,6 @@ if (typeof window !== 'undefined') {
     coverage: () => { try { return vfxFamilyCoverage(); } catch { return ['error']; } },
     academy: () => { try { return arena.academyStats(); } catch (e) { return { error: String(e && e.message || e) }; } },
     showcase: () => { try { return arena.showcaseStats(); } catch (e) { return { error: String(e && e.message || e) }; } },
-    showcaseOrbit: (seconds) => { try { return arena.showcaseOrbitPosition(Number(seconds)); } catch (e) { return { error: String(e && e.message || e) }; } },
     showcaseArc: (wizardId, arcPos, landscapePhone = false) => {
       try { return arena.showcaseArcPosition(Number(wizardId), Number(arcPos), !!landscapePhone); }
       catch (e) { return { error: String(e && e.message || e) }; }

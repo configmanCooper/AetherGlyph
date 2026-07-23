@@ -25,8 +25,6 @@ const SEP = 11;
 const PLAYER_Z = SEP / 2;
 const ENEMY_Z = -SEP / 2;
 const MAX_EFFECTS = 26; // hard cap on live transient effects (impacts + releases)
-const SHOWCASE_ORBIT_SECONDS = 120;
-const SHOWCASE_ORBIT_RADIUS = 14;
 
 const SCHOOL_COLOR = {
   Ember: 0xff6a3d, Tide: 0x54c8ff, Storm: 0xffe14d, Stone: 0xb08a5a,
@@ -86,7 +84,6 @@ export class Arena {
     this.castCues = new Map();   // caster id -> { handle, spellId }
     this.beams = new Map();      // caster id -> { handle, spellId }
     this._t = 0;                 // seconds accumulator for animation
-    this._showcaseOrbitT = 0;
     this.shake = 0;
     this._debug = [];            // dev-only VFX gallery objects (never in normal play)
 
@@ -955,22 +952,20 @@ export class Arena {
   }
 
   showcaseArcPosition(wizardId, arcPos, landscapePhone = false) {
-    const arcRadius = landscapePhone ? 6 : 5.6;
-    const enemyOffset = landscapePhone ? 8 : 3.5;
-    const playerOffset = landscapePhone ? 7.5 : 4;
-    const halfArc = (landscapePhone ? 65 : 70) * Math.PI / 180;
+    const arcRadiusX = landscapePhone ? 14.2 : 7.1;
+    const arcRadiusZ = landscapePhone ? 6.5 : 7.1;
+    const halfArc = (landscapePhone ? 55 : 60) * Math.PI / 180;
     const midpoint = wizardId === 0 ? 0.6 : -0.6;
     const t = Math.max(-1, Math.min(1, (arcPos - midpoint) / 0.32));
     const angle = t * halfArc;
     return wizardId === 0
-      ? { x: playerOffset + Math.cos(angle) * arcRadius, z: Math.sin(angle) * arcRadius }
-      : { x: -enemyOffset - Math.cos(angle) * arcRadius, z: Math.sin(angle) * arcRadius };
+      ? { x: Math.cos(angle) * arcRadiusX, z: Math.sin(angle) * arcRadiusZ }
+      : { x: -Math.cos(angle) * arcRadiusX, z: Math.sin(angle) * arcRadiusZ };
   }
 
   updateShowcase(sim, alpha, dtMs) {
     this._showcaseMode = true;
     this._t += dtMs * 0.001;
-    if (!this.reduced) this._showcaseOrbitT += dtMs * 0.001;
     const player = sim.wizards[0];
     const enemy = sim.wizards[1];
     this._lastPlayer = player;
@@ -995,9 +990,7 @@ export class Arena {
     this._animateShowcaseFigure(this.enemy, enemy, dtMs, 0.5, -1);
     this._animateShowcaseFigure(this.menuPlayer, player, dtMs, 2.1, 1);
 
-    const orbit = this.showcaseOrbitPosition(this._showcaseOrbitT);
-    const cameraScale = landscapePhone ? 1.3 : 1;
-    this.camera.position.set(orbit.x * cameraScale, 3.8, orbit.z * cameraScale);
+    this.camera.position.set(0, 3.8, landscapePhone ? 18.2 : 14);
     this.camera.lookAt(-0.4, 1.45, 0);
     this._syncCastCues(sim);
     this._syncGuards(player, PLAYER_Z);
@@ -1031,6 +1024,8 @@ export class Arena {
       enemyScreenX: screenX(this.enemy),
       platformScaleX: this._platform?.scale.x ?? 1,
       cameraRadius: Math.hypot(this.camera.position.x, this.camera.position.z),
+      cameraX: this.camera.position.x,
+      cameraZ: this.camera.position.z,
     };
   }
 
@@ -1039,14 +1034,6 @@ export class Arena {
     for (const object of [this._platform, this._platformRing, this._platformInlay]) {
       if (object) object.scale.x = x;
     }
-  }
-
-  showcaseOrbitPosition(timeS) {
-    const angle = ((Number(timeS) || 0) / SHOWCASE_ORBIT_SECONDS) * Math.PI * 2;
-    return {
-      x: Math.sin(angle) * SHOWCASE_ORBIT_RADIUS,
-      z: Math.cos(angle) * SHOWCASE_ORBIT_RADIUS,
-    };
   }
 
   viewStats() {
