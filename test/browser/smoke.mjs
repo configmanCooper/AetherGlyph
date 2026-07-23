@@ -100,13 +100,23 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.7\.0/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.7\.1/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
       || !(titleState.showcase.enemyX < titleState.showcase.playerX)
       || !(titleState.showcase.enemyZ < titleState.showcase.playerZ)) {
     fail('title showcase is incomplete: ' + JSON.stringify(titleState));
+  }
+  const titlePanelBounds = await page.evaluate(() => {
+    const rect = document.querySelector('#panel-main').getBoundingClientRect();
+    return { left: rect.left, right: rect.right };
+  });
+  if (!(titleState.showcase.enemyScreenX < titlePanelBounds.left
+      && titleState.showcase.playerScreenX > titlePanelBounds.right)) {
+    fail('landscape title wizards are covered by the menu: ' + JSON.stringify({
+      panel: titlePanelBounds, showcase: titleState.showcase,
+    }));
   }
 
   // Public spell roster is an in-game reference, not a raw CSV. It contains all

@@ -959,8 +959,12 @@ export class Arena {
     this.handRig.visible = false;
     this.enemy.visible = enemy.invisibleTicks <= 0;
     this.menuPlayer.visible = player.invisibleTicks <= 0;
-    this.enemy.position.set(-8, 0, 0);
-    this.menuPlayer.position.set(5, 0, 2.2);
+    const landscapePhone = this.canvas.clientWidth > this.canvas.clientHeight
+      && this.canvas.clientHeight <= 620;
+    const enemyBaseX = landscapePhone ? -9.5 : -6.8;
+    const playerBaseX = landscapePhone ? 8.5 : 4.2;
+    this.enemy.position.set(enemyBaseX + (enemy.arcPos + 0.6) * 3, 0, 0);
+    this.menuPlayer.position.set(playerBaseX + (player.arcPos - 0.6) * 3, 0, 2.2);
 
     const dx = this.menuPlayer.position.x - this.enemy.position.x;
     const dz = this.menuPlayer.position.z - this.enemy.position.z;
@@ -986,6 +990,11 @@ export class Arena {
   }
 
   showcaseStats() {
+    const screenX = (figure) => {
+      if (!figure || !this.canvas.clientWidth) return null;
+      const projected = figure.getWorldPosition(new THREE.Vector3()).project(this.camera);
+      return (projected.x + 1) * 0.5 * this.canvas.clientWidth;
+    };
     return {
       playerVisible: !!this.menuPlayer?.visible,
       enemyVisible: !!this.enemy?.visible,
@@ -994,6 +1003,8 @@ export class Arena {
       enemyX: this.enemy?.position.x ?? 0,
       playerZ: this.menuPlayer?.position.z ?? 0,
       enemyZ: this.enemy?.position.z ?? 0,
+      playerScreenX: screenX(this.menuPlayer),
+      enemyScreenX: screenX(this.enemy),
     };
   }
 

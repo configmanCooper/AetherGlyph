@@ -56,6 +56,13 @@ export class MenuDuel {
     this.castCounts = [new Map(), new Map()];
     this.lastCastTick = [new Map(), new Map()];
     this.nextShowcaseCast = [0, 45];
+    this.nextGlobalCastTick = 0;
+    this.castIntentReserved = false;
+    this.castStartTicks = [];
+    this.arcRanges = [
+      { min: this.sim.wizards[0].arcPos, max: this.sim.wizards[0].arcPos },
+      { min: this.sim.wizards[1].arcPos, max: this.sim.wizards[1].arcPos },
+    ];
   }
 
   setActive(active) {
@@ -80,7 +87,9 @@ export class MenuDuel {
 
   _step() {
     const intents = {};
-    for (let id = 0; id < 2; id++) {
+    this.castIntentReserved = false;
+    const first = this.sim.tick % 2;
+    for (const id of [first, 1 - first]) {
       const suggested = this.bots[id].act(this.sim);
       intents[id] = this._variedIntent(id, suggested);
     }
@@ -93,18 +102,30 @@ export class MenuDuel {
         this.lastCastTick[event.caster].set(event.spellId, this.sim.tick);
         this.nextShowcaseCast[event.caster] = this.sim.tick + 75;
       }
+      if (event.type === 'castStart') this.castStartTicks.push(this.sim.tick);
       this.events.push(event);
     }
 
     // Keep the back wizard left and the player-side wizard right.
     this.sim.wizards[0].arcPos = Math.max(0.28, Math.min(0.92, this.sim.wizards[0].arcPos));
     this.sim.wizards[1].arcPos = Math.max(-0.92, Math.min(-0.28, this.sim.wizards[1].arcPos));
+    for (let id = 0; id < 2; id++) {
+      this.arcRanges[id].min = Math.min(this.arcRanges[id].min, this.sim.wizards[id].arcPos);
+      this.arcRanges[id].max = Math.max(this.arcRanges[id].max, this.sim.wizards[id].arcPos);
+    }
   }
 
   _variedIntent(id, suggested) {
     const wizard = this.sim.wizards[id];
     if (!this.sim.canAct(wizard) || wizard.casting || wizard.channel || wizard.recoveryTicks > 0) {
       return suggested;
+    }
+    if (this.castIntentReserved || this.sim.tick < this.nextGlobalCastTick) {
+      const movementOnly = { ...suggested };
+      delete movementOnly.cast;
+      delete movementOnly.castQuality;
+      delete movementOnly.castReject;
+      return movementOnly;
     }
     const shouldShowcase = suggested.cast != null || this.sim.tick >= this.nextShowcaseCast[id];
     if (!shouldShowcase) return suggested;
@@ -115,7 +136,12 @@ export class MenuDuel {
     delete base.cast;
     delete base.castQuality;
     delete base.castReject;
-    return this.bots[id]._commitCast(selected, base);
+    const committed = this.bots[id]._commitCast(selected, base);
+    if (committed.cast != null || committed.castReject != null) {
+      this.castIntentReserved = true;
+      this.nextGlobalCastTick = this.sim.tick + this.rng.int(2 * TICK_HZ, 3 * TICK_HZ);
+    }
+    return committed;
   }
 
   _chooseSpell(id, suggestedId) {
@@ -140,8 +166,8 @@ export class MenuDuel {
       const category = categoryOf(effect);
       const uses = this.castCounts[id].get(spell.id) || 0;
       const last = this.lastCastTick[id].get(spell.id) ?? -10000;
-      let score = 100 - uses * 24 + Math.min(45, (this.sim.tick - last) * 0.04);
-      if (spell.id === suggestedId) score += 34;
+      let score = 100 - uses * 60 + Math.min(45, (this.sim.tick - last) * 0.04);
+      if (spell.id === suggestedId) score += 20;
       if (category === 'defense') score += incoming ? 55 : -12;
       if (effect.type === DISPEL) score += harmfulStatusCount(wizard) ? 70 : -50;
       if (effect.type === BARRIER && incoming) score += 25;

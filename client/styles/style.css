@@ -155,7 +155,11 @@ body.title-showcase .overlay {
     linear-gradient(180deg, rgba(3,3,12,0.08), rgba(5,3,13,0.42));
 }
 body.title-showcase #panel-main {
-  position: relative;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
   width: min(360px, 88vw);
   max-height: 94vh;
   padding: 30px 28px 22px;

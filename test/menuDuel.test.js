@@ -13,12 +13,20 @@ export function run() {
   const duel = new MenuDuel({ seed: 99 });
   ok(duel.bots.every((bot) => bot.difficulty === 'hard'),
     'both title duelists use Hard AI decision profiles');
-  duel.stepTicks(3600);
+  duel.stepTicks(7200);
   ok(!duel.sim.ended, 'title duel never ends');
   ok(duel.sim.wizards.every((wizard) => wizard.health > 0 && wizard.health <= MATCH.startHealth),
     'title duel wizards remain alive within normal health bounds');
+  ok(duel.castVariety().size >= 28,
+    `title duel shows broad variety within two minutes (${duel.castVariety().size} spells)`);
+  const castGaps = duel.castStartTicks.slice(1).map((tick, i) => tick - duel.castStartTicks[i]);
+  ok(castGaps.length > 10 && Math.min(...castGaps) >= 2 * 60,
+    `title duel waits at least two seconds between spell starts (${Math.min(...castGaps)} ticks)`);
+  ok(duel.arcRanges.every((range) => range.max - range.min >= 0.2),
+    'both title wizards visibly move around within their side of the arena');
+  duel.stepTicks(7200);
   eq(duel.castVariety().size, 36,
-    'title duel cycles through every public spell within one minute');
+    'title duel eventually cycles through every public spell');
   ok(duel.sim.wizards[0].arcPos > 0 && duel.sim.wizards[1].arcPos < 0,
     'title duel keeps the player-side wizard right and back wizard left');
 
