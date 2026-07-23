@@ -34,6 +34,16 @@ export function run() {
   for (let i = 0; i < 120 && repeatLesson.sim.wizards[0].castsResolved < 1; i++) repeatLesson._stepOnce({});
   near(repeatLesson.sim.wizards[0].cooldowns[1], Math.round(18 * 0.08 * TICK_HZ), 2,
     'the repeated Ember drill applies the reduced cooldown in the real sim');
+  const finalDuel = new TutorialRunner('EXAM', { seed: 4 });
+  finalDuel.arm();
+  eq(finalDuel.sim.rules.cooldownScale, 1, 'the Final Duel uses full live cooldowns');
+  eq(finalDuel.sim.cooldownTicks(24), 14 * TICK_HZ,
+    'Aether Leech keeps its full 14-second cooldown in the Final Duel');
+  const grandmaster = new TutorialRunner('EXAM_GM', { seed: 4 });
+  grandmaster.arm();
+  eq(grandmaster.sim.rules.cooldownScale, 1, 'the Grandmaster Trial uses full live cooldowns');
+  eq(grandmaster.sim.cooldownTicks(24), 14 * TICK_HZ,
+    'Aether Leech keeps its full 14-second cooldown in the Grandmaster Trial');
 
   // --- 1. every lesson is completable + no-input never completes ---------
   let scriptedOk = 0, scriptedTotal = 0, formalOk = 0, formalTotal = 0;

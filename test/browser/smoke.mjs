@@ -100,7 +100,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.7\.7/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.7\.8/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -1205,13 +1205,16 @@ try {
   if (perceptionVfx.fogBounds.height < 4.6) {
     fail('Fog Cloud world bank is not 50% taller: ' + JSON.stringify(perceptionVfx.fogBounds));
   }
-  if (!perceptionVfx.blind.visible || perceptionVfx.blind.opacity < 0.85
-      || perceptionVfx.blind.width < 6 || perceptionVfx.blind.height < 4
-      || perceptionVfx.blind.depthWrite
-      || perceptionVfx.blind.spellRenderOrder <= perceptionVfx.blind.renderOrder
-      || perceptionVfx.blind.layer === perceptionVfx.blind.spellLayer
-      || perceptionVfx.blind.normalBlendCount < 1 || perceptionVfx.blind.spellLights < 1) {
-    fail('Eclipse Glare does not white out the opponent area: ' + JSON.stringify(perceptionVfx.blind));
+  if (!perceptionVfx.blind.visible
+      || perceptionVfx.blind.background !== 'rgb(255, 255, 255)'
+      || perceptionVfx.blind.position !== 'fixed'
+      || perceptionVfx.blind.pointerEvents !== 'none'
+      || perceptionVfx.blind.width !== perceptionVfx.blind.viewportWidth
+      || perceptionVfx.blind.height !== perceptionVfx.blind.viewportHeight
+      || !(perceptionVfx.blind.sceneZIndex < perceptionVfx.blind.zIndex
+        && perceptionVfx.blind.zIndex < perceptionVfx.blind.hudZIndex)
+      || !perceptionVfx.blind.drawPadVisible || !perceptionVfx.blind.spellbarVisible) {
+    fail('Eclipse Glare is not a full-screen whiteout below the HUD: ' + JSON.stringify(perceptionVfx.blind));
   }
   if (perceptionVfx.cover.height < 2.2 || perceptionVfx.cover.width < 2.4) {
     fail('Stone Wall visual is not substantially taller and wider: ' + JSON.stringify(perceptionVfx.cover));

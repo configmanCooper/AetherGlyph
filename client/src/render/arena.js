@@ -159,26 +159,14 @@ export class Arena {
   }
 
   _buildBlindVeil() {
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff, transparent: false, opacity: 1,
-      depthTest: false, depthWrite: false, side: THREE.DoubleSide,
-    });
-    const veil = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 4.4), material);
-    veil.visible = false;
-    veil.renderOrder = 20;
-    veil.layers.set(2);
-    this.scene.add(veil);
-    this.blindVeil = veil;
+    this.blindWhiteout = document.querySelector('#blind-whiteout');
+    this.blindVeil = null;
   }
 
-  _syncBlindness(player, enemy) {
-    if (!this.blindVeil) return;
+  _syncBlindness(player) {
+    if (!this.blindWhiteout) return;
     const blinded = !!player?.statuses?.Blinded && player.statuses.Blinded.ticks > 0;
-    this.blindVeil.visible = blinded;
-    if (!blinded) return;
-    this.blindVeil.position.set(wizardX(enemy), 1.65, ENEMY_Z + 0.72);
-    this.blindVeil.lookAt(this.camera.position);
-    this.blindVeil.material.opacity = 1;
+    this.blindWhiteout.classList.toggle('hidden', !blinded);
   }
 
   _renderScene() {
@@ -191,36 +179,13 @@ export class Arena {
     this.renderer.render(this.scene, this.camera);
     this.scene.background = null;
 
-    if (this.blindVeil?.visible) {
-      this.renderer.clearDepth();
-      this.camera.layers.set(2);
-      this.renderer.render(this.scene, this.camera);
-    }
-
     this.renderer.clearDepth();
     this.camera.layers.set(1);
-    const restoredBlendings = this.blindVeil?.visible ? this._prepareBlindSpellBlending() : [];
     this.renderer.render(this.scene, this.camera);
-    for (const [material, blending] of restoredBlendings) material.blending = blending;
 
     this.camera.layers.mask = oldMask;
     this.scene.background = background;
     this.renderer.autoClear = true;
-  }
-
-  _prepareBlindSpellBlending() {
-    const restored = [];
-    this.scene.traverse((object) => {
-      if ((object.layers.mask & 2) === 0 || !object.material) return;
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) {
-        if (material.transparent && material.blending === THREE.AdditiveBlending) {
-          restored.push([material, material.blending]);
-          material.blending = THREE.NormalBlending;
-        }
-      }
-    });
-    return restored;
   }
 
   _buildLights() {
@@ -897,7 +862,7 @@ export class Arena {
     for (const [, b] of this.beams) { this.scene.remove(b.handle.object3D); b.handle.dispose(); }
     this.beams.clear();
     this._updateFogVeil(0);
-    if (this.blindVeil) this.blindVeil.visible = false;
+    if (this.blindWhiteout) this.blindWhiteout.classList.add('hidden');
     if (this.pDecoy) this.pDecoy.object3D.visible = false;
     if (this.eDecoy) this.eDecoy.object3D.visible = false;
     this.shake = 0;
@@ -1792,43 +1757,29 @@ export class Arena {
   }
 
   debugBlindVeil(enabled = true) {
-    this._syncBlindness(
-      { statuses: enabled ? { Blinded: { ticks: 240 } } : {} },
-      { arcPos: 0 },
-    );
-    const projectile = makeProjectileVfx(4, this.reduced);
-    let spellRenderOrder = 0;
-    projectile.object3D.traverse((object) => {
-      if (object.material && object.material.transparent === false) {
-        spellRenderOrder = Math.max(spellRenderOrder, object.renderOrder || 0);
-      }
-    });
-    projectile.dispose();
-    const additiveProjectile = makeProjectileVfx(8, this.reduced);
-    this.scene.add(additiveProjectile.object3D);
-    const blendings = this._prepareBlindSpellBlending();
-    const normalBlendCount = blendings.filter(([material]) => material.blending === THREE.NormalBlending).length;
-    for (const [material, blending] of blendings) material.blending = blending;
-    this.scene.remove(additiveProjectile.object3D);
-    additiveProjectile.dispose();
-    let spellLights = 0;
-    this.scene.traverse((object) => {
-      if (object.isLight && (object.layers.mask & 2) !== 0) spellLights++;
-    });
+    this._syncBlindness({ statuses: enabled ? { Blinded: { ticks: 240 } } : {} });
+    const veil = this.blindWhiteout;
+    const rect = veil?.getBoundingClientRect();
+    const style = veil ? getComputedStyle(veil) : null;
+    const sceneStyle = getComputedStyle(this.canvas);
+    const hud = document.querySelector('#hud');
+    const hudStyle = hud ? getComputedStyle(hud) : null;
     const result = {
-      visible: !!this.blindVeil?.visible,
-      opacity: this.blindVeil?.material?.opacity || 0,
-      depthWrite: !!this.blindVeil?.material?.depthWrite,
-      renderOrder: this.blindVeil?.renderOrder || 0,
-      layer: this.blindVeil?.layers?.mask || 0,
-      spellRenderOrder,
-      spellLayer: projectile.object3D.layers.mask,
-      normalBlendCount,
-      spellLights,
-      width: this.blindVeil?.geometry?.parameters?.width || 0,
-      height: this.blindVeil?.geometry?.parameters?.height || 0,
+      visible: !!veil && !veil.classList.contains('hidden'),
+      background: style?.backgroundColor || '',
+      position: style?.position || '',
+      pointerEvents: style?.pointerEvents || '',
+      zIndex: Number(style?.zIndex || 0),
+      sceneZIndex: Number(sceneStyle.zIndex || 0),
+      hudZIndex: Number(hudStyle?.zIndex || 0),
+      width: rect?.width || 0,
+      height: rect?.height || 0,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      drawPadVisible: !!document.querySelector('#draw-pad'),
+      spellbarVisible: !!document.querySelector('#spellbar'),
     };
-    this._syncBlindness({ statuses: {} }, { arcPos: 0 });
+    this._syncBlindness({ statuses: {} });
     return result;
   }
 

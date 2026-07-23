@@ -48,7 +48,9 @@ function hasRepeatedCastObjective(lesson) {
 // and every series-round re-arm stay identical).
 function lessonRules(lesson) {
   const cooldownScale = lesson.cooldownScale
-    ?? (hasRepeatedCastObjective(lesson) ? REPEATED_CAST_COOLDOWN_SCALE : TUTORIAL_COOLDOWN_SCALE);
+    ?? (lesson.formal
+      ? 1
+      : (hasRepeatedCastObjective(lesson) ? REPEATED_CAST_COOLDOWN_SCALE : TUTORIAL_COOLDOWN_SCALE));
   return {
     timer: !!lesson.timerEnabled,
     pressure: !!lesson.pressureEnabled,
