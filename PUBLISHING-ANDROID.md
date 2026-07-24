@@ -27,7 +27,7 @@ already-synced assets.
 
 ## 2. Play Console setup
 
-Create the app as a **paid game** at **$0.99**. (A free app can never later be
+Create the app as a **paid game** at **$4.99**. (A free app can never later be
 changed to paid.) No ads. No in-app purchases.
 
 | Field | Value |
@@ -121,7 +121,7 @@ photos, or broad storage.
 - [ ] `npm run android:assets` regenerated icons/splash/store art
 - [ ] `.\build-android.ps1` produced a **signed** `.aab` in `dist\`
 - [ ] Version code/name bumped in `android\app\build.gradle`, `package.json`, and `client\sw.js` `CACHE_VERSION`
-- [ ] Paid ($0.99), no ads, no IAP set in Play Console
+- [ ] Paid ($4.99), no ads, no IAP set in Play Console
 - [ ] Data Safety form completed; privacy + deletion URLs live and returning HTTP 200
 - [ ] Internal testing track + Play **pre-launch report** (low-memory + current devices) reviewed
 - [ ] Authoritative service deployed on a **paid** Render instance (free tier sleeps)

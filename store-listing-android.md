@@ -66,7 +66,7 @@ Games → Strategy
 Duel, Strategy, Wizard, Spellcasting, Competitive, 1v1
 
 ## Price
-$0.99 paid, one-time purchase
+$4.99 paid, one-time purchase
 
 ## Content
 Fantasy magic combat (spell effects, no gore). No chat. No user-generated

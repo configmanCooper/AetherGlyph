@@ -33,7 +33,7 @@ The intended emotional arc is: recognize, prepare, bait, counter, transform the 
 
 ### Commercial model
 
-- Google Play price: $0.99, one-time purchase.
+- Google Play price: $4.99, one-time purchase.
 - No ads.
 - No in-app purchases.
 - No paid spell unlocks.
@@ -607,7 +607,7 @@ Not requested:
 
 ### Store obligations
 
-- Paid app set to $0.99 before production release.
+- Paid app set to $4.99 before production release.
 - Accurate Data Safety form.
 - Privacy policy and account deletion page if online accounts are used.
 - In-app account deletion.
