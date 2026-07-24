@@ -379,9 +379,9 @@ available in the paid Aetherglyph: Arcane Duels app.
 ```
 
 Use `play-assets\demo\icon-512.png` for the demo's 512 × 512 Play Store icon.
-Before publishing, also create a demo-specific 1024 × 500 feature graphic with a
-clearly visible **DEMO** label. Do not use screenshots that imply online play is
-included; upload at least two offline-game screenshots.
+Use `play-assets\demo\FeatureBanner.png` for the demo's 1024 × 500 feature
+graphic. Do not use screenshots that imply online play is included; upload at
+least two offline-game screenshots.
 
 ### 3. Demo App content answers
 
