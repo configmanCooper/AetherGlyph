@@ -1,5 +1,5 @@
 // serverConfig.test.js — the packaged/same-origin service URL resolution and the
-// override validation (HTTPS always; HTTP LAN only in browser development).
+// override validation (HTTPS always; HTTP only for loopback/private LAN).
 // Pure functions, no DOM (see client/src/net/serverConfig.js).
 
 import { createHarness } from './tiny.js';
@@ -15,9 +15,9 @@ export function run() {
   eq(validateServerUrl('').url, '', 'empty normalizes to same-origin/default');
   eq(validateServerUrl('   ').url, '', 'blank normalizes to empty');
 
-  const https = validateServerUrl('https://aetherglyph.onrender.com');
+  const https = validateServerUrl('https://aetherglyph-server.onrender.com');
   eq(https.ok, true, 'https accepted');
-  eq(https.url, 'https://aetherglyph.onrender.com', 'https normalized to origin');
+  eq(https.url, 'https://aetherglyph-server.onrender.com', 'https normalized to origin');
 
   eq(validateServerUrl('https://example.com/').url, 'https://example.com', 'trailing slash trimmed to origin');
   eq(validateServerUrl('https://example.com:8443').url, 'https://example.com:8443', 'explicit https port kept');
@@ -32,10 +32,10 @@ export function run() {
   eq(
     validateServerUrl('http://192.168.1.20:8130', { allowLocalHttp: false }).ok,
     false,
-    'native policy rejects an otherwise-local HTTP service',
+    'an explicitly HTTPS-only policy rejects an otherwise-local HTTP service',
   );
 
-  eq(validateServerUrl('http://aetherglyph.onrender.com').ok, false, 'http to a public host rejected');
+  eq(validateServerUrl('http://aetherglyph-server.onrender.com').ok, false, 'http to a public host rejected');
   eq(validateServerUrl('http://8.8.8.8').ok, false, 'http to a public IP rejected');
   eq(validateServerUrl('http://172.32.0.1').ok, false, 'http to 172.32 (outside private range) rejected');
 
@@ -54,9 +54,14 @@ export function run() {
     'native default connects to the packaged Render service',
   );
   eq(
-    resolveServerUrl({ native: false, origin: 'https://aetherglyph.onrender.com', override: '' }),
+    resolveServerUrl({ native: false, origin: 'https://configmancooper.github.io', override: '' }),
+    PACKAGED_SERVER_URL,
+    'public web build connects to the dedicated Render service',
+  );
+  eq(
+    resolveServerUrl({ native: false, origin: 'http://localhost:8130', override: '' }),
     '',
-    'same-origin web build stays same-origin',
+    'localhost web development stays same-origin',
   );
   eq(
     resolveServerUrl({ native: true, origin: 'https://localhost', override: 'https://my.example.com' }),
@@ -75,10 +80,11 @@ export function run() {
   );
   eq(
     resolveServerUrl({ native: true, origin: 'https://localhost', override: 'http://192.168.0.5:8130' }),
-    PACKAGED_SERVER_URL,
-    'native build ignores HTTP LAN override because the WebView requires HTTPS',
+    'http://192.168.0.5:8130',
+    'paid packaged build accepts a private-LAN duel server override',
   );
-  ok(PACKAGED_SERVER_URL === 'https://aetherglyph.onrender.com', 'packaged default is the Render https origin');
+  ok(PACKAGED_SERVER_URL === 'https://aetherglyph-server.onrender.com',
+    'packaged default is the dedicated Render https origin');
 
   return report('serverConfig');
 }

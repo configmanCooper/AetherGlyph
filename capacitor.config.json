@@ -4,12 +4,12 @@
   "webDir": "www",
   "android": {
     "backgroundColor": "#0a0713",
-    "allowMixedContent": false
+    "allowMixedContent": true
   },
   "server": {
     "androidScheme": "https",
     "allowNavigation": [
-      "aetherglyph.onrender.com"
+      "aetherglyph-server.onrender.com"
     ]
   }
 }

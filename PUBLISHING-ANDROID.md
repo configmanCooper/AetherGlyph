@@ -34,8 +34,8 @@ changed to paid.) No ads. No in-app purchases.
 | --- | --- |
 | App id | `com.configmancooper.aetherglyph` |
 | App name | Aetherglyph: Arcane Duels |
-| Version code | `10714` |
-| Version name | `1.7.14` |
+| Version code | `10900` |
+| Version name | `1.9.0` |
 | Minimum Android | 7.0 / API 24 |
 | Target / compile Android | API 36 |
 | Orientation | User-selectable: Auto rotate, Portrait, or Landscape |
@@ -43,6 +43,11 @@ changed to paid.) No ads. No in-app purchases.
 | Ads | No |
 | In-app purchases | No |
 | Internet required | Yes |
+
+Both Play packages include Google's supported `app-update:2.1.0` startup check.
+When Google Play reports a newer version, the app shows an Update/Later dialog
+and opens its own Play listing when Update is selected. Sideloaded builds and
+devices without Google Play continue normally without a prompt.
 
 Listing copy is in `store-listing-android.md`. Graphics are generated into
 `play-assets\` (icon 512, feature graphic 1024×500) and screenshots into
@@ -85,7 +90,7 @@ update** — losing it blocks future updates.
 ## 4. Data Safety form
 
 - **Network communication:** online multiplayer connects to the authoritative
-  service (`aetherglyph.onrender.com`, or a user-configured URL).
+  service (`aetherglyph-server.onrender.com`, or a user-configured URL).
 - **Collected/processed:** an anonymous, device-local random identifier; optional
   display name; in-match inputs; IP address and short-lived connection/security
   logs (retained ≤ 30 days); a numeric skill rating tied to the anonymous id.
@@ -93,12 +98,12 @@ update** — losing it blocks future updates.
   camera, microphone, photos, advertising id. No analytics/ad SDKs. No data sale.
 - **Encryption in transit:** yes (HTTPS/WSS; production cleartext disabled).
 - **Deletion:** in-app *Settings → Delete my data*; server rating record on
-  request. See `https://aetherglyph.onrender.com/account-deletion.html`.
+  request. See `https://aetherglyph-server.onrender.com/account-deletion.html`.
 
 ## 5. Privacy & account deletion (required for online play)
 
-- Privacy policy: `https://aetherglyph.onrender.com/privacy.html`
-- Account/data deletion: `https://aetherglyph.onrender.com/account-deletion.html`
+- Privacy policy: `https://aetherglyph-server.onrender.com/privacy.html`
+- Account/data deletion: `https://aetherglyph-server.onrender.com/account-deletion.html`
 
 Both are served by the game service and are also bundled offline in the app
 (`Settings → Privacy & deletion`). Accounts are anonymous, so deletion is the

@@ -111,11 +111,14 @@ ok(statSync(join(WWW, 'client/vendor/three.module.js')).size > 100000, 'three is
 ok(statSync(join(WWW, 'client/vendor/socket.io.esm.min.js')).size > 10000, 'socket.io client is vendored locally');
 
 // --- 3. packaged vs same-origin server URL behavior ------------------------
-eq(PACKAGED_SERVER_URL, 'https://aetherglyph.onrender.com', 'packaged default is the Render https origin');
+eq(PACKAGED_SERVER_URL, 'https://aetherglyph-server.onrender.com',
+  'packaged default is the dedicated Render https origin');
 eq(resolveServerUrl({ native: true, origin: 'https://localhost', override: '' }), PACKAGED_SERVER_URL,
   'native build defaults to the packaged Render service');
-eq(resolveServerUrl({ native: false, origin: 'https://aetherglyph.onrender.com', override: '' }), '',
-  'same-origin web build stays same-origin');
+eq(resolveServerUrl({ native: false, origin: 'https://configmancooper.github.io', override: '' }),
+  PACKAGED_SERVER_URL, 'public web build uses the dedicated Render service');
+eq(resolveServerUrl({ native: false, origin: 'http://localhost:8130', override: '' }), '',
+  'local web development stays same-origin');
 eq(resolveServerUrl({ native: true, origin: 'https://localhost', override: 'http://evil.example.com' }), PACKAGED_SERVER_URL,
   'insecure override ignored -> native default');
 
@@ -125,19 +128,27 @@ eq(cap.appId, 'com.configmancooper.aetherglyph', 'capacitor appId');
 eq(cap.appName, 'Aetherglyph: Arcane Duels', 'capacitor appName');
 eq(cap.webDir, 'www', 'capacitor webDir is www');
 eq(cap.server.androidScheme, 'https', 'androidScheme https (no cleartext origin)');
-eq(cap.android.allowMixedContent, false, 'allowMixedContent false');
-ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.includes('aetherglyph.onrender.com'),
+eq(cap.android.allowMixedContent, true, 'paid Android build permits validated LAN HTTP duels');
+ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.includes('aetherglyph-server.onrender.com'),
   'allowNavigation includes the Render service');
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 10714'), 'gradle versionCode 10714');
+ok(appGradle.includes('versionCode 10900'), 'gradle versionCode 10900');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');
+ok(appGradle.includes('com.google.android.play:app-update:2.1.0'),
+  'Android builds include the supported Google Play update-check library');
+const mainActivity = read('android/app/src/main/java/com/configmancooper/aetherglyph/MainActivity.java');
+ok(mainActivity.includes('AppUpdateManagerFactory.create')
+    && mainActivity.includes('UpdateAvailability.UPDATE_AVAILABLE')
+    && mainActivity.includes('setTitle("Update available")')
+    && mainActivity.includes('market://details?id='),
+  'Android startup checks Google Play and presents an Update/Later notice');
 eq(readJson('package-lock.json').version, version, 'package-lock version matches package.json');
 const publishingGuide = read('PUBLISHING-ANDROID.md');
-ok(publishingGuide.includes('| Version code | `10714` |'), 'publishing guide versionCode 10714');
+ok(publishingGuide.includes('| Version code | `10900` |'), 'publishing guide versionCode 10900');
 ok(existsSync(join(ROOT, 'client/audio/music/wanderlust-menu.mp3')), 'menu music asset is packaged');
 ok(existsSync(join(ROOT, 'client/audio/music/spell-duel.mp3')), 'duel music asset is packaged');
 ok(read('client/index.html').includes('id="menu-version"')
@@ -155,7 +166,8 @@ ok(strings.includes('Aetherglyph: Arcane Duels'), 'android app_name is the full 
 
 const manifestXml = read('android/app/src/main/AndroidManifest.xml');
 ok(!manifestXml.includes('android:screenOrientation="landscape"'), 'Android activity allows portrait and landscape');
-ok(manifestXml.includes('android:usesCleartextTraffic="false"'), 'no cleartext traffic in production');
+ok(manifestXml.includes('android:usesCleartextTraffic="true"'),
+  'paid Android build permits app-validated private-LAN cleartext duels');
 ok(manifestXml.includes('android:networkSecurityConfig="@xml/network_security_config"'), 'network security config referenced');
 ok(manifestXml.includes('android.permission.INTERNET'), 'INTERNET permission declared');
 ok(manifestXml.includes('android.permission.ACCESS_NETWORK_STATE'), 'ACCESS_NETWORK_STATE permission declared');

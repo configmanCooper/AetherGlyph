@@ -7,12 +7,14 @@ The separate free, offline-only Google Play demo is built with
 
 ## Project status
 
-**Version 1.7.14 — feature complete.** The castle-styled title page now stages an
+**Version 1.9.0 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
 (Practice vs AI + coaching) is implemented on top of the offline campaign, the
-authoritative online service, and the deterministic shared simulation. Version
+authoritative online service, and the deterministic shared simulation. The full
+and demo Android packages check Google Play at startup and show an Update/Later
+notice when a newer Store version is available. Version
 1.6.x adds 150-point Health, authoritative 100-point Stamina bars and costs for
 movement, Dodge, Brace, and Focus; Haste
 modifies stamina economy; Brace converts damage to Aether; spare Sigil Charges
@@ -150,11 +152,11 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10714 /
-versionName 1.7.14). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10900 /
+versionName 1.9.0). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
-(default `https://aetherglyph.onrender.com`); same-origin web deployments stay
-same-origin.
+(default `https://aetherglyph-server.onrender.com`); localhost/LAN development
+stays same-origin.
 
 **Authoritative online multiplayer** remains: two devices play a real
 best-of-three duel through an authoritative Express + Socket.IO server that owns
@@ -165,11 +167,10 @@ are drawable.
 
 - `MASTERPLAN.md` - authoritative product, game, technical, test, deployment, and release plan
 - `design/SOLO-MODES-PLAN.md` - solo tutorial / Practice-vs-AI / Glyph Laboratory plan
-- `docs/DEPLOYMENT.md` - environment variables, Render blueprint, scaling limits
+- `docs/DEPLOYMENT.md` - full-game and dedicated-server Render deployments
 - `docs/ANDROID.md` - Capacitor packaging, web staging, configurable service URL, scripts
 - `PUBLISHING-ANDROID.md` - build/sign/publish flow, Data Safety, release checklist
 - `store-listing-android.md` - Google Play listing copy
-- `render.yaml` - one-click Render deploy (single instance)
 - `design/spells.csv` - implementation-ready launch spell roster
 - `design/environment-matrix.md` - shared battlefield reactions and counter rules
 - `design/tutorial.md` - complete solo tutorial campaign
@@ -214,6 +215,10 @@ Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT
   coaching), **Glyph Laboratory** (free draw + recognizer diagnostics, no
   opponent), **Online Duel** (best-of-three vs another device: Quick Match, Create
   Private Duel, or Join Code).
+- **Local Network Duel**: the paid Windows build starts an authoritative host on
+  port 8131. Paid Android and Windows devices join by local IP, then use the
+  normal private room code. Android hosting is deferred until a maintained,
+  Play-safe embedded server runtime is available.
 - **Guide shortcuts**: pick any eight public dotted guides or use an archetype preset (Ember Rush,
   Tide Control, Storm Tempo, Stone Warden, Gale Trickster, Arcane Combo, Umbra
   Attrition, Prismatic Hybrid). These shortcuts never limit casting; discovered
@@ -377,7 +382,7 @@ duel while preserving the deterministic shared simulation and all offline modes.
   offline sim; slot mapping means each device always sees itself as local player
   0. Backgrounding stops inputs and reconnects rather than simulating locally.
 
-Run it and deploy: see `docs/DEPLOYMENT.md` and `render.yaml`.
+Run it locally or deploy either Render service: see `docs/DEPLOYMENT.md`.
 
 ### Scaling & limitations (Phase 3)
 
@@ -403,7 +408,8 @@ run in the browser and in the app.
   native origin. `node_modules` is never copied; three.js and the Socket.IO client
   are vendored locally (no CDN), so offline tutorial and bot modes need no network.
 - **Configurable authoritative service.** The packaged app defaults to
-  `https://aetherglyph.onrender.com`; same-origin web builds stay same-origin. A
+  `https://aetherglyph-server.onrender.com`; localhost/LAN web builds stay
+  same-origin. A
   persisted **Settings → Online service URL** override is validated (HTTPS always;
   plain HTTP only for localhost/LAN) with a reset, plus **Delete my data**.
 - **PWA + optional service worker.** `manifest.webmanifest`, icons, and a
@@ -412,7 +418,8 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10714` / `versionName 1.7.14`, no cleartext production traffic,
+  `versionCode 10900` / `versionName 1.9.0`, HTTPS production traffic plus
+  app-validated private-LAN hosting,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.
@@ -431,7 +438,7 @@ Build/sign/publish: see `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.
 ### Known Phase 4 limitations
 
 - **Single instance only** (unchanged): one process owns each live match in
-  memory. Do **not** raise `numInstances` in `render.yaml`; horizontal scaling
+  memory. Do **not** raise `numInstances` in the separate server Blueprint; horizontal scaling
   requires match-ownership leases + fencing tokens and a shared queue/room store,
   which are not implemented.
 - Release artifacts are **unsigned until an upload key is created** with
@@ -461,7 +468,7 @@ reverse when sides swap. Empirical gesture-miss rates are **Easy ~0.34 ≫ Mediu
 ### Known 1.0 limitations
 
 - **Single instance only** (unchanged): one process owns each live match in
-  memory. Do **not** raise `numInstances` in `render.yaml`.
+  memory. Do **not** raise `numInstances` in the separate server Blueprint.
 
 ## Product decision
 

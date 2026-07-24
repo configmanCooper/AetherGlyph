@@ -39,9 +39,12 @@ and `socket.io.esm.min.js` (`npm install`), generated spell data
 
 ## Where online play connects (`client/src/net/serverConfig.js`)
 
-- **Packaged app:** defaults to `https://aetherglyph.onrender.com`.
-- **Same-origin web:** stays same-origin (connects to whatever served the client).
+- **Packaged/public web app:** defaults to `https://aetherglyph-server.onrender.com`.
+- **Local web development:** stays same-origin.
 - **Override:** *Settings → Online service URL* persists a validated override.
+- **Local Network Duel:** the paid app accepts private-LAN `http://` host
+  addresses from the paid Windows host while continuing to reject public
+  cleartext URLs. The demo has no network permission and cannot access this mode.
   The Android app requires HTTPS because its WebView runs on a secure origin.
   Plain HTTP localhost/RFC-1918 overrides are available only in browser
   development. *Use default* resets it. *Delete my data* wipes the local id,
@@ -79,17 +82,18 @@ imports, so every call is a safe no-op in a plain browser:
 ## Android project (`android/`, checked in)
 
 - `variables.gradle`: `minSdk 24`, `compileSdk 36`, `targetSdk 36`.
-- `app/build.gradle`: `versionCode 10714`, `versionName "1.7.14"`; release signing
+- `app/build.gradle`: `versionCode 10900`, `versionName "1.9.0"`; release signing
   read from an ignored `keystore.properties` (unsigned when absent).
 - `AndroidManifest.xml`: `singleTask`, orientation unlocked for the in-app
   Auto/Portrait/Landscape selector,
-  `usesCleartextTraffic="false"` + `@xml/network_security_config`, `INTERNET` +
-  `ACCESS_NETWORK_STATE`.
-- `res/xml/network_security_config.xml`: HTTPS-only, with loopback entries kept
-  for Android tooling. The secure WebView does not claim unsupported HTTP LAN
-  connectivity.
-- `capacitor.config.json`: `androidScheme: https`, `allowMixedContent: false`,
-  `allowNavigation: [aetherglyph.onrender.com]`, `backgroundColor: #0a0713`.
+  validated private-LAN cleartext support via `@xml/network_security_config`,
+  `INTERNET` + `ACCESS_NETWORK_STATE`.
+- `MainActivity.java`: checks Google Play for a newer version at startup and
+  displays a lifecycle-safe Update/Later prompt.
+- `res/xml/network_security_config.xml`: permits cleartext transport for paid-app
+  private-LAN joining; app-level URL validation still rejects public HTTP hosts.
+- `capacitor.config.json`: `androidScheme: https`, `allowMixedContent: true`,
+  `allowNavigation: [aetherglyph-server.onrender.com]`, `backgroundColor: #0a0713`.
 
 ## Scripts
 
@@ -113,4 +117,5 @@ HTTPS endpoint. Release builds are HTTPS-only.
 ## Service limitation
 
 The authoritative service is **single-instance only** (in-memory match ownership).
-Do not raise `numInstances` in `render.yaml`. See `docs/DEPLOYMENT.md`.
+Do not raise `numInstances` in the separate `AetherGlyph-Server` Blueprint. See
+`docs/DEPLOYMENT.md`.

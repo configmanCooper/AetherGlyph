@@ -1444,12 +1444,88 @@ function saveLoadout() {
 }
 
 // ------------------------------------------------------------------ online duel
+let lanHostInfo = null;
+
+async function readLanHostInfo() {
+  try {
+    if (window.AetherglyphDesktop?.getLanServerInfo) {
+      return await window.AetherglyphDesktop.getLanServerInfo();
+    }
+    const plugin = window.Capacitor?.Plugins?.AetherglyphLanServer;
+    if (plugin?.getInfo) return await plugin.getInfo();
+  } catch (error) {
+    return { available: false, error: error?.message || String(error) };
+  }
+  return { available: false };
+}
+
+async function openLanDuel() {
+  $('#lan-server-status').textContent = '';
+  $('#lan-server-address').value = '';
+  $('#lan-host-info').classList.add('hidden');
+  showPanel('panel-lan-duel');
+  lanHostInfo = await readLanHostInfo();
+  if (activePanelId !== 'panel-lan-duel' || !lanHostInfo?.available) return;
+  const urls = Array.isArray(lanHostInfo.urls) && lanHostInfo.urls.length
+    ? lanHostInfo.urls.join(' or ')
+    : lanHostInfo.loopbackUrl;
+  $('#lan-host-status').textContent =
+    `This device is hosting on port ${lanHostInfo.port}. Other devices can use ${urls}. Allow private-network access if prompted.`;
+  $('#lan-host-info').classList.remove('hidden');
+}
+
+function normalizeLanAddress(raw) {
+  let value = String(raw || '').trim();
+  if (!value) return { ok: false, error: 'Enter the host device address.' };
+  if (!/^https?:\/\//i.test(value)) value = `http://${value}`;
+  let parsed;
+  try { parsed = new URL(value); } catch { return { ok: false, error: 'Enter an address such as 192.168.1.50:8131.' }; }
+  if (!parsed.port) parsed.port = '8131';
+  return { ok: true, url: parsed.origin };
+}
+
+function useOnlineServer(url, message) {
+  const saved = setStoredServerUrl(url);
+  if (!saved.ok) {
+    $('#lan-server-status').textContent = saved.error;
+    return;
+  }
+  disposeOnline();
+  openOnline();
+  toast(message);
+}
+
+function connectToLanHost() {
+  const address = normalizeLanAddress($('#lan-server-address').value);
+  if (!address.ok) {
+    $('#lan-server-status').textContent = address.error;
+    return;
+  }
+  useOnlineServer(address.url, `Using local duel server ${address.url}`);
+}
+
+function useThisDeviceAsLanHost() {
+  if (!lanHostInfo?.available || !lanHostInfo.loopbackUrl) {
+    $('#lan-server-status').textContent = 'The local server is not available on this device.';
+    return;
+  }
+  useOnlineServer(lanHostInfo.loopbackUrl, 'Using this device as the local duel host.');
+}
+
+function useInternetDuelServer() {
+  setStoredServerUrl('');
+  disposeOnline();
+  openOnline();
+  toast('Using the internet duel server.');
+}
+
 function updateOnlineSummary() {
   const el = $('#online-loadout-summary');
   if (!el) return;
   const names = playerLoadout.map((s) => s.name).join(', ');
   const playableCount = playableSpellIds(soloProfile()).length;
-  el.textContent = `Your guides: ${names}. All ${playableCount} known spells remain castable.`;
+  el.textContent =
+    `Your guides: ${names}. All ${playableCount} known spells remain castable. ${describeServerTarget()}.`;
 }
 
 function openOnline() {
@@ -1707,6 +1783,10 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
     else if (a === 'online-cancel') cancelOnline();
     else if (a === 'online-copy') copyRoomCode();
+    else if (a === 'lan-duel') openLanDuel();
+    else if (a === 'lan-connect') connectToLanHost();
+    else if (a === 'lan-use-host') useThisDeviceAsLanHost();
+    else if (a === 'lan-internet') useInternetDuelServer();
     else if (a === 'loadout') openLoadoutBuilder();
     else if (a === 'settings') openSettings();
     else if (a === 'spell-roster') openSpellRoster();

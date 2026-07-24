@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.7.14" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.9.0" />
   <script type="importmap">
   {
     "imports": {
@@ -130,7 +130,7 @@
       </div>
       <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
       <p class="links">
-        <span id="menu-version">Version 1.7.14</span> ·
+        <span id="menu-version">Version 1.9.0</span> ·
         <button class="link-button" data-action="spell-roster">Spell roster</button>
       </p>
     </div>
@@ -223,6 +223,7 @@
       <div class="menu-list">
         <button class="menu-btn" data-action="online-quick">Quick Match (ranked)</button>
         <button class="menu-btn" data-action="online-create">Create Private Duel</button>
+        <button class="menu-btn ghost" data-action="lan-duel">Local Network Duel</button>
         <div class="join-row">
           <input type="text" id="online-code" maxlength="5" placeholder="CODE" autocomplete="off" />
           <button class="menu-btn" data-action="online-join">Join Code</button>
@@ -233,6 +234,26 @@
       </div>
       <p id="online-error" class="ls-err-line"></p>
       <p class="offline-note"><span id="conn-quality" class="conn-badge">connecting…</span></p>
+    </div>
+
+    <div class="panel hidden" id="panel-lan-duel">
+      <h2>Local Network Duel</h2>
+      <p>A paid Windows device hosts the duel server. Paid Android and Windows devices on the same Wi-Fi join using its local address, then use the normal private room code.</p>
+      <div id="lan-host-info" class="settings-section hidden">
+        <p id="lan-host-status" class="settings-note"></p>
+        <div class="menu-list compact">
+          <button class="menu-btn" data-action="lan-use-host">Use this device as host</button>
+        </div>
+      </div>
+      <label class="field">Host address
+        <input type="text" id="lan-server-address" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.50:8131" />
+      </label>
+      <p id="lan-server-status" class="server-status"></p>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="lan-connect">Connect to LAN host</button>
+        <button class="menu-btn ghost" data-action="lan-internet">Use internet server</button>
+        <button class="menu-btn ghost" data-action="online">Back to Online Duel</button>
+      </div>
     </div>
 
     <div class="panel hidden" id="panel-demo-online">
@@ -385,6 +406,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.7.14"></script>
+  <script type="module" src="./src/app/main.js?v=1.9.0"></script>
 </body>
 </html>

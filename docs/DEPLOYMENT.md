@@ -1,10 +1,14 @@
 # Aetherglyph — Deployment & Environment
 
-The service is a single Node process (Express + Socket.IO) that serves the static
-client **and** runs the authoritative 1v1 duel simulation. The packaged Android
-app (Phase 4) connects to this same service — by default
-`https://aetherglyph.onrender.com` — while same-origin web deployments stay
-same-origin. Packaging/build details: `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.
+Two separate Render services are maintained:
+
+- `AetherGlyph` is the complete game repository and hosts the full web game at
+  `https://aetherglyph.onrender.com`.
+- `AetherGlyph-Server` is the asset-free authoritative service at
+  `https://aetherglyph-server.onrender.com`.
+
+Packaged and public web clients connect to the dedicated server for matchmaking
+and duels; localhost/LAN development stays same-origin.
 
 ## Run locally
 
@@ -26,7 +30,7 @@ Two devices on the same Wi‑Fi can duel during development: open the LAN addres
 | --- | --- | --- | --- |
 | `PORT` | no | `8130` | HTTP/WebSocket port (Render sets this automatically). |
 | `SESSION_SECRET` | prod | random per process | HMAC key for single‑use resume tokens. Set a stable secret in production. **Never commit it.** |
-| `ALLOWED_ORIGINS` | prod | *(empty)* | Comma‑separated exact Origin allowlist, e.g. `https://aetherglyph.onrender.com`. When empty, only localhost + private‑LAN + no‑origin (native app) are allowed. |
+| `ALLOWED_ORIGINS` | prod | *(empty)* | Comma‑separated exact client Origin allowlist, e.g. `https://configmancooper.github.io`. When empty, only localhost + private‑LAN + no‑origin (native app) are allowed. |
 | `DATABASE_URL` | no | *(unset)* | Postgres connection string for anonymous‑account rating/results. When unset, an **explicit in‑memory development rating adapter** is used (never a silent no‑op). |
 
 No secrets are stored in source. `DATABASE_URL`/`SESSION_SECRET` come only from
@@ -35,13 +39,17 @@ are parameterized.
 
 ## Render
 
-`render.yaml` is a one‑click blueprint (Dashboard → New → Blueprint). It:
+The game repository's `render.yaml` deploys the complete hosted game as
+`aetherglyph`. The separate server repository's `render.yaml` deploys
+`aetherglyph-server`. The server-only service:
 
-- serves the client and runs the authoritative server from one Web Service,
-- health‑checks `/healthz`,
+- serves no game graphics, music, Three.js, or client application,
+- runs matchmaking, private rooms, reconnects, ratings, and authoritative duels,
+- health-checks `/healthz`,
 - generates `SESSION_SECRET`,
-- sets `ALLOWED_ORIGINS` to the service URL,
-- optionally wires a Render Postgres via `DATABASE_URL` (commented out).
+- limits global/per-IP connections and rate-limits client events,
+- sends compressed volatile snapshots at 10 Hz,
+- optionally uses Render Postgres via `DATABASE_URL`.
 
 The service drains gracefully on `SIGTERM` (Render deploys): active matches are
 told to reconnect/aborted and the process exits after a short flush window.
@@ -52,8 +60,7 @@ told to reconnect/aborted and the process exits after a short flush window.
   raise `numInstances`. Horizontal scaling requires external match‑ownership
   leases + fencing tokens and a shared queue/room store, which are **not**
   implemented. This build does not claim horizontal multi‑instance support.
-- Render’s free plan sleeps after idle and is not suitable for a production
-  ranked queue; use a paid instance for real play.
+- Use the server Blueprint's paid always-on plan for a production ranked queue.
 - Reconnects are **not** assumed to return to the same instance; with a single
   instance this is moot, but the resume protocol (signed rotating token + epoch)
   is the mechanism that would be needed once ownership fencing exists.

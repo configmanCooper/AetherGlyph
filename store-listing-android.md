@@ -82,7 +82,7 @@ rating questionnaire for the final rating.
 rocmat21@gmail.com
 
 ## Privacy policy
-https://aetherglyph.onrender.com/privacy.html
+https://aetherglyph-server.onrender.com/privacy.html
 
 ## Account & data deletion
-https://aetherglyph.onrender.com/account-deletion.html
+https://aetherglyph-server.onrender.com/account-deletion.html

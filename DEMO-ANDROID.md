@@ -25,6 +25,10 @@ offline stubs, removes Socket.IO and the production server hostname, removes
 Android Internet/network-state permissions, signs the artifacts, verifies the APK
 signature and permissions, and restores the full-edition Android assets.
 
+The demo still uses the native Google Play update API to notify players when its
+separate demo listing has an update. This communicates through the installed Play
+Store service and does not restore web networking or Android network permissions.
+
 ## Signing backup
 
 The first build creates these ignored files:

@@ -59,5 +59,7 @@ const gradle = readFileSync(join(ROOT, 'android/app/build.gradle'), 'utf8');
 ok(/demo\s*\{[\s\S]*applicationIdSuffix\s+"\.demo"/.test(gradle),
   'demo build type uses a separate application ID');
 ok(/demoRelease/.test(gradle), 'demo build type has dedicated upload signing');
+ok(/usesCleartextTraffic="false"/.test(manifest),
+  'demo Android manifest keeps cleartext networking disabled');
 
 report('demoPackaging');

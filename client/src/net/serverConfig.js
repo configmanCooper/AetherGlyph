@@ -4,8 +4,8 @@
 // (url === ''). The packaged Capacitor/native build has no local server, so it
 // defaults to the authoritative Render service. A player may override the
 // service URL (persisted locally) — useful for browser LAN development or a
-// self-hosted HTTPS instance. The secure native WebView accepts HTTPS overrides
-// only; plain HTTP is limited to localhost/private-LAN browser development.
+// self-hosted HTTPS instance. Plain HTTP is accepted only for loopback/private-LAN
+// hosts so paid packaged apps can join a local authoritative duel server.
 //
 // The pure helpers (validateServerUrl / resolveServerUrl) take an explicit
 // context so they can be unit-tested headlessly (see test/serverConfig.test.js);
@@ -13,7 +13,7 @@
 
 // Default authoritative service for the packaged build. Single Render instance
 // (see README "Scaling & limitations"). Same-origin web builds ignore this.
-export const PACKAGED_SERVER_URL = 'https://aetherglyph.onrender.com';
+export const PACKAGED_SERVER_URL = 'https://aetherglyph-server.onrender.com';
 
 export const SERVER_URL_KEY = 'aeth-server-url';
 
@@ -42,7 +42,7 @@ export function validateServerUrl(raw, opts = {}) {
   try {
     parsed = new URL(trimmed);
   } catch {
-    return { ok: false, error: 'Enter a full URL, e.g. https://aetherglyph.onrender.com' };
+    return { ok: false, error: 'Enter a full URL, e.g. https://aetherglyph-server.onrender.com' };
   }
 
   const scheme = parsed.protocol.toLowerCase();
@@ -67,16 +67,20 @@ export function validateServerUrl(raw, opts = {}) {
   return { ok: true, url: parsed.origin };
 }
 
-// Resolve the effective service URL from an explicit context. Returns '' for
-// "same origin". Precedence: a valid persisted override > native default > ''.
+// Resolve the effective service URL from an explicit context. Local development
+// stays same-origin; packaged and public web clients use the dedicated server.
 //   ctx.native   — running inside the Capacitor native shell
 //   ctx.origin   — location.origin (the origin that served the client)
 //   ctx.override — the persisted user override (may be null/'')
 export function resolveServerUrl(ctx = {}) {
-  const override = validateServerUrl(ctx.override, { allowLocalHttp: !ctx.native });
+  const override = validateServerUrl(ctx.override);
   if (override.ok && override.url) return override.url;
   if (ctx.native) return PACKAGED_SERVER_URL;
-  return '';
+  try {
+    const origin = new URL(ctx.origin);
+    if (isLocalOrLanHost(origin.hostname)) return '';
+  } catch { /* public/default fallback below */ }
+  return PACKAGED_SERVER_URL;
 }
 
 // --- DOM-bound helpers (browser only) --------------------------------------
@@ -85,13 +89,14 @@ function hasWindow() {
   return typeof window !== 'undefined';
 }
 
-// True when running inside the Capacitor native shell (Android app). In a plain
-// browser window.Capacitor is undefined, so this is false and the app stays
-// same-origin.
+// True inside a packaged Capacitor or Electron shell. Plain browsers stay
+// same-origin, while packaged apps default to the authoritative Render service.
 export function isNativeApp() {
   if (!hasWindow()) return false;
   const cap = window.Capacitor;
-  return !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+  const capacitor = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+  const desktop = window.AetherglyphDesktop;
+  return capacitor || !!(desktop && desktop.packaged === true);
 }
 
 export function currentOrigin() {
@@ -111,7 +116,7 @@ export function getStoredServerUrl() {
 // Persist a validated override. Returns the same shape as validateServerUrl.
 // An empty/blank value clears the override (reset to default).
 export function setStoredServerUrl(raw) {
-  const result = validateServerUrl(raw, { allowLocalHttp: !isNativeApp() });
+  const result = validateServerUrl(raw);
   if (!result.ok) return result;
   try {
     if (result.url) window.localStorage.setItem(SERVER_URL_KEY, result.url);
@@ -143,5 +148,5 @@ export function describeServerTarget() {
   const effective = effectiveServerUrl();
   if (override) return `Custom: ${effective}`;
   if (effective) return `Default: ${effective}`;
-  return 'Same origin (this web deployment)';
+  return 'Same origin (local development)';
 }
