@@ -47,7 +47,8 @@ export const SIGIL = {
 
 // --- Universal actions (MASTERPLAN §4) -----------------------------------
 export const FOCUS = {
-  channelS: 0.95, // hold to gain one Sigil Charge; interruptible
+  channelS: 1.9, // hold to gain one Sigil Charge; interruptible
+  fullChargeAetherRegenMul: 1.5,
 };
 export const SIDESTEP = {
   charges: 2,

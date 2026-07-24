@@ -88,7 +88,7 @@ Arcane Pressure is symmetric, visually obvious, and never randomly targets one p
 
 These are available to every loadout so no player can be drafted into helplessness:
 
-1. `Focus`: hold the center sigil for 0.95 seconds to gain one Sigil Charge. It costs 3 Stamina/sec, prevents movement, and is visibly interruptible.
+1. `Focus`: hold the center sigil for 1.9 seconds to gain one Sigil Charge. It costs 3 Stamina/sec, prevents movement, and is visibly interruptible. At three charges, continued Focus increases total Aether regeneration by 50%.
 2. `Sidestep`: left-thumb flick, costs 5 Stamina and one of two movement charges, 2.5-second recharge each.
 3. `Break Trace`: two-finger tap to cancel a glyph with no Aether cost.
 4. `Brace`: hold to spend 3 Stamina/sec, reduce incoming damage by 75 percent, and convert 25 percent of the incoming damage into Aether. It cannot reflect or stop crowd control.
@@ -120,7 +120,7 @@ The roster is built from a small visual language:
 | Circle | containment, defense, cleansing, zones | 0.55-0.90 s |
 | Triangle or square | constructed heavy magic | 0.75-1.10 s |
 | Spiral or figure eight | channeling, time, secrets | 0.90-1.40 s |
-| Hold | concentration and charge generation | 0.95 s fixed |
+| Hold | concentration and charge generation | 1.9 s fixed |
 
 Direction matters where it carries meaning. Rotation normalization is disabled for directional glyphs and enabled only for explicitly orientation-free glyphs.
 
@@ -199,7 +199,8 @@ Decision: spend rapidly for initiative or reserve enough to answer the opponent.
 ### Sigil Charges: visible setup
 
 - Range: 0-3.
-- Focus grants one after a vulnerable 0.95-second channel.
+- Focus grants one after a vulnerable 1.9-second channel.
+- Holding Focus at the three-charge cap increases total Aether regeneration by 50%.
 - A perfect timed Reflect or interrupt grants half a charge.
 - Charges are spent by heavy, amplified, and secret spells.
 - One charge decays after 8 seconds without dealing damage, taking damage, countering, or beginning a real cast.

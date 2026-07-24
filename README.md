@@ -7,7 +7,7 @@ The separate free, offline-only Google Play demo is built with
 
 ## Project status
 
-**Version 1.7.8 — feature complete.** The castle-styled title page now stages an
+**Version 1.7.9 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
@@ -148,8 +148,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10708 /
-versionName 1.7.8). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10709 /
+versionName 1.7.9). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph.onrender.com`); same-origin web deployments stay
 same-origin.
@@ -199,7 +199,9 @@ Health endpoint: `GET /healthz`. Online setup + deployment: see `docs/DEPLOYMENT
 
 - **Left pad** = move / strafe the arc; a quick horizontal flick = Dodge (sidestep).
 - **Right pad** = draw a glyph; release to cast. Two-finger tap breaks the trace.
-- **Focus** (hold) builds a Sigil Charge; **Brace** (hold) is an emergency guard.
+- **Focus** (hold for 1.9 seconds) builds a Sigil Charge. At three charges,
+  continued Focus increases total Aether regeneration by 50%; **Brace** (hold)
+  is an emergency guard.
 - Starter loadout (8 spells): Ember Bolt (→ flick), Frost Lance (↑ line),
   Stone Shard (V), Spark Dart (zigzag), Concussive Blast (arc), Ward (bracket),
   Barrier Dome (circle), Reflect (check mark).
@@ -403,7 +405,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10708` / `versionName 1.7.8`, no cleartext production traffic,
+  `versionCode 10709` / `versionName 1.7.9`, no cleartext production traffic,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
   `@capacitor/app`, `@capacitor/haptics`, and `@capacitor/screen-orientation`.

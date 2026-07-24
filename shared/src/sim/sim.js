@@ -1051,13 +1051,17 @@ export class Sim {
 
   // ------------------------------------------------------------------ per-tick
   updateWizardTimers(w) {
-    // Aether regen (not during Focus).
-    if (!w.focusing && w.aether < AETHER.max) {
-      w.aether = Math.min(AETHER.max, w.aether + AETHER.regenPerS * DT);
-    }
-    // Aether Surge buff: bonus regen while active (even during light play).
+    const fullChargeFocus = w.focusing && w.charges >= SIGIL.max;
+    let aetherRegenPerS = !w.focusing || fullChargeFocus ? AETHER.regenPerS : 0;
+    // Aether Surge remains active during Focus.
     if (this.hasStatus(w, 'AetherSurge')) {
-      w.aether = Math.min(AETHER.max, w.aether + STATUSES.AetherSurge.aetherPerS * DT);
+      aetherRegenPerS += STATUSES.AetherSurge.aetherPerS;
+    }
+    if (fullChargeFocus) {
+      aetherRegenPerS *= FOCUS.fullChargeAetherRegenMul;
+    }
+    if (aetherRegenPerS > 0 && w.aether < AETHER.max) {
+      w.aether = Math.min(AETHER.max, w.aether + aetherRegenPerS * DT);
     }
     // Cooldowns.
     for (const id of Object.keys(w.cooldowns)) {
@@ -1200,7 +1204,6 @@ export class Sim {
       else if (w.casting) reason = 'casting';
       else if (w.recoveryTicks > 0) reason = 'recovery';
       else if (rooted) reason = 'rooted';
-      else if (w.charges >= SIGIL.max) reason = 'charges-full';
 
       if (reason) {
         this.rejectAction(w, 'focus', reason, {
@@ -1212,11 +1215,13 @@ export class Sim {
         }
       } else if (this.spendStamina(w, STAMINA.focusPerS * DT)) {
         if (!w.focusing) { w.focusing = true; w.focusTicks = 0; this.emit('focusStart', { caster: w.id }); }
-        w.focusTicks += 1;
+        if (w.charges < SIGIL.max) w.focusTicks += 1;
+        else w.focusTicks = 0;
         w.lastActivityTick = this.tick;
-        if (w.focusTicks >= sToTicks(FOCUS.channelS)) {
+        if (w.charges < SIGIL.max && w.focusTicks >= sToTicks(FOCUS.channelS)) {
           w.charges = Math.min(SIGIL.max, w.charges + 1);
-          w.focusing = false; w.focusTicks = 0;
+          w.focusing = w.charges >= SIGIL.max;
+          w.focusTicks = 0;
           this.emit('focusComplete', { caster: w.id, charges: w.charges });
         }
       } else {

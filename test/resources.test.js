@@ -35,13 +35,39 @@ export function run() {
   advance(sim, TICK_HZ, {}, {}); // 1 second
   near(sim.wizards[0].aether, AETHER.start + AETHER.regenPerS, 0.3, 'Aether regen ~4/sec');
 
-  // Aether does not regen during Focus, and Focus grants a charge after 0.95s.
+  // Aether does not regen while building a charge, and Focus takes 1.9 seconds.
   sim = freshSim();
   const focusTicks = Math.round(FOCUS.channelS * TICK_HZ) + 2;
   const beforeAether = sim.wizards[0].aether;
+  advance(sim, Math.round(FOCUS.channelS * TICK_HZ / 2), { focus: true }, {});
+  eq(sim.wizards[0].charges, 0, 'Focus does not grant a charge at the old 0.95-second timing');
+  advance(sim, Math.round(FOCUS.channelS * TICK_HZ / 2) + 2, { focus: true }, {});
+  eq(sim.wizards[0].charges, 1, 'Focus grants 1 Sigil Charge after 1.9 seconds');
+  ok(sim.wizards[0].aether <= beforeAether + 0.5, 'no Aether regen while building a charge');
+
+  sim = freshSim();
+  sim.wizards[0].charges = SIGIL.max;
+  sim.wizards[0].aether = 40;
+  const fullFocusAether = sim.wizards[0].aether;
+  advance(sim, TICK_HZ, { focus: true }, {});
+  eq(sim.wizards[0].charges, SIGIL.max, 'full-charge Focus does not create extra charges');
+  ok(sim.wizards[0].focusing, 'Focus remains active while Sigil Charges are full');
+  near(sim.wizards[0].aether - fullFocusAether,
+    AETHER.regenPerS * FOCUS.fullChargeAetherRegenMul, 0.15,
+    'full-charge Focus increases Aether regeneration by 50%');
+
+  sim = freshSim();
+  sim.wizards[0].charges = SIGIL.max - 1;
+  advance(sim, focusTicks, { focus: true }, {});
+  eq(sim.wizards[0].charges, SIGIL.max, 'Focus can complete the third Sigil Charge');
+  ok(sim.wizards[0].focusing,
+    'holding Focus transitions directly into full-charge Aether regeneration');
+
+  sim = freshSim();
+  const focusBefore = sim.wizards[0].aether;
   advance(sim, focusTicks, { focus: true }, {});
   eq(sim.wizards[0].charges, 1, 'Focus grants 1 Sigil Charge');
-  ok(sim.wizards[0].aether <= beforeAether + 0.5, 'no Aether regen during Focus');
+  ok(sim.wizards[0].aether <= focusBefore + 0.5, 'no Aether regen during Focus');
 
   // Focus ignores movement input, costs stamina, and still completes.
   sim = freshSim();
