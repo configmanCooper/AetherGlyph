@@ -493,6 +493,48 @@ export class PracticeBot {
     return false;
   }
 
+  _cleanseUrgency(w) {
+    const weights = {
+      Burning: 6,
+      Blinded: 5,
+      KnockedDown: 5,
+      Rooted: 4,
+      Sundered: 4,
+      Marked: 4,
+      Weakened: 3,
+      Sloth: 3,
+      Chilled: 2.5,
+      Soaked: 2.5,
+      Static: 2,
+      Veiled: 2,
+      Wet: 1,
+    };
+    let score = 0;
+    let count = 0;
+    let burning = false;
+    for (const [name, status] of Object.entries(w.statuses || {})) {
+      const remainingS = (status?.ticks || 0) / TICK_HZ;
+      const weight = weights[name] || 0;
+      if (weight <= 0 || remainingS < 0.75) continue;
+      count += 1;
+      if (name === 'Burning') burning = true;
+      const durationValue = Math.min(1, remainingS / 3);
+      const stackValue = name === 'Burning' || name === 'Static'
+        ? Math.max(1, status.stacks || 1)
+        : 1;
+      score += weight * durationValue + (stackValue - 1) * 1.5;
+    }
+    return { score, count, burning };
+  }
+
+  _shouldDispel(urgency) {
+    if (!urgency.count) return false;
+    if (this.difficulty === 'hard') return urgency.burning || urgency.score >= 4;
+    if (this.difficulty === 'medium') return urgency.burning || urgency.score >= 5;
+    if (this.difficulty === 'easy') return urgency.score >= 8 && this.rng.next() < 0.25;
+    return urgency.score >= 10 && this.rng.next() < 0.1;
+  }
+
   // ------------------------------------------------------------------- act
   act(sim) {
     if (sim.tick < this.currentTick) this.nextCastTick = 0;
@@ -509,7 +551,6 @@ export class PracticeBot {
     }
     const choosesMovement = this.profile.moveChance >= 1 || this.rng.next() < this.profile.moveChance;
     intent.move = w.stamina > this.profile.staminaReserve && choosesMovement ? this.moveDir : 0;
-    if (sim.hasStatus(w, 'Blinded')) return intent;
 
     const b = this.categorize(sim);
     const threat = this.noticedThreat(sim);
@@ -520,6 +561,21 @@ export class PracticeBot {
       const decision = this._defend(sim, w, o, b, threat, intent, mistake);
       if (decision) return decision;
     }
+
+    // Cleanse meaningful self-debuffs before committing to Focus, recovery, or
+    // offense. Medium and Hard treat Burning as urgent while avoiding effects
+    // that are already about to expire.
+    if (knowsCounter(this.counter, 'cleanse')) {
+      const dispel = b.defense.find((s) => effectFor(s.id).type === DISPEL && this.canCast(sim, w, s));
+      const urgency = this._cleanseUrgency(w);
+      if (dispel && this._shouldDispel(urgency)) return this._commitCast(dispel.id, intent);
+      const haste = this.has(w.loadout, 16);
+      if (haste && sim.hasStatus(w, 'Chilled') && this.canCast(sim, w, haste) && this.rng.next() < 0.5) {
+        return this._commitCast(16, intent);
+      }
+    }
+
+    if (sim.hasStatus(w, 'Blinded')) return intent;
 
     const recoveryStart = Math.max(this.profile.staminaReserve, this.profile.staminaRecoveryStart || 0);
     const recoveryTarget = Math.max(recoveryStart, this.profile.staminaRecoveryTarget || recoveryStart);
@@ -558,17 +614,6 @@ export class PracticeBot {
     // Focus is a held action. Keep channeling unless a noticed threat caused a
     // defensive response above; returning a neutral intent would cancel it.
     if (w.focusing && !threat) return { focus: true };
-
-    // 2. Cleanse a meaningful debuff (needs cleanse knowledge).
-    if (knowsCounter(this.counter, 'cleanse')) {
-      const dispel = b.defense.find((s) => effectFor(s.id).type === DISPEL && this.canCast(sim, w, s));
-      const bad = ['Frozen', 'Rooted', 'Sundered', 'Chilled', 'Marked', 'Sloth'].some((n) => sim.hasStatus(w, n));
-      if (dispel && bad && this.rng.next() < 0.6) return this._commitCast(dispel.id, intent);
-      const haste = this.has(w.loadout, 16);
-      if (haste && sim.hasStatus(w, 'Chilled') && this.canCast(sim, w, haste) && this.rng.next() < 0.5) {
-        return this._commitCast(16, intent);
-      }
-    }
 
     // Proactive-decision cadence gate (perception + replan).
     if (sim.tick - this.lastPlanTick < this.replanTicks) return intent;

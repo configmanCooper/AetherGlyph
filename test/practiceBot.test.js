@@ -213,6 +213,33 @@ export function run() {
       `Very Easy dodges substantially less often than Easy (${veryEasyDodges} < ${easyDodges})`);
   }
 
+  {
+    const ids = [13, 1, 2, 3, 4, 10, 11, 12];
+    const loadout = ids.map(spellWithGesture);
+    const makeCleanseSim = () => new Sim({
+      seed: 71,
+      loadouts: [loadout.map((spell) => ({ ...spell })), loadout.map((spell) => ({ ...spell }))],
+    });
+
+    let sim = makeCleanseSim();
+    sim.wizards[1].aether = 100;
+    sim.wizards[1].statuses.Burning = { stacks: 2, ticks: 9 * TICK_HZ };
+    const medium = new PracticeBot(1, { difficulty: 'medium', seed: 71 });
+    eq(medium.act(sim).cast, 13, 'Medium immediately Dispels meaningful Burning');
+
+    sim = makeCleanseSim();
+    sim.wizards[1].aether = 100;
+    sim.wizards[1].statuses.Blinded = { stacks: 1, ticks: 4 * TICK_HZ };
+    const hard = new PracticeBot(1, { difficulty: 'hard', seed: 72 });
+    eq(hard.act(sim).cast, 13, 'Hard Dispels Blinded before abandoning its plan');
+
+    sim = makeCleanseSim();
+    sim.wizards[1].aether = 100;
+    sim.wizards[1].statuses.Burning = { stacks: 1, ticks: Math.round(0.5 * TICK_HZ) };
+    const patient = new PracticeBot(1, { difficulty: 'hard', seed: 73 });
+    ok(patient.act(sim).cast !== 13, 'Hard does not waste Dispel on nearly expired Burning');
+  }
+
   // --- accepted casts use the SHARED potency mapping (0.90..1.05) ---------
   {
     let inBand = true;
