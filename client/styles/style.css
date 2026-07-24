@@ -486,7 +486,8 @@ body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
 
 /* --------------------------------------------------------- settings sections */
 .settings-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); }
-.settings-section .field input {
+.settings-section .field input,
+.settings-section .field select {
   display: block; width: 100%; margin-top: 6px; padding: 8px; border-radius: 8px;
   background: #1a1230; color: var(--ink); border: 1px solid rgba(255,255,255,0.2);
 }

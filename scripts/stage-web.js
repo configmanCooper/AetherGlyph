@@ -1,10 +1,9 @@
 // stage-web.js — deterministically assemble the no-build web app into the
 // Capacitor webDir (www/). The packaged app is served from the native origin
 // (https://localhost), so we preserve the SAME absolute path layout the Node
-// server uses — /client, /shared, /design at the webDir root — which means the
-// client's absolute import-map paths (/client/vendor/..., /shared/src/...) and
-// static links (/design/spells.csv, /MASTERPLAN.md) resolve unchanged. No path
-// rewriting, no bundling, no build step.
+// server uses — /client, /shared, /design at the webDir root. Client imports are
+// relative so the same payload also works below a GitHub Pages project path.
+// No path rewriting, no bundling, no build step.
 //
 // node_modules is NEVER copied. Only the vendored client libs, shared modules,
 // design data, and a real root index.html end up in www/.
@@ -95,8 +94,9 @@ export function stageWeb({ log = () => {} } = {}) {
   }
 
   writeFileSync(join(WWW, 'index.html'), rootIndexHtml(), 'utf8');
+  writeFileSync(join(WWW, '.nojekyll'), '', 'utf8');
 
-  log(`[stage-web] staged www/ from client, shared, design (+ root index, manifest, MASTERPLAN)`);
+  log(`[stage-web] staged www/ from client, shared, design (+ root index, .nojekyll, manifest, MASTERPLAN)`);
   return { www: WWW };
 }
 

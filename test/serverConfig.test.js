@@ -4,7 +4,8 @@
 
 import { createHarness } from './tiny.js';
 import {
-  PACKAGED_SERVER_URL, validateServerUrl, resolveServerUrl,
+  PACKAGED_SERVER_URL, FULL_GAME_SERVER_URL, validateServerUrl, resolveServerUrl,
+  serverPresetForUrl,
 } from '../client/src/net/serverConfig.js';
 
 export function run() {
@@ -46,6 +47,10 @@ export function run() {
   eq(validateServerUrl('https://user:pass@host.com').ok, false, 'credentials rejected');
   eq(validateServerUrl('https://host.com/path').ok, false, 'non-root path rejected');
   eq(validateServerUrl('https://host.com/?q=1').ok, false, 'query string rejected');
+  eq(serverPresetForUrl(''), 'dedicated', 'blank setting selects the dedicated default');
+  eq(serverPresetForUrl(PACKAGED_SERVER_URL), 'dedicated', 'dedicated URL maps to the dedicated preset');
+  eq(serverPresetForUrl(FULL_GAME_SERVER_URL), 'full-game', 'full-game URL maps to the full-game preset');
+  eq(serverPresetForUrl('https://example.com'), 'custom', 'another valid URL maps to custom');
 
   // --- resolveServerUrl (packaged vs same-origin web) --------------------
   eq(
@@ -85,6 +90,8 @@ export function run() {
   );
   ok(PACKAGED_SERVER_URL === 'https://aetherglyph-server.onrender.com',
     'packaged default is the dedicated Render https origin');
+  ok(FULL_GAME_SERVER_URL === 'https://aetherglyph.onrender.com',
+    'alternate preset is the full-game Render https origin');
 
   return report('serverConfig');
 }

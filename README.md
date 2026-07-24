@@ -7,7 +7,7 @@ The separate free, offline-only Google Play demo is built with
 
 ## Project status
 
-**Version 1.9.0 — feature complete.** The castle-styled title page now stages an
+**Version 1.9.1 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
@@ -152,8 +152,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10900 /
-versionName 1.9.0). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10901 /
+versionName 1.9.1). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph-server.onrender.com`); localhost/LAN development
 stays same-origin.
@@ -403,22 +403,23 @@ run in the browser and in the app.
 
 - **Deterministic web staging.** `npm run stage:web` (`scripts/stage-web.js`)
   assembles the Capacitor `webDir` (`www/`) from `client/` + `shared/` + `design/`
-  with a real root `index.html`, preserving the absolute `/client`, `/shared`,
-  `/design` layout so import maps and static paths resolve unchanged under the
-  native origin. `node_modules` is never copied; three.js and the Socket.IO client
+  with a real root `index.html`. Relative import-map paths let the same staged
+  payload run under the native origin or a GitHub Pages repository subpath.
+  `node_modules` is never copied; three.js and the Socket.IO client
   are vendored locally (no CDN), so offline tutorial and bot modes need no network.
 - **Configurable authoritative service.** The packaged app defaults to
   `https://aetherglyph-server.onrender.com`; localhost/LAN web builds stay
-  same-origin. A
-  persisted **Settings → Online service URL** override is validated (HTTPS always;
-  plain HTTP only for localhost/LAN) with a reset, plus **Delete my data**.
+  same-origin. **Settings → Online multiplayer server** offers the dedicated
+  server, the full-game `https://aetherglyph.onrender.com` service, or a validated
+  custom URL (HTTPS always; plain HTTP only for localhost/LAN), plus a reset and
+  **Delete my data**.
 - **PWA + optional service worker.** `manifest.webmanifest`, icons, and a
   same-origin **production-only** service worker (`client/sw.js`) whose cache
   version tracks the app version. It is never registered in the native shell or on
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10900` / `versionName 1.9.0`, HTTPS production traffic plus
+  `versionCode 10901` / `versionName 1.9.1`, HTTPS production traffic plus
   app-validated private-LAN hosting,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via

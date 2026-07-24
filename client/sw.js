@@ -10,16 +10,17 @@
 // unaffected. CACHE_VERSION is tied to the app version and is asserted by
 // test/packaging.test.js; bump it in lockstep with package.json "version".
 
-const CACHE_VERSION = '1.9.0';
-const CACHE_NAME = `aetherglyph-shell-v${CACHE_VERSION}`;
+const CACHE_VERSION = '1.9.1';
+const CACHE_PREFIX = 'aetherglyph-shell-v';
+const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Core app shell precached on install (best-effort; a miss never fails install).
 // Relative to the /client/ scope. The rest of the ES-module graph is cached at
 // runtime on first load.
 const SHELL = [
   './index.html',
-  './styles/style.css?v=1.9.0',
-  './src/app/main.js?v=1.9.0',
+  './styles/style.css?v=1.9.1',
+  './src/app/main.js?v=1.9.1',
   './src/game/menuDuel.js',
   './audio/music/wanderlust-menu.mp3',
   './audio/music/spell-duel.mp3',
@@ -41,7 +42,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys();
-    await Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)));
+    await Promise.all(names
+      .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+      .map((name) => caches.delete(name)));
     await self.clients.claim();
   })());
 });

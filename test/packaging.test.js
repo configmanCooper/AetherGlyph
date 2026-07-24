@@ -46,6 +46,7 @@ ok(read('android/app/capacitor.build.gradle').includes("implementation project('
 // --- 1. staged web completeness -------------------------------------------
 const requiredStaged = [
   'index.html',
+  '.nojekyll',
   'manifest.webmanifest',
   'client/index.html',
   'client/src/app/main.js',
@@ -88,6 +89,11 @@ for (const rel of requiredStaged) {
 }
 // Root index must hand off to the real client entry.
 ok(/client\/index\.html/.test(read('www/index.html')), 'root index.html redirects into /client/index.html');
+ok(existsSync(join(WWW, '.nojekyll')), 'staged site disables Jekyll processing');
+const clientIndex = read('client/index.html');
+ok(clientIndex.includes('"three": "./vendor/three.module.js"')
+    && clientIndex.includes('"@shared/": "../shared/src/"'),
+  'client import map is relative for GitHub Pages project paths');
 // node_modules must never be staged.
 ok(!existsSync(join(WWW, 'node_modules')), 'www/ contains no node_modules');
 
@@ -134,7 +140,7 @@ ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.inclu
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 10900'), 'gradle versionCode 10900');
+ok(appGradle.includes('versionCode 10901'), 'gradle versionCode 10901');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');
@@ -148,7 +154,7 @@ ok(mainActivity.includes('AppUpdateManagerFactory.create')
   'Android startup checks Google Play and presents an Update/Later notice');
 eq(readJson('package-lock.json').version, version, 'package-lock version matches package.json');
 const publishingGuide = read('PUBLISHING-ANDROID.md');
-ok(publishingGuide.includes('| Version code | `10900` |'), 'publishing guide versionCode 10900');
+ok(publishingGuide.includes('| Version code | `10901` |'), 'publishing guide versionCode 10901');
 ok(existsSync(join(ROOT, 'client/audio/music/wanderlust-menu.mp3')), 'menu music asset is packaged');
 ok(existsSync(join(ROOT, 'client/audio/music/spell-duel.mp3')), 'duel music asset is packaged');
 ok(read('client/index.html').includes('id="menu-version"')
@@ -209,6 +215,8 @@ ok(!!cacheMatch, 'sw.js declares CACHE_VERSION');
 eq(cacheMatch && cacheMatch[1], version, 'sw.js CACHE_VERSION matches package.json version');
 ok(sw.includes("startsWith('/socket.io/')") || sw.includes('/socket.io/'), 'sw.js excludes Socket.IO traffic');
 ok(sw.includes('self.location.origin'), 'sw.js only handles same-origin requests (scope-safe)');
+ok(sw.includes('name.startsWith(CACHE_PREFIX)'),
+  'service worker deletes only stale Aetherglyph caches on shared origins');
 
 const main = read('client/src/app/main.js');
 ok(main.includes("navigator.serviceWorker.register('./sw.js'"), 'main.js registers ./sw.js (scope /client/)');
@@ -217,6 +225,10 @@ ok(main.includes("updateViaCache: 'none'") && main.includes("'controllerchange'"
 ok(main.includes('isNativeApp') && /loc\.protocol\s*!==\s*'https:'/.test(main),
   'SW registration is gated to production web (never native / never non-https dev)');
 ok(read('client/index.html').includes('data-action="install-app"'), 'Settings exposes an install web app action');
+ok(clientIndex.includes('id="set-server-choice"')
+    && clientIndex.includes('value="dedicated"')
+    && clientIndex.includes('value="full-game"'),
+  'Settings exposes dedicated and full-game Render server choices');
 ok(main.includes('beforeinstallprompt') && main.includes("endsWith('.onrender.com')") && main.includes('/Android/i'),
   'Android Render install prompt is captured and gated to onrender.com');
 ok(main.includes('(display-mode: standalone)') && main.includes('(display-mode: fullscreen)'),

@@ -14,6 +14,7 @@
 // Default authoritative service for the packaged build. Single Render instance
 // (see README "Scaling & limitations"). Same-origin web builds ignore this.
 export const PACKAGED_SERVER_URL = 'https://aetherglyph-server.onrender.com';
+export const FULL_GAME_SERVER_URL = 'https://aetherglyph.onrender.com';
 
 export const SERVER_URL_KEY = 'aeth-server-url';
 
@@ -65,6 +66,13 @@ export function validateServerUrl(raw, opts = {}) {
   }
   // Normalize to a bare origin (Socket.IO connects to the origin).
   return { ok: true, url: parsed.origin };
+}
+
+export function serverPresetForUrl(raw) {
+  const result = validateServerUrl(raw);
+  if (!result.ok || !result.url || result.url === PACKAGED_SERVER_URL) return 'dedicated';
+  if (result.url === FULL_GAME_SERVER_URL) return 'full-game';
+  return 'custom';
 }
 
 // Resolve the effective service URL from an explicit context. Local development

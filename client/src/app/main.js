@@ -12,7 +12,10 @@ import { LocalMatch } from '../game/localMatch.js';
 import { MenuDuel } from '../game/menuDuel.js';
 import { OnlineMatch } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
-import { effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget } from '../net/serverConfig.js';
+import {
+  effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget,
+  PACKAGED_SERVER_URL, FULL_GAME_SERVER_URL, serverPresetForUrl,
+} from '../net/serverConfig.js';
 import { isNativeApp, onBackButton, onAppStateChange, exitApp, nativeImpact, setNativeOrientation } from './native.js';
 import { TutorialRunner, STATES } from '../tutorial/runner.js';
 import { CAMPAIGN, CAMPAIGN_BY_ID, REQUIRED_LESSON_IDS, chapters,
@@ -1926,6 +1929,7 @@ $('#set-reduced').addEventListener('change', (e) => { settings.reduced = e.targe
 $('#set-audio').addEventListener('change', (e) => { settings.audio = e.target.checked; applySettings(); });
 $('#set-haptics').addEventListener('change', (e) => { settings.haptics = e.target.checked; });
 $('#set-devcast').addEventListener('change', (e) => { settings.devcast = e.target.checked; applySettings(); });
+$('#set-server-choice').addEventListener('change', updateServerChoiceUi);
 $('#set-orientation').addEventListener('change', (e) => {
   const value = ORIENTATIONS.has(e.target.value) ? e.target.value : 'auto';
   settings.orientation = value;
@@ -1935,8 +1939,7 @@ $('#set-orientation').addEventListener('change', (e) => {
 
 // ----------------------------------------------------- server URL + local data
 function openSettings() {
-  const input = $('#set-server-url');
-  if (input) input.value = getStoredServerUrl();
+  syncServerSettingsUi();
   const orientation = $('#set-orientation');
   if (orientation) orientation.value = settings.orientation;
   updateOrientationStatus();
@@ -2040,20 +2043,40 @@ function setServerStatus(msg, cls) {
   el.textContent = msg || '';
   el.className = 'server-status' + (cls ? ' ' + cls : '');
 }
+function syncServerSettingsUi() {
+  const stored = getStoredServerUrl();
+  const choice = serverPresetForUrl(stored);
+  const select = $('#set-server-choice');
+  const input = $('#set-server-url');
+  if (select) select.value = choice;
+  if (input) input.value = choice === 'custom' ? stored : '';
+  $('#set-server-custom-field')?.classList.toggle('hidden', choice !== 'custom');
+}
+function updateServerChoiceUi() {
+  const custom = $('#set-server-choice')?.value === 'custom';
+  $('#set-server-custom-field')?.classList.toggle('hidden', !custom);
+  if (custom) $('#set-server-url')?.focus();
+}
 function saveServerUrl() {
-  const res = setStoredServerUrl($('#set-server-url').value);
+  const choice = $('#set-server-choice')?.value || 'dedicated';
+  const raw = choice === 'full-game'
+    ? FULL_GAME_SERVER_URL
+    : choice === 'custom'
+      ? $('#set-server-url').value
+      : '';
+  const res = setStoredServerUrl(raw);
   if (!res.ok) { setServerStatus(res.error, 'err'); return; }
-  $('#set-server-url').value = res.url;
+  syncServerSettingsUi();
   disposeOnline(); // reconnect to the new target on the next online action
   setServerStatus(`Saved. ${describeServerTarget()}`, 'ok');
   toast('Online service updated.');
 }
 function resetServerUrl() {
   setStoredServerUrl('');
-  $('#set-server-url').value = '';
+  syncServerSettingsUi();
   disposeOnline();
   setServerStatus(`Reset. ${describeServerTarget()}`, 'ok');
-  toast('Using the default service.');
+  toast(`Using ${PACKAGED_SERVER_URL}.`);
 }
 function openPrivacy() {
   window.location.href = './privacy.html';

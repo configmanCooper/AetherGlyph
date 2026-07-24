@@ -10,6 +10,24 @@ Two separate Render services are maintained:
 Packaged and public web clients connect to the dedicated server for matchmaking
 and duels; localhost/LAN development stays same-origin.
 
+## GitHub Pages
+
+Pushes to `main` deploy the complete static client through
+`.github/workflows/pages.yml`. The workflow installs the vendored browser
+dependencies, stages `www/`, and publishes it at the repository's GitHub Pages
+URL. All graphics, music, and solo-game files are served by GitHub Pages; Render
+is contacted only when the player uses online multiplayer.
+
+In **Settings → Online multiplayer server**, players can choose:
+
+- `https://aetherglyph-server.onrender.com` (dedicated, default),
+- `https://aetherglyph.onrender.com` (the full-game Render service), or
+- a validated local/custom service URL.
+
+Both Render Blueprints allow the `https://configmancooper.github.io` origin.
+In repository **Settings → Pages**, set the source to **GitHub Actions** if Pages
+has not previously been enabled.
+
 ## Run locally
 
 ```bash
