@@ -100,7 +100,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.7\.11/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.7\.12/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -643,9 +643,12 @@ try {
   await page.waitForSelector('#panel-lab-enemy:not(.hidden)', { timeout: 5000 });
   const enemyOptions = await page.evaluate(() => ({
     spells: document.querySelectorAll('#lab-enemy-spell option').length,
+    ids: Array.from(document.querySelectorAll('#lab-enemy-spell option')).map((option) => Number(option.value)),
     cadences: Array.from(document.querySelectorAll('#lab-enemy-cadence option')).map((option) => option.value),
   }));
-  if (enemyOptions.spells < 20 || enemyOptions.cadences.join(',') !== 'once,5,15,30') {
+  if (enemyOptions.spells < 26
+      || ![10, 11, 12, 13, 14, 15].every((id) => enemyOptions.ids.includes(id))
+      || enemyOptions.cadences.join(',') !== 'once,5,15,30') {
     fail('Glyph Lab enemy controls are incomplete: ' + JSON.stringify(enemyOptions));
   }
   await page.select('#lab-enemy-spell', '1');

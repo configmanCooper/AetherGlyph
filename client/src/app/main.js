@@ -75,7 +75,8 @@ const LAB_PUBLIC_IDS = [
   ...SPELL_CATALOG.filter((s) => !s.secret && !STARTER_SPELL_IDS.includes(s.id)).map((s) => s.id),
 ];
 const LAB_ENEMY_IDS = SPELL_CATALOG
-  .filter((spell) => !spell.secret && ['Offensive', 'Debuff', 'Control', 'Environmental'].includes(spell.category))
+  .filter((spell) => !spell.secret
+    && ['Offensive', 'Defensive', 'Debuff', 'Control', 'Environmental'].includes(spell.category))
   .map((spell) => spell.id);
 let labPage = 0;
 let labSelectedId = LAB_PUBLIC_IDS[0];
@@ -2107,6 +2108,7 @@ if (typeof window !== 'undefined') {
       labEnemy: { ...labEnemy },
       enemyCastsResolved: match?.sim?.wizards?.[1]?.castsResolved ?? 0,
       enemyArcPos: match?.sim?.wizards?.[1]?.arcPos ?? 0,
+      enemyShieldActive: !!match?.sim?.wizards?.[1]?.shield,
       playerMirrorTicks: match?.sim?.wizards?.[0]?.mirrorTicks ?? 0,
       playerMirrorPos: match?.sim?.wizards?.[0]?.mirrorPos ?? null,
       enemyFacing: match?.sim?.wizards?.[1]?.facing ?? null,
