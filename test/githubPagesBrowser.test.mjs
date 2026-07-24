@@ -1,7 +1,7 @@
 import express from 'express';
 import puppeteer from 'puppeteer-core';
 import { existsSync } from 'node:fs';
-import { stageWeb, WWW } from '../scripts/stage-web.js';
+import { stageWeb, ROOT, WWW } from '../scripts/stage-web.js';
 
 const EDGE_CANDIDATES = [
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
@@ -16,7 +16,8 @@ if (!executablePath) {
 
 stageWeb();
 const app = express();
-app.use('/AetherGlyph', express.static(WWW));
+app.use('/AetherGlyph', express.static(ROOT));
+app.use('/AetherGlyphActions', express.static(WWW));
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
 const port = server.address().port;
@@ -83,6 +84,20 @@ try {
   if (reset !== null) throw new Error(`dedicated default should clear override: ${reset}`);
   if (errors.length || missing.length) {
     throw new Error(`browser errors=${JSON.stringify(errors)} missing=${JSON.stringify(missing)}`);
+  }
+
+  const stagedPage = await browser.newPage();
+  const stagedErrors = [];
+  stagedPage.on('pageerror', (error) => stagedErrors.push(String(error)));
+  stagedPage.on('response', (response) => {
+    if (response.status() === 404 && !/favicon/i.test(response.url())) stagedErrors.push(response.url());
+  });
+  await stagedPage.goto(`${origin}/AetherGlyphActions/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await stagedPage.waitForFunction(() => !!window.__aegTest, { timeout: 15000 });
+  const stagedPath = await stagedPage.evaluate(() => window.location.pathname);
+  await stagedPage.close();
+  if (stagedPath !== '/AetherGlyphActions/client/index.html' || stagedErrors.length) {
+    throw new Error(`Actions artifact failed: path=${stagedPath} errors=${JSON.stringify(stagedErrors)}`);
   }
 
   console.log('GitHub Pages browser test: PASS');

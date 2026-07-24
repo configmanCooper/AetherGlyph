@@ -10,7 +10,7 @@
 //
 // Run: `npm run stage:web` (also invoked by sync-android.ps1 before cap sync).
 
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -23,6 +23,8 @@ export const WWW = join(ROOT, 'www');
 // a broken package.
 const REQUIRED = [
   ['client/index.html', 'the client is missing'],
+  ['index.html', 'the root GitHub Pages entry is missing'],
+  ['.nojekyll', 'the GitHub Pages Jekyll opt-out is missing'],
   ['client/src/app/main.js', 'the client is missing'],
   ['client/styles/style.css', 'the client is missing'],
   ['client/manifest.webmanifest', 'the web manifest is missing'],
@@ -38,40 +40,14 @@ const COPY_DIRS = ['client', 'shared', 'design'];
 
 // Single files copied to the webDir root so absolute links keep working offline.
 const COPY_FILES = [
+  ['index.html', 'index.html'],
+  ['.nojekyll', '.nojekyll'],
   ['MASTERPLAN.md', 'MASTERPLAN.md'],
   ['client/manifest.webmanifest', 'manifest.webmanifest'],
 ];
 
 function skipCruft(src) {
   return !/[\\/]node_modules([\\/]|$)|[\\/]\.git([\\/]|$)|[\\/](?:\.DS_Store|Thumbs\.db)$/.test(src);
-}
-
-function rootIndexHtml() {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#0a0713" />
-  <title>Aetherglyph: Arcane Duels</title>
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="./client/icons/icon-192.png" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
-  <meta http-equiv="refresh" content="0; url=./client/index.html" />
-  <style>
-    html, body { margin: 0; height: 100%; background: #0a0713; color: #ece7f6;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    .boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      letter-spacing: 2px; color: #8b6bff; }
-  </style>
-  <script>window.location.replace('./client/index.html');</script>
-</head>
-<body>
-  <div class="boot">Aetherglyph…</div>
-  <noscript><p style="text-align:center"><a href="./client/index.html" style="color:#8b6bff">Enter Aetherglyph</a></p></noscript>
-</body>
-</html>
-`;
 }
 
 export function stageWeb({ log = () => {} } = {}) {
@@ -92,9 +68,6 @@ export function stageWeb({ log = () => {} } = {}) {
   for (const [src, dest] of COPY_FILES) {
     copyFileSync(join(ROOT, src), join(WWW, dest));
   }
-
-  writeFileSync(join(WWW, 'index.html'), rootIndexHtml(), 'utf8');
-  writeFileSync(join(WWW, '.nojekyll'), '', 'utf8');
 
   log(`[stage-web] staged www/ from client, shared, design (+ root index, .nojekyll, manifest, MASTERPLAN)`);
   return { www: WWW };

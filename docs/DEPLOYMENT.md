@@ -12,11 +12,16 @@ and duels; localhost/LAN development stays same-origin.
 
 ## GitHub Pages
 
-Pushes to `main` deploy the complete static client through
-`.github/workflows/pages.yml`. The workflow installs the vendored browser
-dependencies, stages `www/`, and publishes it at the repository's GitHub Pages
-URL. All graphics, music, and solo-game files are served by GitHub Pages; Render
-is contacted only when the player uses online multiplayer.
+The repository works with either GitHub Pages source mode:
+
+- **Deploy from branch (`main` / root):** the tracked root `index.html`,
+  `.nojekyll`, client/shared files, and vendored browser libraries are served
+  directly.
+- **GitHub Actions:** `.github/workflows/pages.yml` installs dependencies,
+  stages `www/`, and publishes the same payload.
+
+All graphics, music, and solo-game files are served by GitHub Pages; Render is
+contacted only when the player uses online multiplayer.
 
 In **Settings → Online multiplayer server**, players can choose:
 
@@ -25,8 +30,6 @@ In **Settings → Online multiplayer server**, players can choose:
 - a validated local/custom service URL.
 
 Both Render Blueprints allow the `https://configmancooper.github.io` origin.
-In repository **Settings → Pages**, set the source to **GitHub Actions** if Pages
-has not previously been enabled.
 
 ## Run locally
 

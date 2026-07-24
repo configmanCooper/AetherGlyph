@@ -37,6 +37,9 @@ stageWeb();
 
 const pkg = readJson('package.json');
 const version = pkg.version;
+ok(existsSync(join(ROOT, 'index.html')) && /client\/index\.html/.test(read('index.html')),
+  'repository root redirects branch-based GitHub Pages into the game');
+ok(existsSync(join(ROOT, '.nojekyll')), 'repository root disables Jekyll for branch-based Pages');
 ok(!!pkg.dependencies['@capacitor/screen-orientation'], 'screen orientation plugin is packaged');
 ok(read('android/capacitor.settings.gradle').includes("include ':capacitor-screen-orientation'"),
   'Android settings include the ScreenOrientation plugin project');
