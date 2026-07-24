@@ -62,6 +62,8 @@ try {
       schemaVersion: 1,
       currentLessonId: 'EXAM',
       completedLessons: [
+        'PROLOGUE', 'L01', 'L02', 'L03', 'L04', 'L05', 'L06',
+        'L07', 'L08', 'L09', 'L10', 'L11',
         'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10', 'G11', 'G12',
         'S01', 'S02', 'S03', 'S04', 'EXAM',
       ],
@@ -84,6 +86,29 @@ try {
   });
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => !!window.__aegTest);
+
+  await openTutorialHub(page);
+  await page.click('[data-lesson="L12"]');
+  await page.waitForSelector('#panel-loadout:not(.hidden)', { timeout: 5000 });
+  const firstFormalChooser = await page.evaluate(() => ({
+    title: document.querySelector('#panel-loadout h2')?.textContent || '',
+    picked: document.querySelectorAll('#loadout-picked .picked-chip').length,
+    secretChips: document.querySelectorAll('#loadout-catalog .spell-chip.secret').length,
+  }));
+  assert(firstFormalChooser.title === 'First Formal Duel Guide Shortcuts'
+      && firstFormalChooser.picked === 8 && firstFormalChooser.secretChips === 0,
+  `First Formal Duel did not present eight public guide choices: ${JSON.stringify(firstFormalChooser)}`);
+  await page.click('#panel-loadout [data-action="save-loadout"]');
+  await page.waitForSelector('#panel-lesson-intro:not(.hidden)', { timeout: 5000 });
+  await page.click('[data-action="tut-begin"]');
+  await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });
+  const firstFormalGuides = await page.evaluate(() => ({
+    count: document.querySelectorAll('#spellbar .spell-btn[data-spell]').length,
+    hidden: document.querySelector('#spellbar')?.classList.contains('hidden'),
+  }));
+  assert(!firstFormalGuides.hidden && firstFormalGuides.count === 8,
+    `First Formal Duel did not show its selected guides: ${JSON.stringify(firstFormalGuides)}`);
+  await page.evaluate(() => window.__aegTest.returnMenu());
 
   await page.click('[data-action="lab"]');
   await page.waitForSelector('#hud:not(.hidden)', { timeout: 5000 });

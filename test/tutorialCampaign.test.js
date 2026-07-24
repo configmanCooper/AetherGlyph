@@ -90,6 +90,8 @@ export function run() {
   ok(formalLegal, 'every formal duel uses a legal 8-spell / 14-point loadout');
   ok(CAMPAIGN_BY_ID.L12.fullRoster === true,
     'First Formal Duel enables recognition for the full spell roster');
+  ok(CAMPAIGN_BY_ID.L12.chooseGuides === true,
+    'First Formal Duel prompts for eight public guide shortcuts');
   ok(CAMPAIGN_BY_ID.A16.fullRoster === true,
     'Eight Schools Examination enables recognition for the full spell roster');
 

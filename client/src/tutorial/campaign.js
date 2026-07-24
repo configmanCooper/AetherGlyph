@@ -497,7 +497,7 @@ export const CAMPAIGN = [
       'A full round adds the timer and Arcane Pressure. Win it fairly.',
       'Defeat the fair Easy AI in one legal round.',
     ],
-    formal: true,
+    formal: true, chooseGuides: true,
     fullRoster: true,
     timerEnabled: true, pressureEnabled: true,
     loadoutRule: 'legal',

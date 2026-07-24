@@ -758,7 +758,7 @@ function startTutorialLesson(lessonId, options = {}) {
   }
   if (lesson.chooseGuides && !options.guidesChosen) {
     pendingTutorialLessonId = lesson.id;
-    openLoadoutBuilder('final-duel');
+    openLoadoutBuilder('tutorial-duel');
     return;
   }
   const runtimeLesson = lesson.chooseGuides
@@ -1315,18 +1315,20 @@ function updatePracticeSummaries() {
 function openLoadoutBuilder(destination = 'practice') {
   loadoutDestination = destination;
   draftIds = playerIds.filter((id) => !SPELLS_BY_ID[id]?.secret).slice(0, 8);
-  const finalDuel = destination === 'final-duel';
+  const tutorialDuel = destination === 'tutorial-duel';
+  const pendingLesson = tutorialDuel ? CAMPAIGN_BY_ID[pendingTutorialLessonId] : null;
+  const duelTitle = pendingLesson?.title || 'Formal Duel';
   const panel = $('#panel-loadout');
   const title = panel?.querySelector('h2');
   const rules = $('#loadout-rules');
   const save = panel?.querySelector('[data-action="save-loadout"]');
-  if (title) title.textContent = finalDuel ? 'Final Duel Guide Shortcuts' : 'Guide Shortcuts';
+  if (title) title.textContent = tutorialDuel ? `${duelTitle} Guide Shortcuts` : 'Guide Shortcuts';
   if (rules) {
-    rules.textContent = finalDuel
-      ? 'Choose 8 public spell guides for the Final Duel. These are visual shortcuts only: every public spell and each secret spell you have discovered remains castable.'
+    rules.textContent = tutorialDuel
+      ? `Choose 8 public spell guides for ${duelTitle}. These are visual shortcuts only: every public spell and each secret spell you have discovered remains castable.`
       : 'Choose any 8 public spell guides for quick reference. Every public spell and each secret spell you have discovered can still be drawn and cast.';
   }
-  if (save) save.textContent = finalDuel ? 'Use guides and begin Final Duel' : 'Save guide shortcuts';
+  if (save) save.textContent = tutorialDuel ? `Use guides and begin ${duelTitle}` : 'Save guide shortcuts';
   renderPresetButtons();
   renderCatalog();
   renderLoadoutState();
@@ -1408,7 +1410,7 @@ function saveLoadout() {
   playerIds = draftIds.slice();
   rebuildForLoadout();
   toast('Guide shortcuts saved.');
-  if (loadoutDestination === 'final-duel' && pendingTutorialLessonId) {
+  if (loadoutDestination === 'tutorial-duel' && pendingTutorialLessonId) {
     const lessonId = pendingTutorialLessonId;
     pendingTutorialLessonId = null;
     loadoutDestination = 'practice';
@@ -1745,7 +1747,7 @@ function backFromSubpanel() {
     updateResumeGameButton();
     showPanel('panel-main');
     showOverlay(true);
-  } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'final-duel') {
+  } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'tutorial-duel') {
     pendingTutorialLessonId = null;
     loadoutDestination = 'practice';
     openTutorialHub();
