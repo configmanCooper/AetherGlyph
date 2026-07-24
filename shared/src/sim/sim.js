@@ -146,7 +146,11 @@ export class Sim {
     return false;
   }
 
-  regenerateStamina(w) {
+  regenerateStamina(w, regenerationBlocked = this.isHardControlled(w)) {
+    if (regenerationBlocked) {
+      w.staminaIdleTicks = 0;
+      return;
+    }
     if (w.movedThisTick) {
       w.staminaIdleTicks = 0;
       return;
@@ -1051,10 +1055,13 @@ export class Sim {
 
   // ------------------------------------------------------------------ per-tick
   updateWizardTimers(w) {
+    const regenerationBlocked = this.isHardControlled(w);
     const fullChargeFocus = w.focusing && w.charges >= SIGIL.max;
-    let aetherRegenPerS = !w.focusing || fullChargeFocus ? AETHER.regenPerS : 0;
+    let aetherRegenPerS = !regenerationBlocked && (!w.focusing || fullChargeFocus)
+      ? AETHER.regenPerS
+      : 0;
     // Aether Surge remains active during Focus.
-    if (this.hasStatus(w, 'AetherSurge')) {
+    if (!regenerationBlocked && this.hasStatus(w, 'AetherSurge')) {
       aetherRegenPerS += STATUSES.AetherSurge.aetherPerS;
     }
     if (fullChargeFocus) {
@@ -1204,6 +1211,7 @@ export class Sim {
       else if (w.casting) reason = 'casting';
       else if (w.recoveryTicks > 0) reason = 'recovery';
       else if (rooted) reason = 'rooted';
+      else if (knockedDown) reason = 'knocked-down';
 
       if (reason) {
         this.rejectAction(w, 'focus', reason, {
@@ -1245,6 +1253,7 @@ export class Sim {
       let reason = null;
       if (this.hasStatus(w, 'Frozen')) reason = 'frozen';
       else if (this.hasStatus(w, 'Stunned')) reason = 'stunned';
+      else if (knockedDown) reason = 'knocked-down';
       else if (w.channel) reason = 'channeling';
       else if (w.focusing) reason = 'focusing';
 
@@ -1431,6 +1440,7 @@ export class Sim {
     this.timeS = this.tick * DT;
 
     // 1. Timers / regen / status ticks / zones.
+    const regenerationBlocked = this.wizards.map((w) => this.isHardControlled(w));
     for (const w of this.wizards) {
       this.updateWizardTimers(w);
       this.tickStatuses(w);
@@ -1447,8 +1457,8 @@ export class Sim {
     this.wizards[1].movedThisTick = false;
     this.applyIntent(this.wizards[0], intents[0]);
     this.applyIntent(this.wizards[1], intents[1]);
-    this.regenerateStamina(this.wizards[0]);
-    this.regenerateStamina(this.wizards[1]);
+    this.regenerateStamina(this.wizards[0], regenerationBlocked[0]);
+    this.regenerateStamina(this.wizards[1], regenerationBlocked[1]);
     this.updateFacings();
 
     // 4. Advance casts + channels.

@@ -228,13 +228,13 @@ Decision: become efficient but predictable, or switch schools to create a reacti
 | Chilled | 18 percent movement and cast recovery slow for 3 sec | Haste, Dispel |
 | Soaked | Lightning deals 25 percent more; removes Burning | leave water, Dispel |
 | Static | next channel is interrupted; 2 stacks prime stun; Spark Dart Static lasts 45 sec | Dispel |
-| Knocked Down | cannot move or Dodge for 2 sec; casting remains available | Grounding Mantle, Dispel |
+| Knocked Down | cannot move, Dodge, Focus, or Brace for 2 sec; casting remains available | Grounding Mantle, Dispel |
 | Sundered | 20 percent more direct damage for 4 sec | Dispel, defensive play |
 | Weakened | 22 percent less outgoing damage for 4 sec | Dispel |
 | Marked | next direct hit gains 35 percent damage, then consumes mark | Dispel, Brace |
 | Rooted | cannot move but may cast | Blink, Dispel |
-| Frozen | cannot move or cast | preemptive Dispel, Tenacity |
-| Stunned | cannot act | Tenacity |
+| Frozen | cannot act; Aether and Stamina regeneration stop | preemptive Dispel, Tenacity |
+| Stunned | cannot act; Aether and Stamina regeneration stop | Tenacity |
 
 Hard-control safety:
 

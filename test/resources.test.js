@@ -200,6 +200,57 @@ export function run() {
     'Brace attempted while Stunned reports why it failed');
   eq(sim.wizards[0].braceTicks, 1, 'failed Brace input does not erase an already-active Brace window');
 
+  for (const status of ['Frozen', 'Stunned']) {
+    sim = freshSim();
+    const wizard = sim.wizards[0];
+    wizard.aether = 40;
+    wizard.stamina = 40;
+    sim.applyStatus(wizard, 'AetherSurge', 1);
+    sim.applyStatus(wizard, status, 1, { durationS: 2, ignoreHardCap: true });
+    advance(sim, TICK_HZ, {}, {});
+    near(wizard.aether, 40, 0.001, `${status} stops all Aether regeneration`);
+    near(wizard.stamina, 40, 0.001, `${status} stops all Stamina regeneration`);
+    eq(wizard.staminaIdleTicks, 0, `${status} does not build rested Stamina time`);
+
+    rejectEvents = sim.step({ 0: { cast: 1, castQuality: 1 }, 1: {} });
+    eq(rejectEvents.find((e) => e.type === 'castRejected')?.reason, status.toLowerCase(),
+      `${status} prevents spell casting`);
+    rejectEvents = sim.step({ 0: { focus: true }, 1: {} });
+    eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'focus')?.reason,
+      status.toLowerCase(), `${status} prevents Focus`);
+    rejectEvents = sim.step({ 0: { brace: true }, 1: {} });
+    eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'brace')?.reason,
+      status.toLowerCase(), `${status} prevents Brace`);
+    rejectEvents = sim.step({ 0: { sidestep: 1 }, 1: {} });
+    eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'sidestep')?.reason,
+      status.toLowerCase(), `${status} prevents Dodge`);
+  }
+
+  sim = freshSim();
+  sim.wizards[0].aether = 40;
+  sim.wizards[0].stamina = 40;
+  sim.applyStatus(sim.wizards[0], 'Frozen', 1, { durationS: 0.5, ignoreHardCap: true });
+  advance(sim, Math.round(0.5 * TICK_HZ), {}, {});
+  near(sim.wizards[0].aether, 40, 0.001,
+    'Aether remains stopped through the exact Frozen expiry tick');
+  near(sim.wizards[0].stamina, 40, 0.001,
+    'Stamina remains stopped through the exact Frozen expiry tick');
+  sim.step({ 0: {}, 1: {} });
+  ok(sim.wizards[0].aether > 40 && sim.wizards[0].stamina > 40,
+    'Aether and Stamina resume together on the tick after Frozen expires');
+
+  sim = freshSim();
+  sim.applyStatus(sim.wizards[0], 'KnockedDown', 1, { durationS: 2 });
+  rejectEvents = sim.step({ 0: { focus: true }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'focus')?.reason,
+    'knocked-down', 'Knocked Down prevents Focus');
+  rejectEvents = sim.step({ 0: { brace: true }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'brace')?.reason,
+    'knocked-down', 'Knocked Down prevents Brace');
+  rejectEvents = sim.step({ 0: { sidestep: 1 }, 1: {} });
+  eq(rejectEvents.find((e) => e.type === 'actionRejected' && e.action === 'sidestep')?.reason,
+    'knocked-down', 'Knocked Down prevents Dodge');
+
   sim = freshSim();
   sim.wizards[0].stamina = 0;
   rejectEvents = sim.step({ 0: { focus: true }, 1: {} });
