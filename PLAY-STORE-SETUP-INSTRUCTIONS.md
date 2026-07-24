@@ -378,10 +378,10 @@ duels, private rooms, ranked matchmaking and local-network multiplayer are
 available in the paid Aetherglyph: Arcane Duels app.
 ```
 
-Before publishing the demo, create demo-specific store graphics with a clearly
-visible **DEMO** label. Do not use screenshots that imply online play is included.
-The icon must remain 512 × 512 and the feature graphic 1024 × 500. Upload at
-least two offline-game screenshots.
+Use `play-assets\demo\icon-512.png` for the demo's 512 × 512 Play Store icon.
+Before publishing, also create a demo-specific 1024 × 500 feature graphic with a
+clearly visible **DEMO** label. Do not use screenshots that imply online play is
+included; upload at least two offline-game screenshots.
 
 ### 3. Demo App content answers
 
