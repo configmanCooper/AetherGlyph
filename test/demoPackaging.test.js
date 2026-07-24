@@ -36,6 +36,10 @@ ok(read('client/src/net/onlineMatch.js').includes('unavailable in the Aetherglyp
   'demo OnlineMatch is an inert local stub');
 eq(read('client/src/net/serverConfig.js').includes('http'), false,
   'demo server configuration contains no network URL');
+ok(read('client/src/net/serverConfig.js').includes("export const PACKAGED_SERVER_URL = '';")
+    && read('client/src/net/serverConfig.js').includes("export const FULL_GAME_SERVER_URL = '';")
+    && read('client/src/net/serverConfig.js').includes("export function serverPresetForUrl() { return 'dedicated'; }"),
+  'demo server-config stub satisfies the full client import surface without real endpoints');
 ok(!existsSync(join(DEMO_WWW, 'client/vendor/socket.io.esm.min.js')),
   'demo bundle omits the Socket.IO client');
 ok(!existsSync(join(DEMO_WWW, 'client/sw.js')),

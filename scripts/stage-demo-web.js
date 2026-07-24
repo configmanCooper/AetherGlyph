@@ -49,7 +49,10 @@ export function setDisplayName(name) {
 export function loadResume() { return null; }
 `);
 
-  write('client/src/net/serverConfig.js', `export function effectiveServerUrl() { return ''; }
+  write('client/src/net/serverConfig.js', `export const PACKAGED_SERVER_URL = '';
+export const FULL_GAME_SERVER_URL = '';
+export function serverPresetForUrl() { return 'dedicated'; }
+export function effectiveServerUrl() { return ''; }
 export function getStoredServerUrl() { return ''; }
 export function setStoredServerUrl() {
   return { ok: false, error: 'Online play is unavailable in the demo.', url: '' };
