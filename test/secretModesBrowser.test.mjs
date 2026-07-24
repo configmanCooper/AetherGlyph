@@ -49,6 +49,16 @@ async function drawGesture(page, points) {
   await page.mouse.up();
 }
 
+async function doubleTapGuideSide(page, side) {
+  const canvas = await page.$('#draw-canvas');
+  const box = await canvas.boundingBox();
+  const x = box.x + box.width * (side === 'left' ? 0.25 : 0.75);
+  const y = box.y + box.height * 0.5;
+  await page.mouse.click(x, y);
+  await sleep(70);
+  await page.mouse.click(x, y);
+}
+
 try {
   await sleep(1400);
   browser = await puppeteer.launch({
@@ -142,6 +152,18 @@ try {
   assert(practiceSecret.recognition.accepted && practiceSecret.recognition.spellId === 37,
     `Practice did not recognize discovered Mirror Twin: ${JSON.stringify(practiceSecret)}`);
   assert(!practiceSecret.secretGuide, 'Practice exposed a secret-spell guide button.');
+  await doubleTapGuideSide(page, 'right');
+  await page.waitForFunction(() => window.__aegTest.info().selectedGuideId === 1);
+  await doubleTapGuideSide(page, 'right');
+  await page.waitForFunction(() => window.__aegTest.info().selectedGuideId === 2);
+  await doubleTapGuideSide(page, 'left');
+  await page.waitForFunction(() => window.__aegTest.info().selectedGuideId === 1);
+  const guideNavigation = await page.evaluate(() => ({
+    selected: window.__aegTest.info().selectedGuideId,
+    casts: window.__aegTest.info().playerCastsResolved,
+  }));
+  assert(guideNavigation.selected === 1 && guideNavigation.casts === 0,
+    `draw-pad double taps did not cycle guides without casting: ${JSON.stringify(guideNavigation)}`);
 
   await page.evaluate(() => window.__aegTest.returnMenu());
   await openTutorialHub(page);

@@ -21,6 +21,7 @@ export class GestureInput {
     this.onCast = opts.onCast || (() => {});
     this.onReject = opts.onReject || (() => {});
     this.onProgress = opts.onProgress || (() => {});
+    this.onGuideNavigate = opts.onGuideNavigate || (() => {});
     this.haptics = opts.haptics || (() => {});
     this.reduced = opts.reduced || false;
 
@@ -30,6 +31,9 @@ export class GestureInput {
     this.pointerCount = 0;
     this.rect = null;
     this.startTime = 0;
+    this.pointerStartStamp = 0;
+    this._lastTap = null;
+    this._tapTimer = null;
 
     // Progressive guide system (SOLO-MODES-PLAN §5). `guide` is the canonical
     // template path in 0..100 pad space; `guideStage` selects how much help to
@@ -158,6 +162,7 @@ export class GestureInput {
     this.activePointer = e.pointerId;
     this.drawing = true;
     this.startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this.pointerStartStamp = Number(e.timeStamp) || this.startTime;
     this.points = [this._pos(e)];
     this._redraw();
   }
@@ -169,6 +174,7 @@ export class GestureInput {
     const last = this.points[this.points.length - 1];
     if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 1.5) {
       this.points.push(p);
+      if (this._lastTap && this._traceLength() > 12) this._clearPendingTap();
       this.onProgress(this.points.length);
       this._redraw();
     }
@@ -179,6 +185,12 @@ export class GestureInput {
     if (!this.drawing) return;
     this.drawing = false;
     this.activePointer = null;
+    if (this._isTapGesture(e)) {
+      this._handleTap(this.points[0], e);
+      this.points = [];
+      this._redraw();
+      return;
+    }
     this._classify();
     // Fade the trace shortly after.
     setTimeout(() => { this.points = []; this._redraw(); }, this.reduced ? 0 : 140);
@@ -191,9 +203,49 @@ export class GestureInput {
   }
 
   _breakTrace() {
+    this._clearPendingTap();
     this.drawing = false; this.activePointer = null;
     this.points = []; this._redraw();
     this.onReject({ reason: 'break-trace' });
+  }
+
+  _traceLength() {
+    let length = 0;
+    for (let i = 1; i < this.points.length; i++) {
+      length += Math.hypot(
+        this.points[i].x - this.points[i - 1].x,
+        this.points[i].y - this.points[i - 1].y,
+      );
+    }
+    return length;
+  }
+
+  _isTapGesture(event) {
+    const endStamp = Number(event?.timeStamp)
+      || (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    return endStamp - this.pointerStartStamp <= 400 && this._traceLength() <= 12;
+  }
+
+  _clearPendingTap() {
+    this._lastTap = null;
+    if (this._tapTimer) clearTimeout(this._tapTimer);
+    this._tapTimer = null;
+  }
+
+  _handleTap(point, event) {
+    const now = Number(event?.timeStamp)
+      || (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const rect = this.canvas.getBoundingClientRect();
+    const side = point.x < rect.width / 2 ? -1 : 1;
+    if (this._lastTap && now - this._lastTap.time <= 450 && this._lastTap.side === side) {
+      this._clearPendingTap();
+      this.haptics('accept');
+      this.onGuideNavigate(side);
+      return;
+    }
+    this._clearPendingTap();
+    this._lastTap = { time: now, side };
+    this._tapTimer = setTimeout(() => this._clearPendingTap(), 500);
   }
 
   _classify() {

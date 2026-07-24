@@ -227,10 +227,31 @@ function castSpell(id, quality = 1) {
   if (match) { match.input.pendingCast = id; match.input.pendingQuality = quality; }
 }
 
+function cycleVisibleGuide(direction) {
+  if ($('#spellbar')?.classList.contains('hidden')) return;
+  if (mode === 'lab') {
+    const ids = labPageIds();
+    if (!ids.length) return;
+    const current = ids.indexOf(labSelectedId);
+    const next = current < 0
+      ? (direction < 0 ? ids.length - 1 : 0)
+      : (current + Math.sign(direction) + ids.length) % ids.length;
+    selectLabSpell(ids[next]);
+    return;
+  }
+  if (!activeGuideLoadout.length) return;
+  const current = activeGuideLoadout.findIndex((spell) => spell.id === selectedGuideId);
+  const next = current < 0
+    ? (direction < 0 ? activeGuideLoadout.length - 1 : 0)
+    : (current + Math.sign(direction) + activeGuideLoadout.length) % activeGuideLoadout.length;
+  selectEquippedGuide(activeGuideLoadout[next].id);
+}
+
 const gesture = new GestureInput($('#draw-canvas'), {
   recognizer: null,
   reduced: settings.reduced,
   haptics: haptic,
+  onGuideNavigate: (direction) => cycleVisibleGuide(direction),
   onCast: (spellId, quality, diag, trace) => {
     audio.unlock(); audio.accept();
     hud.setDiag(diag);
