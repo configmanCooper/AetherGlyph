@@ -7,14 +7,18 @@ The separate free, offline-only Google Play demo is built with
 
 ## Project status
 
-**Version 1.9.1 — feature complete.** The castle-styled title page now stages an
+**Version 1.10.0 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
 (Practice vs AI + coaching) is implemented on top of the offline campaign, the
 authoritative online service, and the deterministic shared simulation. The full
 and demo Android packages check Google Play at startup and show an Update/Later
-notice when a newer Store version is available. Version
+notice when a newer Store version is available. Version 1.10.0 hardens every
+portrait guide strip, adds real Focus/Brace/Dodge feedback, extends rounds to
+150 seconds, makes Stone Wall durable HP-based cover, teaches the touch controls,
+adds online population and authoritative surrender, and keeps private duel rooms
+available for ready-up rematches. Version
 1.6.x adds 150-point Health, authoritative 100-point Stamina bars and costs for
 movement, Dodge, Brace, and Focus; Haste
 modifies stamina economy; Brace converts damage to Aether; spare Sigil Charges
@@ -152,8 +156,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 10901 /
-versionName 1.9.1). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 11000 /
+versionName 1.10.0). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph-server.onrender.com`); localhost/LAN development
 stays same-origin.
@@ -419,7 +423,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 10901` / `versionName 1.9.1`, HTTPS production traffic plus
+  `versionCode 11000` / `versionName 1.10.0`, HTTPS production traffic plus
   app-validated private-LAN hosting,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via

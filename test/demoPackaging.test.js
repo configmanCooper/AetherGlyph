@@ -34,6 +34,8 @@ ok(read('client/src/app/edition.js').includes(message),
   'demo bundle contains the exact online purchase message');
 ok(read('client/src/net/onlineMatch.js').includes('unavailable in the Aetherglyph demo'),
   'demo OnlineMatch is an inert local stub');
+ok(read('client/src/net/onlineMatch.js').includes('export function formatOnlinePopulation'),
+  'demo OnlineMatch stub satisfies the full client import surface');
 eq(read('client/src/net/serverConfig.js').includes('http'), false,
   'demo server configuration contains no network URL');
 ok(read('client/src/net/serverConfig.js').includes("export const PACKAGED_SERVER_URL = '';")

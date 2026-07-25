@@ -54,7 +54,7 @@ The intended emotional arc is: recognize, prepare, bait, counter, transform the 
 
 - Best of three rounds.
 - 150 health each round.
-- Round limit: 105 seconds.
+- Round limit: 150 seconds.
 - Aether starts at 60 of 100.
 - Sigil Charges start at 0 of 3.
 - Arena-created zones reset between rounds.
@@ -66,7 +66,7 @@ The intended emotional arc is: recognize, prepare, bait, counter, transform the 
 - 0-60 seconds: normal duel.
 - At 60 seconds, Arcane Pressure begins narrowing the safe combat arc and increases by one step every 10 seconds.
 - At 90 seconds, shields lose 20 percent maximum capacity and healing is disabled.
-- At 105 seconds, the player with higher health percentage wins.
+- At 150 seconds, the player with higher health percentage wins.
 - Exact tie breakers: damage dealt, successful counters, then a draw round. A match can contain only one draw round; a second tied round becomes sudden death at 1 health each.
 
 Arcane Pressure is symmetric, visually obvious, and never randomly targets one player.

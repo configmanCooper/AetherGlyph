@@ -47,10 +47,14 @@ export class HUD {
       environment: root.querySelector('#environment'),
       series: root.querySelector('#series-score'),
       spellbar: root.querySelector('#spellbar'),
+      focus: root.querySelector('#btn-focus'),
+      brace: root.querySelector('#btn-brace'),
+      dodge: root.querySelector('#btn-sidestep'),
     };
     this.showDiag = false;
     this.spellButtons = new Map(); // spellId -> button element
     this.lastTouchPress = { at: -Infinity, key: '' };
+    this.dodgePulseTimer = null;
   }
 
   _pips(container, charges) {
@@ -86,8 +90,8 @@ export class HUD {
   // dotted guide; all roster spells remain drawable whether listed here or not.
   buildSpellbar(loadout, onCast, opts = {}) {
     if (!this.el.spellbar) return;
+    const previousScroll = opts.resetScroll ? 0 : this.el.spellbar.scrollLeft;
     this.el.spellbar.innerHTML = '';
-    if (opts.resetScroll) this.el.spellbar.scrollLeft = 0;
     this.spellButtons.clear();
     if (typeof opts.onBlank === 'function') {
       const blank = document.createElement('button');
@@ -148,6 +152,7 @@ export class HUD {
       bindPress(next, opts.onNext, this);
       this.el.spellbar.appendChild(next);
     }
+    this.el.spellbar.scrollLeft = previousScroll;
 
     function bindPress(button, action, owner) {
       let touch = null;
@@ -156,22 +161,34 @@ export class HUD {
         : [...button.classList].filter((name) => name.startsWith('spell-')).sort().join(':');
       button.addEventListener('pointerdown', (event) => {
         if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
-        touch = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+        touch = {
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          moved: false,
+          scrollLeft: owner.el.spellbar.scrollLeft,
+        };
       });
       button.addEventListener('pointermove', (event) => {
         if (!touch || event.pointerId !== touch.id) return;
-        if (Math.hypot(event.clientX - touch.x, event.clientY - touch.y) > 8) touch.moved = true;
+        if (Math.hypot(event.clientX - touch.x, event.clientY - touch.y) > 8
+            || Math.abs(owner.el.spellbar.scrollLeft - touch.scrollLeft) > 2) {
+          touch.moved = true;
+        }
       });
       button.addEventListener('pointerup', (event) => {
         if (!touch || event.pointerId !== touch.id) return;
-        const activate = !touch.moved;
+        const activate = !touch.moved
+          && Math.abs(owner.el.spellbar.scrollLeft - touch.scrollLeft) <= 2;
         touch = null;
-        if (!activate) return;
         event.preventDefault();
         owner.lastTouchPress = { at: performance.now(), key };
-        action();
+        if (activate) action();
       });
-      button.addEventListener('pointercancel', () => { touch = null; });
+      button.addEventListener('pointercancel', () => {
+        if (touch) owner.lastTouchPress = { at: performance.now(), key };
+        touch = null;
+      });
       button.addEventListener('click', (event) => {
         event.preventDefault();
         if (owner.lastTouchPress.key === key && performance.now() - owner.lastTouchPress.at < 700) return;
@@ -226,6 +243,13 @@ export class HUD {
       `<span class="rd">Round ${Math.min(roundIndex + 1, 3)}/3</span>`;
   }
 
+  pulseDodge() {
+    if (!this.el.dodge) return;
+    this.el.dodge.classList.add('active');
+    clearTimeout(this.dodgePulseTimer);
+    this.dodgePulseTimer = setTimeout(() => this.el.dodge?.classList.remove('active'), 220);
+  }
+
   update(sim) {
     const [p, e] = sim.wizards;
     this.el.playerHealth.style.width = `${(Math.max(0, p.health) / MATCH.startHealth) * 100}%`;
@@ -240,6 +264,8 @@ export class HUD {
     this._statuses(this.el.enemyStatus, e);
     this._environment(sim);
     this._updateSpellbar(p);
+    this.el.focus?.classList.toggle('active', !!p.focusing);
+    this.el.brace?.classList.toggle('active', p.braceTicks > 0);
 
     // Enemy cast tell (school + name).
     if (e.casting) {

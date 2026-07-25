@@ -100,7 +100,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.9\.0/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.10\.0/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -184,6 +184,12 @@ try {
   // to the authoritative server), confirm a share code appears, then cancel.
   await activate(page, '[data-action="online"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
+  await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
+    document.querySelector('#online-population')?.textContent || ''), { timeout: 10000 });
+  await activate(page, '[data-action="lan-duel"]');
+  await page.waitForSelector('#panel-lan-duel:not(.hidden)', { timeout: 5000 });
+  await page.evaluate(() => window.__aegTest.nativeBack());
+  await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   await activate(page, '[data-action="online-create"]');
   await page.waitForSelector('#panel-online-wait:not(.hidden)', { timeout: 15000 });
   await page.waitForFunction(() => /^[A-Z0-9]{5}$/.test(document.querySelector('#wait-code-value')?.textContent || ''), { timeout: 15000 });
@@ -206,6 +212,8 @@ try {
   }
   await page.click('#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
+  const surrenderVisible = await page.evaluate(() => !document.querySelector('#btn-surrender-game')?.classList.contains('hidden'));
+  if (!surrenderVisible) fail('online pause menu does not expose Surrender and exit duel');
   const pausedForeground = await page.evaluate(() => {
     window.__aegTest.backgroundChange(true);
     window.__aegTest.backgroundChange(false);
@@ -586,8 +594,63 @@ try {
     fail('Glyph Laboratory catalog must contain all 36 public spells including weather, excluding secrets: ' + labCatalog.join(','));
   }
 
+  // Selecting a glyph after horizontally scrolling must preserve the current
+  // scroll position rather than snapping back and making another button appear
+  // selected under the player's finger.
+  const scrolledSelection = await page.evaluate(() => {
+    const bar = document.querySelector('#spellbar');
+    bar.scrollLeft = Math.max(1, bar.scrollWidth - bar.clientWidth);
+    const before = bar.scrollLeft;
+    const rect = bar.getBoundingClientRect();
+    const target = Array.from(bar.querySelectorAll('.spell-btn[data-spell]')).findLast((button) => {
+      const r = button.getBoundingClientRect();
+      return r.left >= rect.left && r.right <= rect.right;
+    });
+    const id = target?.dataset.spell;
+    target?.click();
+    const nextBar = document.querySelector('#spellbar');
+    return {
+      id,
+      selected: nextBar.querySelector('.spell-btn.selected')?.dataset.spell,
+      before,
+      after: nextBar.scrollLeft,
+    };
+  });
+  if (!scrolledSelection.id || scrolledSelection.selected !== scrolledSelection.id
+      || Math.abs(scrolledSelection.after - scrolledSelection.before) > 2) {
+    fail('portrait/scrolled Glyph Lab selection moved to the wrong guide: ' + JSON.stringify(scrolledSelection));
+  }
+
+  const scrollGestureCancelled = await page.evaluate(() => {
+    const bar = document.querySelector('#spellbar');
+    if (bar.scrollWidth <= bar.clientWidth) return { skipped: true };
+    bar.scrollLeft = 0;
+    const selectedBefore = bar.querySelector('.spell-btn.selected')?.dataset.spell;
+    const candidate = Array.from(bar.querySelectorAll('.spell-btn[data-spell]'))
+      .find((button) => button.dataset.spell !== selectedBefore);
+    candidate.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 91, pointerType: 'touch', clientX: 100, clientY: 20,
+    }));
+    bar.scrollLeft = 90;
+    candidate.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true, cancelable: true, pointerId: 91, pointerType: 'touch', clientX: 102, clientY: 20,
+    }));
+    return {
+      selectedBefore,
+      selectedAfter: document.querySelector('#spellbar .spell-btn.selected')?.dataset.spell,
+    };
+  });
+  if (!scrollGestureCancelled.skipped
+      && scrollGestureCancelled.selectedAfter !== scrollGestureCancelled.selectedBefore) {
+    fail('horizontal scroll gesture activated a pre-scroll glyph: ' + JSON.stringify(scrollGestureCancelled));
+  }
+
   // Blank guide mode clears the template but keeps all public spells recognizable.
-  await page.evaluate(() => { const bar = document.querySelector('#spellbar'); bar.scrollLeft = bar.scrollWidth; });
+  const scrollBeforeBlank = await page.evaluate(() => {
+    const bar = document.querySelector('#spellbar');
+    bar.scrollLeft = bar.scrollWidth;
+    return bar.scrollLeft;
+  });
   await page.click('#spellbar .spell-blank');
   await new Promise((r) => setTimeout(r, 120));
   const blankLab = await page.evaluate(() => {
@@ -608,7 +671,8 @@ try {
     };
   });
   if (!/any public spell/i.test(blankLab.hint) || blankLab.stage !== 'blank'
-      || blankLab.guide != null || !blankLab.selected || blankLab.painted !== 0 || blankLab.scrollLeft !== 0) {
+      || blankLab.guide != null || !blankLab.selected || blankLab.painted !== 0
+      || Math.abs(blankLab.scrollLeft - scrollBeforeBlank) > 2) {
     fail('Glyph Laboratory Blank mode did not clear the guide: ' + JSON.stringify(blankLab));
   }
   const cooldownToggle = await page.$('#spellbar .spell-cooldown-toggle');
@@ -713,9 +777,17 @@ try {
   }
   await page.keyboard.down('b');
   await new Promise((r) => setTimeout(r, 120));
-  const labBraceInfo = await page.evaluate(() => window.__aegTest.info());
+  const labBraceInfo = await page.evaluate(() => ({
+    ...window.__aegTest.info(),
+    active: document.querySelector('#btn-brace')?.classList.contains('active'),
+  }));
   await page.keyboard.up('b');
-  if (labBraceInfo.playerBraceTicks <= 0) fail('Brace (B) keyboard binding did not activate in Glyph Laboratory');
+  if (labBraceInfo.playerBraceTicks <= 0 || !labBraceInfo.active) {
+    fail('Brace did not provide active visual feedback in Glyph Laboratory: ' + JSON.stringify(labBraceInfo));
+  }
+  await page.evaluate(() => window.__aegTest.dispatchEvents([{ type: 'sidestep', caster: 0 }]));
+  const dodgeLit = await page.evaluate(() => document.querySelector('#btn-sidestep')?.classList.contains('active'));
+  if (!dodgeLit) fail('successful Dodge did not light the Dodge button');
   await activate(page, '#btn-menu');
   await page.waitForSelector('#panel-main:not(.hidden) #btn-resume-game:not(.hidden)', { timeout: 5000 });
   await activate(page, '#btn-resume-game');
@@ -752,6 +824,15 @@ try {
     if (!info || info.mode !== 'practice' || !info.botActive || !info.hasBot
         || info.difficulty !== diff || info.music?.scene !== 'duel') {
       fail(`Practice AI not active for ${diff}: ` + JSON.stringify(info));
+    }
+    if (diff === 'very-easy') {
+      const setCharges = await page.evaluate(() => window.__aegTest.setPlayerCharges(0));
+      if (!setCharges) fail('could not prepare Focus feedback test');
+      await page.keyboard.down('f');
+      await new Promise((r) => setTimeout(r, 120));
+      const focusActive = await page.evaluate(() => document.querySelector('#btn-focus')?.classList.contains('active'));
+      await page.keyboard.up('f');
+      if (!focusActive) fail('active Focus did not light the Focus button');
     }
     const liveView = await page.evaluate(() => window.__aegVfx.view());
     if (liveView.showcaseMode || Math.abs(liveView.cameraZ - 5.5) > 1e-6
@@ -956,6 +1037,8 @@ try {
   // Settings can rerun the same baseline and persist replacement comfort values.
   await page.click('[data-action="settings"]');
   await page.waitForSelector('#panel-settings:not(.hidden)', { timeout: 5000 });
+  const devcastSetting = await page.$('#set-devcast');
+  if (devcastSetting) fail('Settings still exposes the dev quick-cast toggle');
   const localInstallHidden = await page.evaluate(() => document.querySelector('#install-app-section')?.classList.contains('hidden'));
   if (!localInstallHidden) fail('Android Render install action should stay hidden on localhost');
   await page.select('#set-orientation', 'portrait');

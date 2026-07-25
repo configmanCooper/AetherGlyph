@@ -183,12 +183,12 @@ export function run() {
   eq(sim.zonesOfKind('Fog').length, 0, 'Fog cleared by Gust');
 
   // Stone Wall + Quake -> Rubble: cover destroyed.
-  sim = mk([15, 34]);
-  fire(sim, 15);
+  sim = mk([34], [15]);
+  fire(sim, 15, 1);
   ok(sim.zones.some((z) => z.kind === 'Cover'), 'Stone Wall cover created');
   const rubble = reactionNames(fire(sim, 34));
   ok(rubble.includes('Rubble'), 'Stone Wall + Quake -> Rubble');
-  eq(sim.zones.filter((z) => z.kind === 'Cover').length, 0, 'Quake destroys cover');
+  eq(sim.zones.filter((z) => z.kind === 'Cover').length, 0, 'Quake destroys opposing cover through HP damage');
 
   // Chilled + Frost Bind -> earned 3s Freeze, then Tenacity.
   sim = mk([27], [1]);

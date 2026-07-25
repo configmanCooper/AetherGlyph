@@ -143,7 +143,7 @@ ok(Array.isArray(cap.server.allowNavigation) && cap.server.allowNavigation.inclu
 
 const appGradle = read('android/app/build.gradle');
 ok(appGradle.includes('applicationId "com.configmancooper.aetherglyph"'), 'gradle applicationId');
-ok(appGradle.includes('versionCode 10901'), 'gradle versionCode 10901');
+ok(appGradle.includes('versionCode 11000'), 'gradle versionCode 11000');
 ok(appGradle.includes(`versionName "${version}"`), `gradle versionName ${version} matches package.json`);
 ok(appGradle.includes('keystore.properties'), 'gradle reads keystore.properties for signing');
 ok(appGradle.includes('signingConfig signingConfigs.release'), 'gradle applies the release signing config when present');
@@ -157,7 +157,7 @@ ok(mainActivity.includes('AppUpdateManagerFactory.create')
   'Android startup checks Google Play and presents an Update/Later notice');
 eq(readJson('package-lock.json').version, version, 'package-lock version matches package.json');
 const publishingGuide = read('PUBLISHING-ANDROID.md');
-ok(publishingGuide.includes('| Version code | `10901` |'), 'publishing guide versionCode 10901');
+ok(publishingGuide.includes('| Version code | `11000` |'), 'publishing guide versionCode 11000');
 ok(existsSync(join(ROOT, 'client/audio/music/wanderlust-menu.mp3')), 'menu music asset is packaged');
 ok(existsSync(join(ROOT, 'client/audio/music/spell-duel.mp3')), 'duel music asset is packaged');
 ok(read('client/index.html').includes('id="menu-version"')
@@ -232,6 +232,16 @@ ok(clientIndex.includes('id="set-server-choice"')
     && clientIndex.includes('value="dedicated"')
     && clientIndex.includes('value="full-game"'),
   'Settings exposes dedicated and full-game Render server choices');
+ok(!clientIndex.includes('id="set-devcast"'),
+  'Settings does not expose the developer quick-cast toggle');
+ok(!clientIndex.includes('id="devcast"') && !main.includes('buildDevcast'),
+  'developer quick-cast UI and dead builder code are removed');
+ok(clientIndex.includes('id="btn-surrender-game"')
+    && clientIndex.includes('id="btn-private-ready"')
+    && clientIndex.includes('id="online-population"'),
+  'online UI includes surrender, private-rematch readiness, and population status');
+ok(pkg.scripts['test:guide-strip'] === 'node test/guideStripPortrait.test.mjs',
+  'package scripts include the portrait guide-strip regression');
 ok(main.includes('beforeinstallprompt') && main.includes("endsWith('.onrender.com')") && main.includes('/Android/i'),
   'Android Render install prompt is captured and gated to onrender.com');
 ok(main.includes('(display-mode: standalone)') && main.includes('(display-mode: fullscreen)'),

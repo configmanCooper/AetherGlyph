@@ -60,7 +60,7 @@ export function defaultPractice() {
     playerPreset: 'current',   // 'current' saved loadout, or a preset key
     opponentPreset: 'auto',    // 'auto' (fair for difficulty) or a preset key
     coaching: 'detailed',
-    timed: true,               // standard 105s + Arcane Pressure, or untimed
+    timed: true,               // standard 150s + Arcane Pressure, or untimed
     templates: false,          // assisted per-spell guides (off by default)
   };
 }

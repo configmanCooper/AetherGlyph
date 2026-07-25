@@ -34,7 +34,7 @@ html, body {
   padding: calc(8px + var(--safe-top)) calc(8px + var(--safe-right))
            calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
 }
-.hud .act-btn, .hud .corner-btn, .hud .control-zone, .hud .devcast button { pointer-events: auto; }
+.hud .act-btn, .hud .corner-btn, .hud .control-zone { pointer-events: auto; }
 
 .enemy-panel {
   position: absolute; top: calc(10px + var(--safe-top)); left: 50%; transform: translateX(-50%);
@@ -113,16 +113,13 @@ body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right));
   border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600; min-width: 78px;
 }
 .touch-label { display: none; }
-.act-btn:active, .act-btn.active { background: var(--accent); border-color: var(--accent); }
+.act-btn.active { background: var(--accent); border-color: var(--accent); }
 
 .corner-btn {
   position: absolute; top: calc(6px + var(--safe-top)); left: calc(10px + var(--safe-left));
   background: var(--panel); color: var(--ink); border: 1px solid rgba(255,255,255,0.18);
   border-radius: 10px; width: 40px; height: 40px; font-size: 18px;
 }
-
-.devcast { position: absolute; bottom: calc(60px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 60vw; }
-.devcast button { font-size: 10px; padding: 5px 7px; border-radius: 8px; background: var(--panel); color: var(--muted); border: 1px solid rgba(255,255,255,0.14); }
 
 /* ========================= OVERLAYS ========================= */
 .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
@@ -144,6 +141,7 @@ body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right));
 }
 .menu-btn:active { transform: translateY(1px); }
 .menu-btn.ghost { background: transparent; border-color: rgba(255,255,255,0.2); }
+.menu-btn.danger { background: rgba(210, 55, 75, 0.22); border-color: rgba(255, 93, 115, 0.72); }
 .offline-note { color: var(--accent2); font-size: 12px; margin-top: 16px; }
 .links { font-size: 12px; margin-top: 8px; }
 .links a { color: var(--muted); }
@@ -384,7 +382,7 @@ body.reduced * { animation: none !important; transition: none !important; }
   min-width: 62px; padding: 5px 6px; border-radius: 9px; cursor: pointer;
   background: linear-gradient(180deg, rgba(139,107,255,0.28), rgba(30,22,52,0.9));
   border: 1px solid rgba(139,107,255,0.55); color: var(--ink);
-  touch-action: manipulation;
+  touch-action: pan-x;
 }
 .spell-btn .sb-key { font-size: 10px; color: var(--accent2); }
 .spell-btn .sb-name { font-size: 11px; font-weight: 600; line-height: 1.1; text-align: center; }

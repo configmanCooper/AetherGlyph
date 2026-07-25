@@ -10,7 +10,7 @@ import { GestureInput } from '../input/gestureInput.js';
 import { MovementControl } from '../input/movement.js';
 import { LocalMatch } from '../game/localMatch.js';
 import { MenuDuel } from '../game/menuDuel.js';
-import { OnlineMatch } from '../net/onlineMatch.js';
+import { OnlineMatch, formatOnlinePopulation } from '../net/onlineMatch.js';
 import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
 import {
   effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget,
@@ -63,7 +63,7 @@ function storedOrientation() {
   }
 }
 const settings = {
-  lefthand: false, reduced: false, audio: true, haptics: true, devcast: false,
+  lefthand: false, reduced: false, audio: true, haptics: true,
   orientation: storedOrientation(),
 };
 
@@ -206,6 +206,8 @@ let series = null;
 // Online duel session (OnlineMatch adapter). `match` points at it while online.
 let online = null;
 let onlineRoundIndex = 0;
+let onlinePrivateCode = null;
+let onlineSurrenderPending = false;
 
 function haptic(kind) {
   if (!settings.haptics) return;
@@ -284,7 +286,6 @@ function rebuildForLoadout() {
   activeGuideLoadout = playerLoadout;
   selectedGuideId = null;
   renderEquippedGuideBar();
-  buildDevcast();
   updatePracticeSummaries();
 }
 
@@ -292,7 +293,7 @@ const movement = new MovementControl($('#move-pad'), $('#move-stick'), dummyInpu
 
 function bindHold(btn, key) {
   const el = $(btn);
-  const set = (v) => { heldActions[key] = v; el.classList.toggle('active', v); };
+  const set = (v) => { heldActions[key] = v; };
   el.addEventListener('pointerdown', (e) => { e.preventDefault(); audio.unlock(); set(true); });
   el.addEventListener('pointerup', (e) => { e.preventDefault(); set(false); });
   el.addEventListener('pointerleave', () => set(false));
@@ -324,18 +325,6 @@ window.addEventListener('keyup', (e) => {
   else if (e.key === 'b') kbBrace = false;
 });
 
-// Dev quick-cast buttons (mirror of the selected guide shortcuts).
-function buildDevcast() {
-  const wrap = $('#devcast');
-  wrap.innerHTML = '';
-  playerLoadout.forEach((s, i) => {
-    const b = document.createElement('button');
-    b.textContent = `${i + 1} ${s.name}`;
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); castSpell(s.id, 1); });
-    wrap.appendChild(b);
-  });
-}
-
 // ------------------------------------------------------------------ match flow
 function applyInputBridge() {
   if (!match) return;
@@ -353,7 +342,7 @@ function labPageIds() {
   return LAB_PUBLIC_IDS.slice(start, start + LAB_PAGE_SIZE);
 }
 
-function selectLabSpell(id) {
+function selectLabSpell(id, opts = {}) {
   labSelectedId = id;
   // A guide is visual help only. Recognition always compares against the full
   // public catalog plus every secret spell the player has discovered.
@@ -367,7 +356,7 @@ function selectLabSpell(id) {
     canvas.dataset.guideSpell = String(id);
     canvas.dataset.guideStage = 'dotted';
   }
-  renderLabSpellbar();
+  renderLabSpellbar({ resetScroll: !!opts.resetScroll });
 }
 
 function selectLabBlank() {
@@ -468,7 +457,7 @@ function updateLabEnemySchedule() {
   renderLabSpellbar();
 }
 
-function renderLabSpellbar() {
+function renderLabSpellbar({ resetScroll = false } = {}) {
   const pageIds = labPageIds();
   const pages = Math.ceil(LAB_PUBLIC_IDS.length / LAB_PAGE_SIZE);
   hud.buildSpellbar(makeLoadout(pageIds), (id) => selectLabSpell(id), {
@@ -481,11 +470,11 @@ function renderLabSpellbar() {
     onEnemyControl: () => openLabEnemyPanel(),
     enemyEnabled: labEnemy.enabled || labEnemy.movement,
     enemyLabel: labEnemyLabel(),
-    resetScroll: true,
+    resetScroll,
     onNext: () => {
       labPage = (labPage + 1) % pages;
       labSelectedId = labPageIds()[0];
-      selectLabSpell(labSelectedId);
+      selectLabSpell(labSelectedId, { resetScroll: true });
     },
     pageLabel: `${labPage + 1}/${pages}`,
   });
@@ -524,9 +513,7 @@ function startLab() {
   $('#coach').classList.add('hidden');
   document.body.classList.remove('mode-tutorial');
   $('#spellbar').classList.remove('hidden');
-  $('#devcast').classList.toggle('hidden', !settings.devcast);
-  renderLabSpellbar();
-  selectLabSpell(labSelectedId);
+  selectLabSpell(labSelectedId, { resetScroll: true });
   toast('Glyph Laboratory — use Enemy in the guide bar to schedule attacks or movement.');
 }
 
@@ -592,7 +579,6 @@ function startPractice() {
   $('#coach-report').classList.add('hidden');
   document.body.classList.remove('mode-tutorial');
   $('#spellbar').classList.remove('hidden');
-  $('#devcast').classList.toggle('hidden', !settings.devcast);
   // Templates on = per-spell assistance (a guide) and an assisted coaching flag.
   if (practice.templates) setSpellGuide(pLoadout[0].id, { stage: 1, showGhost: false });
   else gesture.setGuide(null);
@@ -944,9 +930,11 @@ function armTutorialLesson() {
   buildCoachPanel(tutorialLesson);
   showOverlay(false);
   $('#hud').classList.remove('hidden');
-  const showGuideShortcuts = !!tutorialLesson?.chooseGuides && !tutorialLesson?.noGuides;
+  const tutorialGuideIds = tutorialLesson?.playerLoadout || [];
+  const showGuideShortcuts = !tutorialLesson?.noGuides
+    && (tutorialLesson?.chooseGuides || tutorialGuideIds.length > 1);
   if (showGuideShortcuts) {
-    activeGuideLoadout = makeLoadout(playerIds);
+    activeGuideLoadout = makeLoadout(tutorialGuideIds);
     selectedGuideId = null;
     renderEquippedGuideBar();
     $('#spellbar').classList.remove('hidden');
@@ -955,7 +943,6 @@ function armTutorialLesson() {
     selectedGuideId = null;
     $('#spellbar').classList.add('hidden');
   }
-  $('#devcast').classList.add('hidden');
   $('#coach').classList.remove('hidden');
   document.body.classList.add('mode-tutorial');
   // The draw canvas has no layout size while the HUD is hidden. Resize and draw
@@ -1050,6 +1037,7 @@ function onTutorialReject(r) {
 function onTutorialGuide(g) {
   const canvas = $('#draw-canvas');
   if (!g || g.spellId == null) {
+    selectedGuideId = null;
     gesture.setGuide(null);
     setDrawHint('draw without a guide');
     if (canvas) {
@@ -1068,6 +1056,10 @@ function onTutorialGuide(g) {
       setSpellGuide(g.spellId, { stage: 1, showGhost: false });
     }
     const spell = SPELLS_BY_ID[g.spellId];
+    if (activeGuideLoadout.some((entry) => entry.id === g.spellId)) {
+      selectedGuideId = g.spellId;
+      renderEquippedGuideBar();
+    }
     setDrawHint(fraction < 1
       ? `secret hint — start ${spell ? spell.name : 'the glyph'} along the dotted first quarter`
       : `draw ${spell ? spell.name : 'spell'} — follow the dotted line`);
@@ -1196,6 +1188,8 @@ function handleEvents(events) {
         'no-dodges': 'No Dodge charges are ready yet.',
       };
       toast(messages[e.reason] || `You cannot ${action} right now.`);
+    } else if (e.type === 'sidestep' && e.caster === 0) {
+      hud.pulseDodge();
     } else if (e.type === 'reflect') { audio.reflect(); haptic('counter'); }
     else if (e.type === 'shield' || e.type === 'barrier') audio.shield();
     else if (e.type === 'focusComplete') audio.focus();
@@ -1440,6 +1434,9 @@ function saveLoadout() {
     pendingTutorialLessonId = null;
     loadoutDestination = 'practice';
     startTutorialLesson(lessonId, { guidesChosen: true });
+  } else if (loadoutDestination === 'online') {
+    loadoutDestination = 'practice';
+    openOnline();
   } else {
     loadoutDestination = 'practice';
     openPractice();
@@ -1539,6 +1536,7 @@ function openOnline() {
   $('#online-code').value = '';
   showPanel('panel-online');
   updateConnBadges({ state: online && online.connected ? 'connected' : 'idle', rttMs: online ? online.rtt : null });
+  ensureOnline().catch((err) => onOnlineError(err));
 }
 
 function onlineErrorText(ack) {
@@ -1571,11 +1569,12 @@ async function ensureOnline() {
 }
 
 function wireOnlineCallbacks(o) {
-  o.onMatchStart = () => onOnlineMatchStart();
+  o.onMatchStart = (p) => onOnlineMatchStart(p);
   o.onRoundEnd = (p) => onOnlineRoundEnd(p);
   o.onMatchEnd = (p) => onOnlineMatchEnd(p);
   o.onStatus = (p) => onOnlineStatus(p);
-  o.onRoom = () => {};
+  o.onRoom = (p) => onOnlineRoom(p);
+  o.onPopulation = (p) => updateOnlinePopulation(p);
   o.onConnection = (p) => updateConnBadges(p);
   o.onError = (err) => onOnlineError(err);
   o.onCastAck = (ack) => { if (ack && !ack.ok && ack.code === 'rate') toast('Slow down — too many casts.'); };
@@ -1600,6 +1599,7 @@ async function startOnlineAction(kind, code) {
 function showWaiting(kind, ack) {
   mode = 'online-wait';
   const codeBox = $('#wait-code');
+  $('#btn-private-ready').classList.add('hidden');
   if (kind === 'create') {
     $('#wait-title').textContent = 'Waiting for opponent';
     $('#wait-text').textContent = 'Share your code. The duel starts when they join.';
@@ -1617,6 +1617,39 @@ function showWaiting(kind, ack) {
   showPanel('panel-online-wait');
 }
 
+function showPrivateLobby(code = onlinePrivateCode) {
+  if (!code) { openOnline(); return; }
+  onlinePrivateCode = code;
+  mode = 'online-lobby';
+  running = false;
+  match = null;
+  gameMenuPaused = false;
+  updateResumeGameButton();
+  $('#wait-title').textContent = 'Private Duel Room';
+  $('#wait-text').textContent = 'Both players are back in the room. Ready up when you want a rematch.';
+  $('#wait-code-value').textContent = code;
+  $('#wait-code').classList.remove('hidden');
+  $('#btn-private-ready').classList.remove('hidden');
+  $('#btn-private-ready').disabled = false;
+  $('#btn-private-ready').textContent = 'Ready for rematch';
+  showPanel('panel-online-wait');
+  showOverlay(true);
+}
+
+async function readyPrivateRematch() {
+  if (!online || !onlinePrivateCode) return;
+  rebuildForLoadout();
+  online.setLoadout(playerIds);
+  $('#btn-private-ready').disabled = true;
+  $('#btn-private-ready').textContent = 'Waiting for opponent…';
+  const ack = await online.privateReady();
+  if (!ack?.ok) {
+    $('#btn-private-ready').disabled = false;
+    $('#btn-private-ready').textContent = 'Ready for rematch';
+    $('#wait-text').textContent = onlineErrorText(ack);
+  }
+}
+
 function copyRoomCode() {
   const code = $('#wait-code-value').textContent;
   if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => toast('Code copied')).catch(() => toast(code));
@@ -1625,11 +1658,16 @@ function copyRoomCode() {
 
 function cancelOnline() {
   if (online) online.leave();
+  onlinePrivateCode = null;
+  onlineSurrenderPending = false;
   mode = null;
-  showPanel('panel-online');
+  openOnline();
 }
 
-function onOnlineMatchStart() {
+function onOnlineMatchStart(p = {}) {
+  onlinePrivateCode = p.code || online?.privateCode || null;
+  onlineSurrenderPending = false;
+  online?.setActive(true);
   mode = 'online';
   document.body.classList.remove('mode-lab', 'mode-tutorial');
   resetLastCast();
@@ -1647,7 +1685,6 @@ function onOnlineMatchStart() {
   if (!activeGuideLoadout.some((spell) => spell.id === selectedGuideId)) selectedGuideId = null;
   renderEquippedGuideBar();
   $('#spellbar').classList.remove('hidden');
-  $('#devcast').classList.add('hidden');
   if (selectedGuideId) selectEquippedGuide(selectedGuideId);
   else {
     gesture.setGuide(null);
@@ -1670,16 +1707,72 @@ function onOnlineRoundEnd(p) {
 function onOnlineMatchEnd(p) {
   running = false;
   const win = p.winner === 'win';
+  onlinePrivateCode = p.code || online?.privateCode || null;
+  if (onlineSurrenderPending) {
+    onlineSurrenderPending = false;
+    setNetStatus(null);
+    if (onlinePrivateCode) showPrivateLobby(onlinePrivateCode);
+    else {
+      mode = null;
+      match = null;
+      openOnline();
+      showOverlay(true);
+    }
+    return;
+  }
   audio.roundEnd(win); haptic('round');
   $('#result-title').textContent = win ? 'Series won!' : p.winner === 'draw' ? 'Series drawn' : 'Series lost';
-  const reason = p.reason === 'disconnect' ? ' (opponent left)' : p.reason === 'forfeit' ? ' (opponent forfeited)'
+  const reason = p.reason === 'disconnect' ? ' (opponent left)' : p.reason === 'forfeit' ? (win ? ' (opponent surrendered)' : ' (you surrendered)')
     : p.reason === 'connection-lost' ? ' (you lost connection)' : '';
   const score = Array.isArray(p.score) ? `${p.score[0]}–${p.score[1]}` : '';
   $('#result-text').textContent = `Online duel${score ? ` ${score}` : ''}${reason}.`;
   $('#btn-next-round').classList.add('hidden');
   $('#coach-report').classList.add('hidden');
+  const rematch = document.querySelector('#panel-result [data-action="rematch"]');
+  if (rematch) rematch.textContent = onlinePrivateCode ? 'Return to private room' : 'Online Duel menu';
   setNetStatus(null);
   showPanel('panel-result'); showOverlay(true);
+}
+
+function onOnlineRoom(p) {
+  if (p?.state === 'private-lobby' && p.code) {
+    onlinePrivateCode = p.code;
+    if (mode === 'online-lobby' || onlineSurrenderPending) showPrivateLobby(p.code);
+    if (mode === 'online-lobby') {
+      $('#wait-text').textContent = `${p.readyCount || 0}/${p.playerCount || 2} players ready.`;
+    }
+  } else if (p?.state === 'closed') {
+    onlinePrivateCode = null;
+    if (mode === 'online-lobby') {
+      toast('The private room was closed.');
+      openOnline();
+    }
+  }
+}
+
+function updateOnlinePopulation(p) {
+  const display = formatOnlinePopulation(p?.online);
+  for (const id of ['#online-population', '#online-population-wait']) {
+    const el = $(id);
+    if (el) el.textContent = `Players online: ${display}`;
+  }
+}
+
+async function surrenderOnlineDuel() {
+  if (!online?.inMatch) return;
+  if (!window.confirm('Surrender this duel? Your opponent will win.')) return;
+  onlineSurrenderPending = true;
+  gameMenuPaused = false;
+  updateResumeGameButton();
+  const ack = await online.surrender();
+  if (!ack?.ok && online?.inMatch) {
+    onlineSurrenderPending = false;
+    gameMenuPaused = true;
+    online.setActive(false);
+    updateResumeGameButton();
+    toast('Could not surrender cleanly. Check your connection.');
+    return;
+  }
 }
 
 function onOnlineStatus(p) {
@@ -1697,7 +1790,9 @@ function onOnlineError(err) {
   const code = err && (err.code || (err.data && err.data.code));
   if (code === 'incompatible') toast('Update required — version mismatch.');
   else toast(err && err.message ? `Network: ${err.message}` : 'Network error.');
-  if (mode === 'online-wait' || !online || !online.inMatch) showOnlineError(onlineErrorText({ code }));
+  if (activePanelId === 'panel-online' || activePanelId === 'panel-online-wait') {
+    showOnlineError(onlineErrorText({ code }));
+  }
 }
 
 function setNetStatus(kind) {
@@ -1786,11 +1881,13 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
     else if (a === 'online-cancel') cancelOnline();
     else if (a === 'online-copy') copyRoomCode();
+    else if (a === 'online-ready') readyPrivateRematch();
+    else if (a === 'online-surrender') surrenderOnlineDuel();
     else if (a === 'lan-duel') openLanDuel();
     else if (a === 'lan-connect') connectToLanHost();
     else if (a === 'lan-use-host') useThisDeviceAsLanHost();
     else if (a === 'lan-internet') useInternetDuelServer();
-    else if (a === 'loadout') openLoadoutBuilder();
+    else if (a === 'loadout') openLoadoutBuilder(activePanelId === 'panel-online' ? 'online' : 'practice');
     else if (a === 'settings') openSettings();
     else if (a === 'spell-roster') openSpellRoster();
     else if (a === 'resume-game') resumeActiveGame();
@@ -1819,9 +1916,10 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
       $('#coach-report').classList.add('hidden');
       if (mode === 'tutorial') { if (tutorialLesson) startTutorialLesson(tutorialLesson.id); }
       else if (mode === 'online') {
-        running = false; match = null; mode = null; setNetStatus(null);
+        running = false; match = null; setNetStatus(null);
         hud.setSeries(null); $('#hud').classList.add('hidden');
-        openOnline(); showOverlay(true);
+        if (onlinePrivateCode) showPrivateLobby();
+        else { mode = null; openOnline(); showOverlay(true); }
       } else if (mode === 'practice') startPractice();
       else startLab();
     }
@@ -1856,8 +1954,23 @@ function backFromSubpanel() {
     pendingTutorialLessonId = null;
     loadoutDestination = 'practice';
     openTutorialHub();
-  } else {
+  } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'online') {
+    openOnline();
+  } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'practice') {
+    openPractice();
+  } else if (activePanelId === 'panel-lan-duel') {
+    openOnline();
+  } else if (activePanelId === 'panel-secret-hints' || activePanelId === 'panel-lesson-intro') {
+    openTutorialHub();
+  } else if (activePanelId === 'panel-online-wait') {
+    cancelOnline();
+  } else if (activePanelId === 'panel-calibrate') {
+    skipCalibration();
+  } else if (activePanelId === 'panel-result') {
     returnToMainMenu();
+  } else {
+    showPanel('panel-main');
+    showOverlay(true);
   }
 }
 
@@ -1885,6 +1998,8 @@ $('#btn-menu').addEventListener('click', () => pauseToGameMenu());
 function updateResumeGameButton() {
   const button = $('#btn-resume-game');
   if (button) button.classList.toggle('hidden', !gameMenuPaused);
+  const surrender = $('#btn-surrender-game');
+  if (surrender) surrender.classList.toggle('hidden', !(gameMenuPaused && mode === 'online' && online?.inMatch));
 }
 
 function resumeActiveGame() {
@@ -1922,13 +2037,11 @@ function applySettings() {
   gesture.setReduced(settings.reduced);
   arena.setReduced(settings.reduced);
   audio.setEnabled(settings.audio);
-  $('#devcast').classList.toggle('hidden', !settings.devcast || !match || mode === 'online');
 }
 $('#set-lefthand').addEventListener('change', (e) => { settings.lefthand = e.target.checked; applySettings(); });
 $('#set-reduced').addEventListener('change', (e) => { settings.reduced = e.target.checked; applySettings(); });
 $('#set-audio').addEventListener('change', (e) => { settings.audio = e.target.checked; applySettings(); });
 $('#set-haptics').addEventListener('change', (e) => { settings.haptics = e.target.checked; });
-$('#set-devcast').addEventListener('change', (e) => { settings.devcast = e.target.checked; applySettings(); });
 $('#set-server-choice').addEventListener('change', updateServerChoiceUi);
 $('#set-orientation').addEventListener('change', (e) => {
   const value = ORIENTATIONS.has(e.target.value) ? e.target.value : 'auto';
@@ -2138,8 +2251,7 @@ function nativeBack() {
       exitApp();
       return;
     }
-    if (gameMenuPaused) backFromSubpanel();
-    else returnToMainMenu();
+    backFromSubpanel();
     return;
   }
   // A live mode is on screen: open the same resumable menu as the corner button.
@@ -2247,7 +2359,16 @@ if (typeof window !== 'undefined') {
       try { return gesture.recognizer ? gesture.recognizer.recognize(points) : { accepted: false, reason: 'no-recognizer' }; }
       catch (e) { return { accepted: false, error: String(e && e.message || e) }; }
     },
-    simulateOnlineStart: () => { try { onOnlineMatchStart(); return true; } catch { return false; } },
+    simulateOnlineStart: (payload = {}) => {
+      try {
+        if (online) {
+          online.inMatch = true;
+          online.privateCode = payload.code || null;
+        }
+        onOnlineMatchStart(payload);
+        return true;
+      } catch { return false; }
+    },
     dispatchEvents: (events) => {
       try {
         handleEvents(Array.isArray(events) ? events : []);
@@ -2259,6 +2380,19 @@ if (typeof window !== 'undefined') {
     returnMenu: () => { try { returnToMainMenu(); return true; } catch { return false; } },
     nativeBack: () => { try { nativeBack(); return true; } catch { return false; } },
     backgroundChange: (hidden) => { try { onBackgroundChange(!!hidden); return true; } catch { return false; } },
+    startTutorialLesson: (id, options = {}) => {
+      try {
+        startTutorialLesson(id, options);
+        return tutorialLesson?.id === id;
+      } catch { return false; }
+    },
+    setPlayerCharges: (value) => {
+      try {
+        if (mode === 'online' || !match?.sim?.wizards?.[0]) return false;
+        match.sim.wizards[0].charges = Math.max(0, Math.min(3, Number(value) || 0));
+        return true;
+      } catch { return false; }
+    },
     forceEnd: (winner = 0) => {
       try { if (match && match.sim && typeof match.sim.endMatch === 'function' && !match.sim.ended) match.sim.endMatch(winner, 'health'); } catch { /* ignore */ }
     },

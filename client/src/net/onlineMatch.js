@@ -35,6 +35,11 @@ function neutralView() {
   };
 }
 
+export function formatOnlinePopulation(value) {
+  const count = Math.max(0, Math.floor(Number(value) || 0));
+  return count > 9999 ? '9999+' : String(count);
+}
+
 export class OnlineMatch {
   constructor(opts = {}) {
     this.url = opts.url || '';
@@ -54,6 +59,7 @@ export class OnlineMatch {
     this.onMatchEnd = opts.onMatchEnd || (() => {});
     this.onStatus = opts.onStatus || (() => {});
     this.onRoom = opts.onRoom || (() => {});
+    this.onPopulation = opts.onPopulation || (() => {});
     this.onConnection = opts.onConnection || (() => {});
     this.onError = opts.onError || (() => {});
     this.onCastAck = opts.onCastAck || (() => {});
@@ -72,6 +78,8 @@ export class OnlineMatch {
     this.rtt = null;
     this.pingTimer = null;
     this.pendingEvents = [];
+    this.privateCode = null;
+    this.ranked = false;
   }
 
   // --- frame-loop surface -------------------------------------------------
@@ -115,9 +123,15 @@ export class OnlineMatch {
         this.stopPing();
         this.emitConnection('disconnected');
         if (this.inMatch) this.onStatus({ state: 'reconnecting' });
+        else if (this.privateCode) {
+          const code = this.privateCode;
+          this.privateCode = null;
+          this.onRoom({ state: 'closed', code, reason: 'disconnect' });
+        }
       });
 
-      socket.on(EVENTS.ROOM_UPDATE, (p) => this.onRoom(p || {}));
+      socket.on(EVENTS.ROOM_UPDATE, (p) => this.handleRoomUpdate(p || {}));
+      socket.on(EVENTS.POPULATION, (p) => this.onPopulation(p || {}));
       socket.on(EVENTS.MATCH_START, (p) => this.handleMatchStart(p || {}));
       socket.on(EVENTS.SNAPSHOT, (p) => this.handleSnapshot(p || {}));
       socket.on(EVENTS.ROUND_END, (p) => this.onRoundEnd(p || {}));
@@ -146,7 +160,26 @@ export class OnlineMatch {
   joinRoom(code) { return this.request(EVENTS.JOIN_ROOM, { code, loadout: this.loadoutIds, name: this.identity.name }); }
   quickMatch() { return this.request(EVENTS.QUICK_MATCH, { loadout: this.loadoutIds, name: this.identity.name }); }
   cancelQueue() { return this.request(EVENTS.CANCEL_QUEUE, {}); }
-  leave() { clearResume(); this.inMatch = false; return this.request(EVENTS.LEAVE, {}); }
+  privateReady() {
+    return this.request(EVENTS.PRIVATE_READY, {
+      loadout: this.loadoutIds,
+      name: this.identity.name,
+    });
+  }
+  async surrender() {
+    const result = await this.request(EVENTS.LEAVE, { surrender: true });
+    if (result?.ok) {
+      clearResume();
+      this.inMatch = false;
+    }
+    return result;
+  }
+  leave() {
+    clearResume();
+    this.inMatch = false;
+    this.privateCode = null;
+    return this.request(EVENTS.LEAVE, {});
+  }
 
   request(ev, payload) {
     return new Promise((resolve) => {
@@ -182,12 +215,20 @@ export class OnlineMatch {
   }
 
   // --- inbound ------------------------------------------------------------
+  handleRoomUpdate(p) {
+    if (p.state === 'private-lobby' && p.code) this.privateCode = p.code;
+    else if (p.state === 'closed') this.privateCode = null;
+    this.onRoom(p);
+  }
+
   handleMatchStart(p) {
     this.inMatch = true;
     this.matchId = p.matchId;
     this.slot = p.slot;
     this.epoch = p.epoch || 1;
     this.resumeToken = p.token || null;
+    this.privateCode = p.code || null;
+    this.ranked = !!p.ranked;
     if (p.token) saveResume(this.matchId, p.token);
     this.inputSeq = 0;
     this.castSeq = 0;
@@ -209,8 +250,12 @@ export class OnlineMatch {
   handleMatchEnd(p) {
     this.inMatch = false;
     clearResume();
-    this.stopPing();
-    this.onMatchEnd(p);
+    if (p.code) this.privateCode = p.code;
+    this.onMatchEnd({
+      ...p,
+      code: p.code || this.privateCode,
+      ranked: p.ranked == null ? this.ranked : !!p.ranked,
+    });
   }
 
   handleAborted(p) {

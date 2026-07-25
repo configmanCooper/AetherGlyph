@@ -28,7 +28,11 @@ export function stageDemoWeb({ log = () => {} } = {}) {
 export const DEMO_ONLINE_MESSAGE = ${JSON.stringify(DEMO_MESSAGE)};
 `);
 
-  write('client/src/net/onlineMatch.js', `export class OnlineMatch {
+  write('client/src/net/onlineMatch.js', `export function formatOnlinePopulation(value) {
+  const count = Math.max(0, Math.floor(Number(value) || 0));
+  return count > 9999 ? '9999+' : String(count);
+}
+export class OnlineMatch {
   constructor() { throw new Error('Online play is unavailable in the Aetherglyph demo.'); }
 }
 `);

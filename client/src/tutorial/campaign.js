@@ -22,6 +22,9 @@ import { PracticeBot } from '../../../shared/src/bot/practiceBot.js';
 import { isHeavyProjectile } from '../../../shared/src/sim/spellEffects.js';
 import { PRESETS_BY_KEY } from '../../../shared/src/balance/loadouts.js';
 
+const FORMAL_ROUND_MAX_TICKS = 9300;
+const FORMAL_SERIES_MAX_TICKS = 28800;
+
 // --- solution helpers ------------------------------------------------------
 const pc = (sim, id) => canWizardCast(sim, 0, id);                 // player can legally cast
 const playerZone = (sim, kind) => sim.zones.some((z) => z.kind === kind && z.owner === 0 && z.ticks > 0);
@@ -133,7 +136,8 @@ export const CAMPAIGN = [
     narration: [
       'Aether powers every cast and regenerates over time.',
       'Overspending leaves you defenceless. Keep a reserve.',
-      'Damage the target, keep at least 20 Aether, and Brace the telegraphed bolt.',
+      'Push the joystick down, or hold the Brace button, when the telegraphed bolt is about to hit.',
+      'Damage the target, keep at least 20 Aether, and Brace that bolt.',
     ],
     timerEnabled: false, pressureEnabled: false,
     playerLoadout: [1], opponentLoadout: [1],
@@ -160,7 +164,7 @@ export const CAMPAIGN = [
   {
     id: 'L02', chapter: 'core', title: 'The Moving Line', order: 2,
     narration: [
-      'Your left thumb strafes along a shallow arc; Sidestep is a quick burst.',
+      'Your left thumb strafes along a shallow arc. Push the joystick all the way left or right to Dodge in that direction.',
       'Projectiles travel — move and you can slip an aimed shot.',
       'Evade two bolts, then land Stone Shard through the opening.',
     ],
@@ -188,6 +192,7 @@ export const CAMPAIGN = [
     id: 'L03', chapter: 'core', title: 'Wards and Angles', order: 3,
     narration: [
       'A Ward is a frontal shield — precious, but only when it faces the threat.',
+      'When several glyph guides are visible, double-tap the left or right side of the draw pad to switch guides.',
       'Raise it and the instructor will fire one bolt into the shield.',
       'Block that bolt, then answer with Flame Wave.',
     ],
@@ -248,7 +253,8 @@ export const CAMPAIGN = [
   {
     id: 'L05', chapter: 'core', title: 'Focus Under Fire', order: 5,
     narration: [
-      'Focus channels a Sigil Charge, but leaves you open — and it can be interrupted.',
+      'Push the joystick up, or hold the Focus button, to channel a Sigil Charge.',
+      'Focus leaves you open — and it can be interrupted.',
       'Gain a charge in a safe window, then punish the instructor\'s Focus.',
       'Complete one Focus, then interrupt theirs with Concussive Blast.',
     ],
@@ -308,7 +314,7 @@ export const CAMPAIGN = [
     narration: [
       'Weather is shared. Rain creates a Wet zone either wizard can exploit.',
       'Lightning conducts through Wet ground — and the instructor can answer.',
-      'After the return lightning is released, let it get close, then tap Dodge. Spark homes slightly, so dodging too early lets it follow you.',
+      'After the return lightning is released, let it get close, then push the joystick fully left or right to Dodge. Spark homes slightly, so dodging too early lets it follow you.',
     ],
     timerEnabled: false, pressureEnabled: false,
     projectileTravelScale: 2.5,
@@ -512,7 +518,7 @@ export const CAMPAIGN = [
     reward: { rankedReady: true },
     remediation: ['retry'],
     solutionBot: 'archmage',
-    maxTicks: 6600,
+    maxTicks: FORMAL_ROUND_MAX_TICKS,
   },
 
   {
@@ -655,7 +661,7 @@ export const CAMPAIGN = [
     ],
     remediation: ['retry'],
     solutionBot: 'practice-hard',
-    maxTicks: 21000,
+    maxTicks: FORMAL_SERIES_MAX_TICKS,
   },
 
   // --- final exam: gesture gauntlet (draw any 10 of 12, no templates) -------
@@ -844,7 +850,7 @@ export const CAMPAIGN = [
     ],
     remediation: ['retry'],
     solutionBot: 'archmage',
-    maxTicks: 21000,
+    maxTicks: FORMAL_SERIES_MAX_TICKS,
   },
 
   // --- final exam: the optional Grandmaster trial (best-of-three vs Hard) ----
@@ -872,7 +878,7 @@ export const CAMPAIGN = [
     medal: { id: 'grandmaster', text: 'Grandmaster', predicate: 'win-series' },
     remediation: ['retry'],
     solutionBot: 'archmage',
-    maxTicks: 21000,
+    maxTicks: FORMAL_SERIES_MAX_TICKS,
   },
 
   // --- secret trials (optional; cover roster 37-40) -------------------------

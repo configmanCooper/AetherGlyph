@@ -2,9 +2,9 @@
 
 import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
-import { starterLoadout } from '../shared/src/balance/loadouts.js';
+import { makeLoadout, starterLoadout } from '../shared/src/balance/loadouts.js';
 import { effectFor } from '../shared/src/sim/spellEffects.js';
-import { TICK_HZ } from '../shared/src/sim/constants.js';
+import { TICK_HZ, ZONE } from '../shared/src/sim/constants.js';
 
 function freshSim(seed = 1) {
   const sim = new Sim({ seed, loadouts: [starterLoadout(), starterLoadout()] });
@@ -44,8 +44,67 @@ export function run() {
   }
   ok(coverBlocked, 'Stone Wall collides with Ember Bolt before the target');
   eq(sim.wizards[1].health, coveredHp, 'a Stone Wall-blocked projectile deals no wizard damage');
-  ok(cover.hp < 26, 'blocked projectile lowers Stone Wall HP');
-  eq(missedCover.hp, 26, 'projectile checks every wall and leaves non-intersecting cover untouched');
+  ok(cover.hp < ZONE.coverHp, 'blocked projectile lowers Stone Wall HP');
+  eq(missedCover.hp, ZONE.coverHp, 'projectile checks every wall and leaves non-intersecting cover untouched');
+
+  // Wide area projectiles hit the wall instead of bypassing it. Fireball's
+  // triple cover damage shatters a full wall without damaging its wizard.
+  sim = new Sim({ seed: 2, loadouts: [makeLoadout([8]), makeLoadout([15])] });
+  sim.wizards[0].arcPos = -1;
+  sim.wizards[1].arcPos = 0.7;
+  sim.wizards[0].aether = 100;
+  sim.wizards[0].charges = 3;
+  sim.addZone(1, 'Cover', { center: 0 });
+  const fireballCoveredHp = sim.wizards[1].health;
+  sim.step({ 0: { cast: 8, castQuality: 1 }, 1: {} });
+  idleFor(sim, 120);
+  eq(sim.wizards[1].health, fireballCoveredHp, 'Stone Wall blocks a heavy area Fireball');
+  eq(sim.zones.filter((z) => z.kind === 'Cover').length, 0, 'Fireball destroys Stone Wall by reducing its HP to zero');
+
+  // Stone Shard is the explicit projectile exception: it pierces the wall and
+  // damages the protected wizard without consuming cover HP.
+  sim = freshSim();
+  sim.wizards[0].arcPos = -1;
+  sim.wizards[1].arcPos = 0.7;
+  const piercedCover = sim.addZone(1, 'Cover', { center: 0 });
+  const piercedHp = sim.wizards[1].health;
+  sim.step({ 0: { cast: 4, castQuality: 1 }, 1: {} });
+  idleFor(sim, 90);
+  ok(sim.wizards[1].health < piercedHp, 'Stone Shard pierces Stone Wall and damages the wizard');
+  eq(piercedCover.hp, ZONE.coverHp, 'Stone Shard does not damage the wall it pierces');
+
+  // Continuous beams are also absorbed into wall HP while the defender stays
+  // behind the wall.
+  sim = new Sim({ seed: 3, loadouts: [makeLoadout([40]), makeLoadout([15])] });
+  sim.wizards[0].arcPos = -1;
+  sim.wizards[1].arcPos = 0;
+  sim.wizards[0].aether = 100;
+  sim.wizards[0].charges = 3;
+  const beamCover = sim.addZone(1, 'Cover', { center: 0 });
+  const beamCoveredHp = sim.wizards[1].health;
+  sim.step({ 0: { cast: 40, castQuality: 1 }, 1: {} });
+  idleFor(sim, 240);
+  eq(sim.wizards[1].health, beamCoveredHp, 'Stone Wall blocks Prismatic Beam damage');
+  ok(beamCover.hp < ZONE.coverHp && beamCover.hp > 0, 'Prismatic Beam lowers wall HP without bypassing it');
+
+  // Beam utility is earned only by beam damage that actually reaches the
+  // wizard. A damaged wall absorbing most of the channel must not let Static
+  // leak through when less than half the beam lands afterward.
+  sim = new Sim({ seed: 4, loadouts: [makeLoadout([40]), makeLoadout([15])] });
+  sim.wizards[0].arcPos = -1;
+  sim.wizards[1].arcPos = 0;
+  sim.wizards[0].aether = 100;
+  sim.wizards[0].charges = 3;
+  sim.wizards[0].resonance = [
+    { school: 'Tide', ticks: 600 },
+    { school: 'Storm', ticks: 600 },
+  ];
+  const damagedBeamCover = sim.addZone(1, 'Cover', { center: 0 });
+  damagedBeamCover.hp = 20;
+  sim.step({ 0: { cast: 40, castQuality: 1 }, 1: {} });
+  idleFor(sim, 240);
+  ok(!sim.wizards[1].statuses.Static,
+    'Prismatic Beam does not apply Static when Stone Wall absorbed more than half the channel');
 
   // A target that strafes away after release dodges (homing-free bolt).
   sim = freshSim();

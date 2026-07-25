@@ -21,6 +21,7 @@ import { SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
 import { effectFor } from '../shared/src/sim/spellEffects.js';
 import { GESTURE_KEYS, validateLoadout } from '../shared/src/balance/loadouts.js';
 import { GESTURE_TEMPLATES } from '../shared/src/gesture/templates.js';
+import { MATCH, TICK_HZ } from '../shared/src/sim/constants.js';
 
 export function run() {
   const { ok, eq, report } = createHarness();
@@ -94,6 +95,19 @@ export function run() {
     'First Formal Duel prompts for eight public guide shortcuts');
   ok(CAMPAIGN_BY_ID.A16.fullRoster === true,
     'Eight Schools Examination enables recognition for the full spell roster');
+  ok(CAMPAIGN_BY_ID.L01.narration.some((line) => /joystick down|Brace button/i.test(line)),
+    'Aether Breath explicitly teaches the Brace controls');
+  ok(CAMPAIGN_BY_ID.L02.narration.some((line) => /joystick.*left or right.*Dodge/i.test(line)),
+    'the first movement lesson explicitly teaches directional joystick Dodge');
+  ok(CAMPAIGN_BY_ID.L05.narration.some((line) => /joystick up|Focus button/i.test(line)),
+    'the first Focus lesson explicitly teaches the Focus controls');
+  ok(CAMPAIGN_BY_ID.L03.narration.some((line) => /double-tap.*left or right.*switch guides/i.test(line)),
+    'the tutorial teaches draw-pad double-tap guide switching');
+  ok(CAMPAIGN_BY_ID.L12.maxTicks >= (MATCH.roundLimitS + 5) * TICK_HZ,
+    'First Formal Duel allows the complete expanded round timer');
+  ok([CAMPAIGN_BY_ID.A16, CAMPAIGN_BY_ID.EXAM, CAMPAIGN_BY_ID.EXAM_GM]
+    .every((lesson) => lesson.maxTicks >= (MATCH.roundLimitS * 3 + 20) * TICK_HZ),
+  'best-of-three tutorials allow three complete expanded rounds');
 
   // --- teaching loadouts are non-empty, distinct, known -----------------
   let teachingOk = true;

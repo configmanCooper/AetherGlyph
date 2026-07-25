@@ -61,7 +61,7 @@ Options:
 - Player loadout: current saved loadout or a preset.
 - Opponent loadout: Auto or a chosen preset.
 - Opponent loadout visibility: shown by default.
-- Round: standard 105 seconds or untimed.
+- Round: standard 150 seconds or untimed.
 - Coaching: summary or detailed.
 - Seed: automatic or fixed.
 - Templates: off by default; optional per-spell assistance marks the coaching report as assisted and excludes the round from difficulty-comparison statistics.

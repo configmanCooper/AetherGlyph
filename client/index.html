@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.9.1" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.10.0" />
   <script type="importmap">
   {
     "imports": {
@@ -53,7 +53,7 @@
 
     <!-- Round timer + pressure + series score -->
     <div class="round-info">
-      <span id="round-timer">1:45</span>
+      <span id="round-timer">2:30</span>
       <span id="pressure" class="pressure hidden">Arcane Pressure</span>
       <span id="series-score" class="series hidden"></span>
       <span id="net-status" class="net-status hidden"></span>
@@ -106,9 +106,6 @@
       <button id="btn-sidestep" class="act-btn"><span class="desktop-label">Dodge (Space)</span><span class="touch-label">Dodge</span></button>
     </div>
 
-    <!-- Dev accessibility fallback: quick-cast the selected guide shortcuts -->
-    <div id="devcast" class="devcast hidden"></div>
-
     <button id="btn-menu" class="corner-btn" title="Menu">☰</button>
   </div>
 
@@ -121,6 +118,7 @@
       <p class="tagline">Enter the academy. Draw living glyphs. Master the eight schools.</p>
       <div class="menu-list">
         <button id="btn-resume-game" class="menu-btn hidden" data-action="resume-game">Go back to current game</button>
+        <button id="btn-surrender-game" class="menu-btn danger hidden" data-action="online-surrender">Surrender and exit duel</button>
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
         <button class="menu-btn" data-action="practice-ai">Practice vs AI</button>
         <button class="menu-btn" data-action="lab">Glyph Laboratory</button>
@@ -130,7 +128,7 @@
       </div>
       <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
       <p class="links">
-        <span id="menu-version">Version 1.9.1</span> ·
+        <span id="menu-version">Version 1.10.0</span> ·
         <button class="link-button" data-action="spell-roster">Spell roster</button>
       </p>
     </div>
@@ -186,7 +184,7 @@
         </label>
         <label class="field">Round
           <select id="prac-timed">
-            <option value="timed" selected>Standard · 105s + Arcane Pressure</option>
+            <option value="timed" selected>Standard · 150s + Arcane Pressure</option>
             <option value="untimed">Untimed</option>
           </select>
         </label>
@@ -233,7 +231,7 @@
         <button class="menu-btn ghost" data-action="back">Back</button>
       </div>
       <p id="online-error" class="ls-err-line"></p>
-      <p class="offline-note"><span id="conn-quality" class="conn-badge">connecting…</span></p>
+      <p class="offline-note"><span id="conn-quality" class="conn-badge">connecting…</span> · <span id="online-population">Players online: connecting…</span></p>
     </div>
 
     <div class="panel hidden" id="panel-lan-duel">
@@ -274,9 +272,10 @@
       </div>
       <div class="spinner" aria-hidden="true"></div>
       <div class="menu-list">
+        <button id="btn-private-ready" class="menu-btn hidden" data-action="online-ready">Ready for rematch</button>
         <button class="menu-btn ghost" data-action="online-cancel">Cancel</button>
       </div>
-      <p class="offline-note"><span id="conn-quality-wait" class="conn-badge">connecting…</span></p>
+      <p class="offline-note"><span id="conn-quality-wait" class="conn-badge">connecting…</span> · <span id="online-population-wait">Players online: connecting…</span></p>
     </div>
 
     <div class="panel hidden wide" id="panel-loadout">
@@ -299,7 +298,6 @@
       <label class="toggle"><input type="checkbox" id="set-reduced" /> Reduced motion</label>
       <label class="toggle"><input type="checkbox" id="set-audio" checked /> Audio</label>
       <label class="toggle"><input type="checkbox" id="set-haptics" checked /> Haptics</label>
-      <label class="toggle"><input type="checkbox" id="set-devcast" /> Show dev quick-cast buttons</label>
       <label class="field">Orientation
         <select id="set-orientation">
           <option value="auto">Auto rotate</option>
@@ -413,6 +411,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.9.1"></script>
+  <script type="module" src="./src/app/main.js?v=1.10.0"></script>
 </body>
 </html>

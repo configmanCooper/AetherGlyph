@@ -1,6 +1,6 @@
 # Google Play Console Setup Instructions
 
-This guide is tailored to the current Aetherglyph 1.9.1 Android releases.
+This guide is tailored to the current Aetherglyph 1.10.0 Android releases.
 Google changes Play Console labels occasionally, but the overall sequence remains
 the same. Official Google references are listed at the end.
 
@@ -11,8 +11,8 @@ the other listing.
 
 | Edition | Play Console name | Package name | Price | Upload file |
 | --- | --- | --- | --- | --- |
-| Full game | Aetherglyph: Arcane Duels | `com.configmancooper.aetherglyph` | **$4.99 paid, one-time purchase** | `dist\Aetherglyph-1.9.1-release.aab` |
-| Demo | Aetherglyph: Arcane Duels Demo | `com.configmancooper.aetherglyph.demo` | **Free** | `dist\Aetherglyph-Demo-1.9.1.aab` |
+| Full game | Aetherglyph: Arcane Duels | `com.configmancooper.aetherglyph` | **$4.99 paid, one-time purchase** | `dist\Aetherglyph-1.10.0-release.aab` |
+| Demo | Aetherglyph: Arcane Duels Demo | `com.configmancooper.aetherglyph.demo` | **Free** | `dist\Aetherglyph-Demo-1.10.0.aab` |
 
 Upload the `.aab` files to Google Play. The APK files in `dist\` are for local
 device testing and should not be used for a new Play Store release.
@@ -46,11 +46,11 @@ This is the quick copy/paste reference for the fields Play Console will request.
 | Subscriptions | No |
 | Login/account required | No |
 | Target audience | 13–15, 16–17, 18 and over |
-| Version code | `10901` |
-| Version name | `1.9.1` |
+| Version code | `11000` |
+| Version name | `1.10.0` |
 | Minimum Android | Android 7.0 / API 24 |
 | Target Android | API 36 |
-| App Bundle | `dist\Aetherglyph-1.9.1-release.aab` |
+| App Bundle | `dist\Aetherglyph-1.10.0-release.aab` |
 | Internet use | Required only for online multiplayer |
 | Online interaction | Real-time 1v1 gameplay; no text or voice chat |
 
@@ -73,11 +73,11 @@ This is the quick copy/paste reference for the fields Play Console will request.
 | Subscriptions | No |
 | Login/account required | No |
 | Target audience | 13–15, 16–17, 18 and over |
-| Version code | `10901` |
-| Version name | `1.9.1-demo` |
+| Version code | `11000` |
+| Version name | `1.10.0-demo` |
 | Minimum Android | Android 7.0 / API 24 |
 | Target Android | API 36 |
-| App Bundle | `dist\Aetherglyph-Demo-1.9.1.aab` |
+| App Bundle | `dist\Aetherglyph-Demo-1.10.0.aab` |
 | Internet use | None; no Internet permission |
 | Online interaction | None |
 
@@ -270,18 +270,18 @@ Start with **Testing → Internal testing**:
    signing key; the local keystore remains the upload key.
 3. Upload:
 
-   `dist\Aetherglyph-1.9.1-release.aab`
+   `dist\Aetherglyph-1.10.0-release.aab`
 
 4. Confirm Play Console displays:
 
    | Field | Expected value |
    | --- | --- |
    | Package | `com.configmancooper.aetherglyph` |
-   | Version code | `10901` |
-   | Version name | `1.9.1` |
+   | Version code | `11000` |
+   | Version name | `1.10.0` |
    | Target API | 36 |
 
-5. Release name: `1.9.1 initial release`.
+5. Release name: `1.10.0 initial release`.
 6. Suggested release notes:
 
    ```text
@@ -322,7 +322,7 @@ tester count or duration. Organization accounts may receive a different path.
 1. Finish every Dashboard and App content task.
 2. Open **Test and release → Production**.
 3. Select **Create new release**.
-4. Add the already uploaded 1.9.1 bundle from the library.
+4. Add the already uploaded 1.10.0 bundle from the library.
 5. Add the release notes above.
 6. Resolve every error; review warnings individually.
 7. Select **Next**, review the release, and start the production rollout.
@@ -416,18 +416,18 @@ communicates through the installed Google Play Store service.
 3. Accept Play App Signing.
 4. Upload:
 
-   `dist\Aetherglyph-Demo-1.9.1.aab`
+   `dist\Aetherglyph-Demo-1.10.0.aab`
 
 5. Confirm:
 
    | Field | Expected value |
    | --- | --- |
    | Package | `com.configmancooper.aetherglyph.demo` |
-   | Version code | `10901` |
-   | Version name | `1.9.1-demo` |
+   | Version code | `11000` |
+   | Version name | `1.10.0-demo` |
    | Target API | 36 |
 
-6. Release name: `1.9.1 demo initial release`.
+6. Release name: `1.10.0 demo initial release`.
 7. Suggested release notes:
 
    ```text
@@ -463,7 +463,7 @@ communicates through the installed Google Play Store service.
 
 For each update:
 
-1. Increase `versionCode` above `10901`.
+1. Increase `versionCode` above `11000`.
 2. Increase `versionName`.
 3. Rebuild the correct signed AAB.
 4. Upload it to the existing listing—never create a replacement app.

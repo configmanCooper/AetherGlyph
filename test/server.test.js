@@ -93,6 +93,11 @@ async function main() {
     // --- 3. Private room create/join + match start -----------------------
     const host = track(await connect(url, goodAuth('acc-host')));
     const joiner = track(await connect(url, goodAuth('acc-join')));
+    const populationP = once(host, EVENTS.POPULATION);
+    const populationProbe = track(await connect(url, goodAuth('acc-population')));
+    const population = await populationP;
+    ok(population.online >= 3, 'server broadcasts the connected online player count');
+    populationProbe.disconnect();
     const created = await emitAck(host, EVENTS.CREATE_ROOM, { loadout: emberIds, name: 'Host' });
     ok(created.ok && created.code && created.slot === 0, 'private room created with code, host is slot 0');
 
@@ -223,7 +228,54 @@ async function main() {
       j.disconnect();
     }
 
-    // --- 11. Disconnect during intermission resumes the next round -------
+    // --- 11. Private surrender returns both players to the same room -----
+    {
+      const h = track(await connect(url, goodAuth('acc-sh')));
+      const j = track(await connect(url, goodAuth('acc-sj')));
+      const cr = await emitAck(h, EVENTS.CREATE_ROOM, { loadout: emberIds, name: 'Host' });
+      const hStartP = once(h, EVENTS.MATCH_START);
+      const jStartP = once(j, EVENTS.MATCH_START);
+      await emitAck(j, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds, name: 'Join' });
+      await hStartP;
+      await jStartP;
+
+      const hEndP = once(h, EVENTS.MATCH_END);
+      const jEndP = once(j, EVENTS.MATCH_END);
+      const hLobbyP = once(h, EVENTS.ROOM_UPDATE);
+      const jLobbyP = once(j, EVENTS.ROOM_UPDATE);
+      const surrendered = await emitAck(h, EVENTS.LEAVE, { surrender: true });
+      ok(surrendered.ok, 'private surrender is acknowledged');
+      const hEnd = await hEndP;
+      const jEnd = await jEndP;
+      eq(hEnd.winner, 'loss', 'surrendering private player loses');
+      eq(jEnd.winner, 'win', 'private opponent wins the surrender');
+      eq(hEnd.reason, 'forfeit', 'private surrender has forfeit reason');
+      eq(hEnd.code, cr.code, 'private match end retains the room code');
+      const hLobby = await hLobbyP;
+      const jLobby = await jLobbyP;
+      ok(hLobby.state === 'private-lobby' && jLobby.state === 'private-lobby',
+        'both private players return to a persistent room lobby');
+      eq(hLobby.code, cr.code, 'persistent lobby keeps the original code');
+
+      const hRematchP = once(h, EVENTS.MATCH_START);
+      const jRematchP = once(j, EVENTS.MATCH_START);
+      const hReady = await emitAck(h, EVENTS.PRIVATE_READY, { loadout: emberIds, name: 'Host' });
+      ok(hReady.ok && hReady.readyCount === 1, 'first private player can ready for rematch');
+      const jReady = await emitAck(j, EVENTS.PRIVATE_READY, { loadout: tideIds, name: 'Join' });
+      ok(jReady.ok && jReady.readyCount === 2, 'second ready starts the rematch');
+      const hRematch = await hRematchP;
+      const jRematch = await jRematchP;
+      eq(hRematch.code, cr.code, 'private rematch keeps the original code');
+      eq(jRematch.code, cr.code, 'both rematch clients receive the original code');
+
+      await emitAck(h, EVENTS.LEAVE, { surrender: true });
+      await sleep(40);
+      await emitAck(h, EVENTS.LEAVE, {});
+      h.disconnect();
+      j.disconnect();
+    }
+
+    // --- 12. Disconnect during intermission resumes the next round -------
     {
       const h = track(await connect(url, goodAuth('acc-ih')));
       const j = track(await connect(url, goodAuth('acc-ij')));
