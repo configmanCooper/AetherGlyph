@@ -10,7 +10,7 @@
 // unaffected. CACHE_VERSION starts with the app version and may add an asset
 // revision when web files change without rebuilding the native packages.
 
-const CACHE_VERSION = '1.10.0-glyph1';
+const CACHE_VERSION = '1.10.0-glyph2';
 const CACHE_PREFIX = 'aetherglyph-shell-v';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
@@ -19,8 +19,8 @@ const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 // runtime on first load.
 const SHELL = [
   './index.html',
-  './styles/style.css?v=1.10.0-glyph1',
-  './src/app/main.js?v=1.10.0-glyph1',
+  './styles/style.css?v=1.10.0-glyph2',
+  './src/app/main.js?v=1.10.0-glyph2',
   './src/game/menuDuel.js',
   './audio/music/wanderlust-menu.mp3',
   './audio/music/spell-duel.mp3',
@@ -67,7 +67,7 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
-        const fresh = await fetch(req);
+        const fresh = await fetch(req, { cache: 'no-store' });
         const cache = await caches.open(CACHE_NAME);
         cache.put(req, fresh.clone());
         return fresh;
@@ -79,11 +79,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (modules, styles, vendor, icons): cache-first with background
-  // refresh so repeat/offline loads are instant and self-healing.
+  // Executable assets are network-first with the browser HTTP cache bypassed.
+  // This prevents a reinstalled PWA from reviving stale ES modules whose import
+  // URLs did not change. Cached copies remain the offline fallback.
+  if (/\.(?:js|mjs|html|webmanifest)$/i.test(url.pathname)) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req, { cache: 'no-store' });
+        if (fresh && fresh.ok && fresh.type === 'basic') {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(req, fresh.clone());
+        }
+        return fresh;
+      } catch {
+        return (await caches.match(req)) || new Response('', { status: 504, statusText: 'Offline' });
+      }
+    })());
+    return;
+  }
+
+  // Media and images remain cache-first with a no-store background refresh.
   event.respondWith((async () => {
     const cached = await caches.match(req);
-    const network = fetch(req).then((res) => {
+    const network = fetch(req, { cache: 'no-store' }).then((res) => {
       if (res && res.ok && res.type === 'basic') {
         caches.open(CACHE_NAME).then((cache) => cache.put(req, res.clone()));
       }

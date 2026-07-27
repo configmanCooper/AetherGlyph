@@ -225,6 +225,9 @@ ok(sw.includes("startsWith('/socket.io/')") || sw.includes('/socket.io/'), 'sw.j
 ok(sw.includes('self.location.origin'), 'sw.js only handles same-origin requests (scope-safe)');
 ok(sw.includes('name.startsWith(CACHE_PREFIX)'),
   'service worker deletes only stale Aetherglyph caches on shared origins');
+ok(/\(\?:js\|mjs\|html\|webmanifest\)/.test(sw)
+    && sw.includes("fetch(req, { cache: 'no-store' })"),
+  'service worker bypasses stale HTTP caches for executable web assets');
 
 const main = read('client/src/app/main.js');
 ok(main.includes("navigator.serviceWorker.register('./sw.js'"), 'main.js registers ./sw.js (scope /client/)');
