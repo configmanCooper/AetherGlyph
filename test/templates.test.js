@@ -125,5 +125,31 @@ export function run() {
   // No pair may be similar enough to risk a miscast (kept well below acceptance).
   ok(worst < 0.86, `no template pair is dangerously ambiguous (worst similarity ${worst.toFixed(3)} < 0.86)`);
 
+  // Requested silhouettes remain structurally recognizable in the authored
+  // guides, independent of recognizer preprocessing.
+  const thunder = GESTURE_TEMPLATES.twinLines[0];
+  ok(thunder.length === 6
+      && thunder[0].x < thunder[1].x
+      && thunder[2].x < thunder[3].x
+      && thunder[4].x < thunder[5].x
+      && thunder[0].y < thunder[2].y
+      && thunder[2].y < thunder[4].y,
+  'Thunderclap is two stacked Blink-like Z strokes');
+
+  const oil = GESTURE_TEMPLATES.wavyLine[0];
+  let oilTurns = 0;
+  let previousDirection = 0;
+  for (let i = 1; i < oil.length; i++) {
+    const direction = Math.sign(oil[i].y - oil[i - 1].y);
+    if (direction && previousDirection && direction !== previousDirection) oilTurns++;
+    if (direction) previousDirection = direction;
+  }
+  const oilXs = oil.map((point) => point.x);
+  const oilYs = oil.map((point) => point.y);
+  ok(oil.length >= 30 && oilTurns === 6
+      && Math.max(...oilXs) - Math.min(...oilXs) >= 80
+      && Math.max(...oilYs) - Math.min(...oilYs) >= 40,
+  'Oil Script is a smooth horizontal three-hump wave');
+
   return report('templates');
 }

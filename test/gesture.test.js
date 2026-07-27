@@ -5,6 +5,7 @@ import { createHarness } from './tiny.js';
 import { Recognizer, resample, normalize, preprocess } from '../shared/src/gesture/recognizer.js';
 import { GESTURE_TEMPLATES, buildTemplates } from '../shared/src/gesture/templates.js';
 import { starterLoadout, STARTER_GESTURE_KEYS, GESTURE_KEYS } from '../shared/src/balance/loadouts.js';
+import { guideTransform } from '../client/src/input/guideGeometry.js';
 
 // Add small deterministic jitter to a path to simulate a human trace.
 function jitter(pts, amp, seed) {
@@ -41,6 +42,10 @@ export function run() {
   const nm = normalize(rs);
   const cx = nm.reduce((s, p) => s + p.x, 0) / nm.length;
   near(cx, 0, 0.001, 'normalize centers x at ~0');
+
+  const wideGuide = guideTransform(414, 177, 1);
+  near(wideGuide.sx(100) - wideGuide.sx(0), wideGuide.sy(100) - wideGuide.sy(0), 0.001,
+    'rectangular draw pads preserve guide aspect ratio with uniform scaling');
 
   const templates = buildTemplates();
   ok(templates.length >= 8, 'templates built for starter gestures');
@@ -190,14 +195,25 @@ export function run() {
   }
   ok(chainCorrect >= 165, `rough Chain Lightning zigzags remain recognizable (${chainCorrect}/200)`);
   eq(sparkChainMiscasts, 0, 'rough Spark Dart zigzags never cross-cast as Chain Lightning');
-  let thunderclapCorrect = 0;
+  let thunderclapCorrect = 0, blinkThunderCrosscasts = 0;
   for (let seed = 1; seed <= 200; seed++) {
     const thunder = full.recognize(jitter(GESTURE_TEMPLATES.twinLines[0], 12, seed * 241));
+    const blink = full.recognize(jitter(GESTURE_TEMPLATES.doubleStroke[0], 10, seed * 241));
     if (thunder.accepted && thunder.spellId === 30) thunderclapCorrect++;
+    if ((thunder.accepted && thunder.spellId === 14) || (blink.accepted && blink.spellId === 30)) {
+      blinkThunderCrosscasts++;
+    }
   }
-  ok(thunderclapCorrect >= 195, `rough Thunderclap twin lines remain recognizable (${thunderclapCorrect}/200)`);
+  ok(thunderclapCorrect >= 190, `rough stacked-Z Thunderclap traces remain recognizable (${thunderclapCorrect}/200)`);
+  eq(blinkThunderCrosscasts, 0, 'rough Blink and stacked-Z Thunderclap traces never cross-cast');
   eq(full.recognize(GESTURE_TEMPLATES.twinLines[0]).requiredMargin, 0.015,
     'high-confidence Thunderclap uses the forgiving ambiguity margin');
+  let oilCorrect = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const oil = full.recognize(jitter(GESTURE_TEMPLATES.wavyLine[0], 8, seed * 251));
+    if (oil.accepted && oil.spellId === 31) oilCorrect++;
+  }
+  ok(oilCorrect >= 195, `rough smooth Oil Script waves remain recognizable (${oilCorrect}/200)`);
   const concussiveXs = GESTURE_TEMPLATES.arc.flat().map((point) => point.x);
   ok(Math.min(...concussiveXs) >= 0 && Math.max(...concussiveXs) <= 100,
     'Concussive Blast guide stays fully inside the draw pad');

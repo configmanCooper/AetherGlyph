@@ -57,6 +57,7 @@ const requiredStaged = [
   'client/src/app/native.js',
   'client/src/net/serverConfig.js',
   'client/src/input/gestureInput.js',
+  'client/src/input/guideGeometry.js',
   'client/src/tutorial/campaign.js',
   'client/src/tutorial/runner.js',
   'client/src/tutorial/objectives.js',
@@ -215,7 +216,11 @@ ok(!existsSync(join(ROOT, 'android/keystore.properties')) || isIgnored('android/
 const sw = read('client/sw.js');
 const cacheMatch = sw.match(/CACHE_VERSION\s*=\s*'([^']+)'/);
 ok(!!cacheMatch, 'sw.js declares CACHE_VERSION');
-eq(cacheMatch && cacheMatch[1], version, 'sw.js CACHE_VERSION matches package.json version');
+ok(!!cacheMatch && cacheMatch[1].startsWith(version),
+  'sw.js CACHE_VERSION starts with the package version');
+ok(read('client/index.html').includes(`style.css?v=${cacheMatch && cacheMatch[1]}`)
+    && read('client/index.html').includes(`main.js?v=${cacheMatch && cacheMatch[1]}`),
+  'client asset query revision matches the service-worker cache revision');
 ok(sw.includes("startsWith('/socket.io/')") || sw.includes('/socket.io/'), 'sw.js excludes Socket.IO traffic');
 ok(sw.includes('self.location.origin'), 'sw.js only handles same-origin requests (scope-safe)');
 ok(sw.includes('name.startsWith(CACHE_PREFIX)'),

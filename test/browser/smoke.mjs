@@ -49,6 +49,29 @@ async function drawEmberFlick(page) {
   return box;
 }
 
+async function drawDisplayedGuide(page, points) {
+  const mapped = await page.evaluate(async (canonical) => {
+    const { guideTransform } = await import('./src/input/guideGeometry.js');
+    const canvas = document.querySelector('#draw-canvas');
+    const rect = canvas.getBoundingClientRect();
+    let guideScale = 1;
+    try {
+      guideScale = JSON.parse(localStorage.getItem('aeg.solo.v1') || '{}')?.calibration?.guideScale || 1;
+    } catch {}
+    const transform = guideTransform(rect.width, rect.height, guideScale);
+    return canonical.map((point) => ({
+      x: rect.left + transform.sx(point.x),
+      y: rect.top + transform.sy(point.y),
+    }));
+  }, points);
+  await page.mouse.move(mapped[0].x, mapped[0].y);
+  await page.mouse.down();
+  for (const point of mapped.slice(1)) {
+    await page.mouse.move(point.x, point.y, { steps: 2 });
+  }
+  await page.mouse.up();
+}
+
 async function drawCalibrationBaseline(page, span = 0.6) {
   const pad = await page.$('#calib-canvas');
   const box = await pad.boundingBox();
@@ -567,6 +590,43 @@ try {
       }
     }
     if (i === 2) {
+      const updatedGlyphs = [
+        { id: 30, name: 'Thunderclap', key: 'twinLines' },
+        { id: 31, name: 'Oil Script', key: 'wavyLine' },
+      ];
+      for (const glyph of updatedGlyphs) {
+        const button = await page.$(`#spellbar .spell-btn[data-spell="${glyph.id}"]`);
+        if (!button) fail(`${glyph.name} missing from expected Glyph Lab page: ${JSON.stringify(labPages)}`);
+        await button.click();
+        const guide = await page.evaluate((entry) => {
+          const canvas = document.querySelector('#draw-canvas');
+          const ctx = canvas?.getContext('2d');
+          let painted = 0;
+          if (canvas && ctx) {
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            for (let px = 3; px < data.length; px += 4) if (data[px] > 0) painted++;
+          }
+          return {
+            hint: document.querySelector('#draw-pad .pad-hint')?.textContent || '',
+            guide: canvas?.dataset.guideSpell,
+            painted,
+            recognition: window.__aegTest.recognize(entry.points),
+          };
+        }, { points: GESTURE_TEMPLATES[glyph.key][0] });
+        if (!guide.hint.includes(glyph.name) || guide.guide !== String(glyph.id)
+            || guide.painted < 20 || !guide.recognition.accepted
+            || guide.recognition.spellId !== glyph.id) {
+          fail(`${glyph.name} updated guide did not render/recognize: ${JSON.stringify(guide)}`);
+        }
+        const beforeCast = await page.evaluate(() => window.__aegTest.info().playerCastsResolved);
+        await drawDisplayedGuide(page, GESTURE_TEMPLATES[glyph.key][0]);
+        await page.waitForFunction((count) =>
+          window.__aegTest.info().playerCastsResolved > count, { timeout: 5000 }, beforeCast);
+        const lastCast = await page.$eval('#last-cast', (element) => element.textContent || '');
+        if (!lastCast.includes(glyph.name)) {
+          fail(`${glyph.name} displayed guide trace cast the wrong spell: ${lastCast}`);
+        }
+      }
       const rain = await page.$('#spellbar .spell-btn[data-spell="32"]');
       if (!rain) fail('Rain Glyph missing from weather lab page: ' + JSON.stringify(labPages));
       await rain.click();

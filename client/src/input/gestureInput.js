@@ -12,6 +12,7 @@
 
 import { boundTrace } from '@shared/protocol/net.js';
 import { qualityFromScore } from '@shared/gesture/quality.js';
+import { guideTransform } from './guideGeometry.js';
 
 export class GestureInput {
   constructor(canvas, opts = {}) {
@@ -294,12 +295,7 @@ export class GestureInput {
   // geometry is NEVER mirrored (left-handed mode moves the pad, not the glyph
   // direction — SOLO-MODES-PLAN §5).
   _guideXY(r) {
-    const pad = 0.16;
-    const span = (1 - 2 * pad) * (this.guideScale || 1);
-    return {
-      sx: (v) => (0.5 + (v / 100 - 0.5) * span) * r.width,
-      sy: (v) => (0.5 + (v / 100 - 0.5) * span) * r.height,
-    };
+    return guideTransform(r.width, r.height, this.guideScale);
   }
 
   _drawGuide(ctx, r) {
