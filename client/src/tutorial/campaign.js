@@ -315,6 +315,7 @@ export const CAMPAIGN = [
     narration: [
       'Weather is shared. Rain creates a Wet zone either wizard can exploit.',
       'Lightning conducts through Wet ground: both wizards jump to maximum Static and Storm spells gain 25% damage while the Wet zone lasts.',
+      'Chain Lightning Stuns for 2 seconds; Thunderclap paralyzes for 4 seconds but Knocks Down its caster on release.',
       'A Stun/paralysis strips buffs and makes every spell deal 25% more damage during the control.',
       'After the return lightning is released, let it get close, then push the joystick fully left or right to Dodge. Spark homes slightly, so dodging too early lets it follow you.',
     ],
@@ -396,7 +397,7 @@ export const CAMPAIGN = [
     narration: [
       'Frost Bind freezes either a Chilled or Soaked target and consumes that setup.',
       'Frozen Ground Chills both wizards and empowers frost spells by 25% while active.',
-      'Frozen strips buffs and makes non-fire spells deal 25% more damage during the Freeze.',
+      'Frost Bind Freeze lasts 4 seconds, strips buffs, and makes non-fire spells deal 25% more damage.',
       'Hard control cannot chain: it grants Tenacity when it ends. Blink clear.',
       'Land one legal Freeze, Blink away, and watch Tenacity engage.',
     ],

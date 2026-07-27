@@ -322,6 +322,7 @@ Teach:
 - shared Wet zones,
 - Soaked,
 - Conductive Arc maximum Static and Storm damage bonus,
+- 2-second Chain Lightning Stun, 4-second Thunderclap paralysis with caster Knock Down,
 - Stun/paralysis buff stripping and damage vulnerability,
 - weather benefiting both players.
 
@@ -362,7 +363,7 @@ Teach:
 - Chilled or Soaked prerequisite,
 - Frost Bind,
 - Frozen Ground damage bonus,
-- Freeze buff stripping and non-fire vulnerability,
+- 4-second Freeze buff stripping and non-fire vulnerability,
 - Tenacity,
 - Root versus Freeze,
 - Blink.

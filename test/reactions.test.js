@@ -225,13 +225,13 @@ export function run() {
     sim.step({ 0: {}, 1: {} });
     frostTicks = sim.wizards[1].statuses.Frozen?.ticks || 0;
   }
-  ok(frostTicks >= 178 && frostTicks <= 180, `Frost Bind grants about 3 seconds of Freeze (${frostTicks} ticks)`);
+  ok(frostTicks >= 238 && frostTicks <= 240, `Frost Bind grants about 4 seconds of Freeze (${frostTicks} ticks)`);
   const frozenPos = sim.wizards[1].arcPos;
   sim.step({ 0: {}, 1: { move: 1, cast: 1, castQuality: 1 } });
   eq(sim.wizards[1].arcPos, frozenPos, 'Frost Bind target cannot move');
   ok(!sim.wizards[1].casting, 'Frost Bind target cannot cast');
-  for (let t = 0; t < 185 && sim.hasStatus(sim.wizards[1], 'Frozen'); t++) sim.step({ 0: {}, 1: {} });
-  ok(sim.wizards[1].tenacityTicks > 0, 'Frost Bind grants Tenacity after the 3s Freeze');
+  for (let t = 0; t < 245 && sim.hasStatus(sim.wizards[1], 'Frozen'); t++) sim.step({ 0: {}, 1: {} });
+  ok(sim.wizards[1].tenacityTicks > 0, 'Frost Bind grants Tenacity after the 4s Freeze');
 
   // Soaked is also a legal Frost Bind setup and is consumed by the Freeze.
   sim = mk([27], [1]);
@@ -249,7 +249,9 @@ export function run() {
     sim.step({ 0: {}, 1: {} });
     stunTicks = sim.wizards[1].statuses.Stunned?.ticks || 0;
   }
-  ok(stunTicks >= 118 && stunTicks <= 120, `Thunderclap grants about 2 seconds of Stun (${stunTicks} ticks)`);
+  ok(stunTicks >= 238 && stunTicks <= 240, `Thunderclap grants about 4 seconds of paralysis (${stunTicks} ticks)`);
+  ok(sim.hasStatus(sim.wizards[0], 'KnockedDown'),
+    'Thunderclap Knocks Down its caster when released');
   const stunnedPos = sim.wizards[1].arcPos;
   sim.step({ 0: {}, 1: { move: 1, cast: 1, castQuality: 1 } });
   eq(sim.wizards[1].arcPos, stunnedPos, 'Thunderclap target cannot move while stunned');
@@ -278,6 +280,17 @@ export function run() {
   fire(sim, 7, 0, 90);
   ok(sim.hasStatus(sim.wizards[1], 'Stunned'),
     'two Static stacks prime Chain Lightning Stun');
+  const chainStunTicks = sim.wizards[1].statuses.Stunned?.ticks || 0;
+  ok(chainStunTicks > 0 && chainStunTicks <= 120,
+    `Chain Lightning Stun lasts up to 2 seconds (${chainStunTicks} ticks remaining)`);
+
+  // Thunderclap backlash occurs even when the target lacks the paralysis setup.
+  sim = mk([30], [1]);
+  fire(sim, 30, 0, 75);
+  ok(sim.hasStatus(sim.wizards[0], 'KnockedDown'),
+    'unprimed Thunderclap still Knocks Down its caster');
+  ok(!sim.hasStatus(sim.wizards[1], 'Stunned'),
+    'unprimed Thunderclap does not paralyze the target');
 
   sim = mk([7], [1]);
   sim.applyStatus(sim.wizards[1], 'Static', 1);

@@ -21,7 +21,9 @@ adds online population and authoritative surrender, and keeps private duel rooms
 available for ready-up rematches. The reaction balance update adds elemental
 zone damage bonuses, opposing-status cancellation, Veil cooldown delay, stronger
 control-state vulnerabilities, buff stripping on Freeze/Stun, longer Gust Wall,
-and persistent Fireball-sized holes in fractured Stone Walls. Version
+and persistent Fireball-sized holes in fractured Stone Walls. The control hotfix
+extends Frost Bind and Thunderclap to 4 seconds, Chain Lightning to 2 seconds,
+and gives Thunderclap a self-Knockdown backlash on release. Version
 1.6.x adds 150-point Health, authoritative 100-point Stamina bars and costs for
 movement, Dodge, Brace, and Focus; Haste
 modifies stamina economy; Brace converts damage to Aether; spare Sigil Charges

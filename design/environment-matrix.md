@@ -33,8 +33,9 @@ This order is data-versioned and covered by replay tests.
 | Storm projectile | Grounding Mantle | Grounded | Lightning bonus and new Static application are canceled | Sunder; Aether Leech; zones |
 | Stone Wall | Quake | Rubble | Wall is destroyed; brief rubble slow, no hard control | Blink; avoid wall dependence |
 | Stone Wall | Fireball | Fractured Cover | Fireball removes 30 wall HP and leaves a Fireball-sized visible hole | Move before impact; Quake the damaged wall |
-| Chilled or Soaked target | Frost Bind | Freeze | 3 sec hard control; consumes the setup, strips buffs, and grants +25% non-Ember spell damage taken | Dispel before bind; Blink |
-| Soaked or Static 2 target | Thunderclap | Stun / paralysis | 2 sec hard control; strips buffs and grants +25% spell damage taken | Dispel; Grounding; spacing |
+| Chilled or Soaked target | Frost Bind | Freeze | 4 sec hard control; consumes the setup, strips buffs, and grants +25% non-Ember spell damage taken | Dispel before bind; Blink |
+| Soaked or Static 2 target | Thunderclap | Stun / paralysis | 4 sec hard control; strips buffs, grants +25% spell damage taken, and Knocks Down the caster on release | Dispel; Grounding; punish caster backlash |
+| Soaked or Static 2 target | Chain Lightning | Stun | 2 sec hard control; strips buffs and grants +25% spell damage taken | Dispel; Grounding; spacing |
 | Any target | Knocked Down | Vulnerability | 2 sec movement/Dodge denial and +10% spell damage taken | Grounding; wait; cast defensively |
 | Mixed resonance | Prismatic Beam | Spectrum | Beam gains small utility based on the two prior schools; direct damage remains capped | Interrupt; Barrier; cover |
 

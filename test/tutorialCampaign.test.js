@@ -107,10 +107,12 @@ export function run() {
     'Clean Hands teaches opposing elemental status cancellation');
   ok(CAMPAIGN_BY_ID.L07.narration.some((line) => /maximum Static.*25% damage/i.test(line)),
     'Rain Conducts teaches the strengthened Conductive Arc');
+  ok(CAMPAIGN_BY_ID.L07.narration.some((line) => /Chain Lightning.*2 seconds.*Thunderclap.*4 seconds.*Knocks Down/i.test(line)),
+    'Rain Conducts teaches both Storm control durations and Thunderclap backlash');
   ok(CAMPAIGN_BY_ID.L08.objectives.some((objective) => objective.predicate === 'reaction:SpreadingFlame'),
     'Fire Changes the Ground requires the player to spread a Fire zone');
   ok(CAMPAIGN_BY_ID.L09.narration.some((line) => /Chilled or Soaked/i.test(line))
-      && CAMPAIGN_BY_ID.L09.narration.some((line) => /strips buffs.*25%/i.test(line)),
+      && CAMPAIGN_BY_ID.L09.narration.some((line) => /4 seconds.*strips buffs.*25%/i.test(line)),
   'The Cold Lock teaches both Frost Bind setups and Freeze vulnerability');
   ok(CAMPAIGN_BY_ID.L10.narration.some((line) => /6 seconds.*5\.5 seconds/i.test(line))
       && CAMPAIGN_BY_ID.L10.narration.some((line) => /10% more damage/i.test(line)),

@@ -109,6 +109,7 @@ Teach:
 - shared zones,
 - Soaked,
 - Conductive Arc gives both wizards maximum Static and empowers Storm spells,
+- Chain Lightning Stuns for 2 sec; Thunderclap paralyzes for 4 sec and Knocks Down its caster,
 - Stun/paralysis strips buffs and creates a 25% damage window,
 - opponent can exploit your weather.
 
@@ -137,7 +138,7 @@ Teach:
 - Chilled or Soaked prerequisite,
 - Frost Bind,
 - Frozen Ground frost bonus,
-- Freeze strips buffs and creates a non-fire damage window,
+- 4-second Freeze strips buffs and creates a non-fire damage window,
 - Tenacity,
 - hard-control cannot chain.
 
