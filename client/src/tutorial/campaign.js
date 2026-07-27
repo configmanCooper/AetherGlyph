@@ -222,6 +222,7 @@ export const CAMPAIGN = [
     id: 'L04', chapter: 'core', title: 'Clean Hands', order: 4,
     narration: [
       'Statuses matter: Burning ticks damage, Chilled slows.',
+      'A Chilled-applying hit removes Burning; a Burning-applying hit removes Chilled.',
       'Dispel removes harmful statuses — but wasting it on plain damage is a loss.',
       'Chill the instructor, cleanse your Burning, and never waste Dispel.',
     ],
@@ -313,7 +314,8 @@ export const CAMPAIGN = [
     id: 'L07', chapter: 'core', title: 'Rain Conducts', order: 7,
     narration: [
       'Weather is shared. Rain creates a Wet zone either wizard can exploit.',
-      'Lightning conducts through Wet ground — and the instructor can answer.',
+      'Lightning conducts through Wet ground: both wizards jump to maximum Static and Storm spells gain 25% damage while the Wet zone lasts.',
+      'A Stun/paralysis strips buffs and makes every spell deal 25% more damage during the control.',
       'After the return lightning is released, let it get close, then push the joystick fully left or right to Dodge. Spark homes slightly, so dodging too early lets it follow you.',
     ],
     timerEnabled: false, pressureEnabled: false,
@@ -344,15 +346,18 @@ export const CAMPAIGN = [
     id: 'L08', chapter: 'core', title: 'Fire Changes the Ground', order: 8,
     narration: [
       'Oil is slick and flammable. Ember ignites it for a capped burst.',
+      'Flash Fire empowers Ember spells by 25% while its Fire zone lasts.',
+      'Gust spreads that Fire for a shorter time and raises Ember damage to the non-spreading wizard to 50%.',
       'Rain washes Oil away before it can catch. You may own only two zones.',
-      'Wash the instructor\'s Oil slick with Rain, then place and ignite your own.',
+      'Wash the instructor\'s Oil slick with Rain, then place, ignite, and spread your own.',
     ],
     timerEnabled: false, pressureEnabled: false,
-    playerLoadout: [31, 32, 1], opponentLoadout: [31],
+    playerLoadout: [31, 32, 1, 33], opponentLoadout: [31],
     taughtSpells: [
       { id: 31, enterStage: 1, exitStage: 1 },
       { id: 32, enterStage: 1, exitStage: 1 },
       { id: 1, enterStage: 1, exitStage: 1 },
+      { id: 33, enterStage: 1, exitStage: 1 },
     ],
     drills: [],
     opponent: {
@@ -363,13 +368,15 @@ export const CAMPAIGN = [
       { id: 'wash', text: 'Wash the instructor\'s Oil slick with Rain', predicate: 'reaction:WashedGround', expectSpell: 32 },
       { id: 'oil-fire', text: 'Place an Oil slick to ignite', predicate: 'create-zone:Oil', expectSpell: 31 },
       { id: 'ignite', text: 'Ignite the Oil slick with Ember', predicate: 'reaction:FlashFire', expectSpell: 1 },
+      { id: 'spread', text: 'Spread the Fire zone with Gust Wall', predicate: 'reaction:SpreadingFlame', expectSpell: 33 },
     ],
     clues: ['phoenixOil'],
     remediation: ['slow-script'],
-    maxTicks: 3000,
+    maxTicks: 3600,
     solution: (sim, t) => {
       const washed = t.facts.reactionsSetPlayer.has('WashedGround');
       const flashed = t.facts.reactionsSetPlayer.has('FlashFire');
+      const spread = t.facts.reactionsSetPlayer.has('SpreadingFlame');
       if (!washed) {
         if (sim.zones.some((z) => z.kind === 'Oil') && pc(sim, 32)) return { cast: 32, castQuality: 1 };
         return IDLE;
@@ -379,6 +386,7 @@ export const CAMPAIGN = [
         if (playerZone(sim, 'Oil') && pc(sim, 1)) return { cast: 1, castQuality: 1 };
         return IDLE;
       }
+      if (!spread && playerZone(sim, 'Fire') && pc(sim, 33)) return { cast: 33, castQuality: 1 };
       return IDLE;
     },
   },
@@ -386,7 +394,9 @@ export const CAMPAIGN = [
   {
     id: 'L09', chapter: 'core', title: 'The Cold Lock', order: 9,
     narration: [
-      'Frost Bind only freezes a Chilled target — set it up with Frost Lance.',
+      'Frost Bind freezes either a Chilled or Soaked target and consumes that setup.',
+      'Frozen Ground Chills both wizards and empowers frost spells by 25% while active.',
+      'Frozen strips buffs and makes non-fire spells deal 25% more damage during the Freeze.',
       'Hard control cannot chain: it grants Tenacity when it ends. Blink clear.',
       'Land one legal Freeze, Blink away, and watch Tenacity engage.',
     ],
@@ -423,6 +433,8 @@ export const CAMPAIGN = [
     id: 'L10', chapter: 'core', title: 'Wind Answers', order: 10,
     narration: [
       'Gust deflects a light bolt and clears Fog, but heavy attacks blow right through it.',
+      'The Gust zone lasts 6 seconds; its light-projectile deflect window lasts 5.5 seconds.',
+      'Its Knock Down lasts 2 seconds and makes spells deal 10% more damage.',
       'Visual effects never change how your glyph is read.',
       'Clear the Fog, deflect a light bolt, then dodge a heavy Stone Shard.',
     ],
@@ -467,17 +479,23 @@ export const CAMPAIGN = [
     id: 'L11', chapter: 'core', title: 'Cover and Ruin', order: 11,
     narration: [
       'Stone Wall breaks line of sight — Focus safely behind it.',
-      'But cover is destructible: Quake and Fireball tear it down mid-channel.',
-      'Focus behind your wall, then shatter the instructor\'s cover with Quake.',
+      'Fireball blasts a Fireball-sized hole and removes half the wall HP; Quake finishes the damaged wall.',
+      'Focus behind your wall, fracture the instructor\'s cover with Fireball, then shatter it with Quake.',
     ],
     timerEnabled: false, pressureEnabled: false,
-    playerLoadout: [15, 34], opponentLoadout: [15],
-    taughtSpells: [{ id: 15, enterStage: 0, exitStage: 2 }, { id: 34, enterStage: 0, exitStage: 2 }],
-    drills: [8, 36],
+    playerLoadout: [15, 8, 34], opponentLoadout: [15],
+    taughtSpells: [
+      { id: 15, enterStage: 0, exitStage: 2 },
+      { id: 8, enterStage: 0, exitStage: 2 },
+      { id: 34, enterStage: 0, exitStage: 2 },
+    ],
+    drills: [36],
+    arena: { playerCharges: 2 },
     opponent: { type: 'script', config: { behavior: 'wall-focus', wallId: 15, startTick: 240 } },
     objectives: [
       { id: 'wall', text: 'Build a Stone Wall', predicate: 'create-zone:Cover', expectSpell: 15 },
       { id: 'cover', text: 'Focus safely behind cover', predicate: 'focus-behind-cover', guideSpell: 15 },
+      { id: 'fracture', text: 'Blast a hole through the instructor\'s wall with Fireball', predicate: 'reaction:FracturedCover', expectSpell: 8 },
       { id: 'ruin', text: 'Destroy the instructor\'s cover', predicate: 'destroy-cover', expectSpell: 34 },
     ],
     remediation: ['slow-script'],
@@ -489,6 +507,9 @@ export const CAMPAIGN = [
         return IDLE;
       }
       if (t.facts.coverDestroyedByPlayer < 1) {
+        if (!t.facts.reactionsSetPlayer.has('FracturedCover') && enemyZone(sim, 'Cover') && pc(sim, 8)) {
+          return { cast: 8, castQuality: 1 };
+        }
         if (enemyZone(sim, 'Cover') && pc(sim, 34)) return { cast: 34, castQuality: 1 };
         return IDLE;
       }
@@ -526,20 +547,23 @@ export const CAMPAIGN = [
     optional: true,
     narration: [
       'Economy wins attrition — but only when it is safe to invest.',
+      'Veil Hex adds one second to every active enemy cooldown for each full second it remains.',
       'Grounding trades movement for protection against Storm.',
-      'Surge your Aether, take Grounding, and Weaken the instructor.',
+      'Surge your Aether, take Grounding, Weaken the instructor, and apply Veil.',
     ],
     timerEnabled: false, pressureEnabled: false,
-    playerLoadout: [17, 24, 21, 16, 20, 23], opponentLoadout: [3],
+    playerLoadout: [17, 24, 21, 16, 20, 23, 25], opponentLoadout: [3],
     taughtSpells: [{ id: 17, enterStage: 0, exitStage: 2 }, { id: 24, enterStage: 0, exitStage: 2 },
       { id: 21, enterStage: 0, exitStage: 2 }, { id: 16, enterStage: 0, exitStage: 2 },
-      { id: 20, enterStage: 0, exitStage: 2 }, { id: 23, enterStage: 0, exitStage: 2 }],
+      { id: 20, enterStage: 0, exitStage: 2 }, { id: 23, enterStage: 0, exitStage: 2 },
+      { id: 25, enterStage: 0, exitStage: 2 }],
     drills: [],
-    opponent: { type: 'script', config: { behavior: 'idle' } },
+    opponent: { type: 'script', config: { behavior: 'periodic', spellId: 3, startTick: 30, periodTicks: 120 } },
     objectives: [
       { id: 'surge', text: 'Channel Aether Surge', predicate: 'self-status:AetherSurge', expectSpell: 17 },
       { id: 'ground', text: 'Take Grounding Mantle', predicate: 'self-status:Grounded', expectSpell: 20 },
       { id: 'weaken', text: 'Weaken the instructor', predicate: 'apply-status:Weakened', expectSpell: 21 },
+      { id: 'veil', text: 'Keep Veil active until it delays an enemy cooldown', predicate: 'veil-cooldown-tax', expectSpell: 25 },
     ],
     clues: ['mirrorEight'],
     remediation: ['slow-script'],
@@ -548,6 +572,10 @@ export const CAMPAIGN = [
       if ((t.facts.statusAppliedToSelf.get('AetherSurge') || 0) < 1) return pc(sim, 17) ? { cast: 17, castQuality: 1 } : IDLE;
       if ((t.facts.statusAppliedToSelf.get('Grounded') || 0) < 1) return pc(sim, 20) ? { cast: 20, castQuality: 1 } : IDLE;
       if (t.statusOnOpp('Weakened') < 1) return pc(sim, 21) ? { cast: 21, castQuality: 1 } : IDLE;
+      if (t.castCount(25) < 1) {
+        if (sim.wizards[0].charges < 1) return { focus: true };
+        return pc(sim, 25) ? { cast: 25, castQuality: 1 } : IDLE;
+      }
       return IDLE;
     },
   },

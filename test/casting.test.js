@@ -47,8 +47,8 @@ export function run() {
   ok(cover.hp < ZONE.coverHp, 'blocked projectile lowers Stone Wall HP');
   eq(missedCover.hp, ZONE.coverHp, 'projectile checks every wall and leaves non-intersecting cover untouched');
 
-  // Wide area projectiles hit the wall instead of bypassing it. Fireball's
-  // triple cover damage shatters a full wall without damaging its wizard.
+  // Wide area projectiles hit the wall instead of bypassing it. Fireball makes
+  // a visible fracture and removes half the wall HP without damaging its wizard.
   sim = new Sim({ seed: 2, loadouts: [makeLoadout([8]), makeLoadout([15])] });
   sim.wizards[0].arcPos = -1;
   sim.wizards[1].arcPos = 0.7;
@@ -59,7 +59,22 @@ export function run() {
   sim.step({ 0: { cast: 8, castQuality: 1 }, 1: {} });
   idleFor(sim, 120);
   eq(sim.wizards[1].health, fireballCoveredHp, 'Stone Wall blocks a heavy area Fireball');
-  eq(sim.zones.filter((z) => z.kind === 'Cover').length, 0, 'Fireball destroys Stone Wall by reducing its HP to zero');
+  const fracturedWall = sim.zones.find((z) => z.kind === 'Cover');
+  ok(!!fracturedWall, 'Fireball leaves a damaged Stone Wall standing');
+  near(fracturedWall.hp, ZONE.coverHp - 30, 0.01, 'Fireball removes 30 Stone Wall HP');
+  ok(fracturedWall.fractured && fracturedWall.fractureRadius > 0,
+    'Fractured Cover records a Fireball-sized wall hole');
+
+  sim = new Sim({ seed: 22, loadouts: [makeLoadout([8]), makeLoadout([15])] });
+  sim.wizards[0].arcPos = -1;
+  sim.wizards[1].arcPos = 0.7;
+  sim.wizards[0].aether = 100;
+  sim.wizards[0].charges = 3;
+  const lowQualityWall = sim.addZone(1, 'Cover', { center: 0 });
+  sim.step({ 0: { cast: 8, castQuality: 0.9 }, 1: {} });
+  idleFor(sim, 120);
+  near(lowQualityWall.hp, ZONE.coverHp - 30, 0.01,
+    'Fireball always removes exactly 30 wall HP regardless of cast quality');
 
   // Stone Shard is the explicit projectile exception: it pierces the wall and
   // damages the protected wizard without consuming cover HP.

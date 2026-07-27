@@ -67,6 +67,7 @@ export class ObjectiveTracker {
       decoyAbsorbedForSelf: 0,
       phoenixSavedSelf: 0,
       channelCompletesBySelf: new Map(),               // spellId -> count
+      veilCooldownTaxesOnOpp: 0,
       schoolsCastByPlayer: new Set(),
       bracedHit: false,
       blockedDamage: 0,
@@ -131,6 +132,11 @@ export class ObjectiveTracker {
         case 'reaction':
           f.reactionsAny.add(e.name);
           if (e.casterId === P) { f.reactionsByPlayer.push(e.name); f.reactionsSetPlayer.add(e.name); }
+          break;
+        case 'veilCooldownTax':
+          if (e.target === B && Array.isArray(e.spells) && e.spells.length > 0) {
+            f.veilCooldownTaxesOnOpp += 1;
+          }
           break;
         case 'zone':
           f.zoneOwnerById.set(e.id, e.owner);
@@ -277,6 +283,7 @@ const num = (v, dflt) => { const n = Number(v); return Number.isFinite(n) ? n : 
 export const OBJECTIVE_PREDICATES = {
   // Player cast a spell (by id) at least N times.
   'cast-spell': (ctx, [id, n]) => (ctx.facts.castsBy[ctx.playerId].get(Number(id)) || 0) >= num(n, 1),
+  'veil-cooldown-tax': (ctx) => ctx.facts.veilCooldownTaxesOnOpp >= 1,
   // Player landed (dealt damage with) a specific spell N times.
   'land-spell': (ctx, [id, n]) => (ctx.facts.hitsOnOppBySpell.get(Number(id)) || 0) >= num(n, 1),
   // Player landed a specific spell while consuming Mark's damage payoff.

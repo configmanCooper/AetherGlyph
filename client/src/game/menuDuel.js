@@ -218,7 +218,9 @@ export class MenuDuel {
       const effect = effectFor(spell.id);
       if (!effect || !this.bots[id].canCast(this.sim, wizard, spell)) return false;
       if (wizard.barrier && (effect.type === PROJECTILE || effect.type === CHANNEL)) return false;
-      if (spell.id === 27 && !this.sim.hasStatus(opponent, 'Chilled')) return false;
+      if (spell.id === 27
+          && !this.sim.hasStatus(opponent, 'Chilled')
+          && !this.sim.hasStatus(opponent, 'Soaked')) return false;
       if (spell.id === 13 && harmfulStatusCount(wizard) === 0
           && !this.sim.zones.some((zone) => zone.owner === opponent.id && zone.ticks > 0)) return false;
       return true;

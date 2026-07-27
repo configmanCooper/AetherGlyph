@@ -141,6 +141,8 @@ export function run() {
   eq(airBuilders.size, 3, 'ClearedAir / BacklitFog / DriftingOil each have a distinct identity');
   const stoneBuilders = new Set(['Rubble', 'FracturedCover'].map((n) => getReactionVfx(n).vfx));
   eq(stoneBuilders.size, 2, 'Rubble and Fractured Cover have distinct stone identities');
+  eq(getReactionVfx('FracturedCover').silhouette, 'fireball-hole',
+    'Fractured Cover advertises its persistent Fireball-sized wall hole');
 
   return report('spellVfx');
 }

@@ -47,7 +47,7 @@ export function run() {
       { id: 1, health: 55, aether: 30 },
     ],
     projectiles: [{ id: 7, owner: 0, spellId: 1 }],
-    zones: [{ id: 3, owner: 1, kind: 'Oil' }],
+    zones: [{ id: 3, owner: 1, kind: 'Fire', damageTargetId: 1 }],
   };
   const slot0 = remapSnapshotForSlot(canon, 0);
   eq(slot0.wizards[0].health, 80, 'slot 0 sees itself unchanged (identity)');
@@ -59,6 +59,8 @@ export function run() {
   eq(slot1.wizards[0].id, 0, 'remapped self id is 0');
   eq(slot1.projectiles[0].owner, 1, "slot 1 sees the opponent's projectile owner as 1");
   eq(slot1.zones[0].owner, 0, 'slot 1 sees its own zone owner as 0');
+  eq(slot1.zones[0].damageTargetId, 0,
+    'slot 1 sees Spreading Flame vulnerability target remapped to local self');
   eq(slot1.winner, 0, 'slot 1 sees itself as the winner (server slot 1 won)');
   // Original snapshot is not mutated.
   eq(canon.wizards[0].health, 80, 'remap does not mutate the canonical snapshot');

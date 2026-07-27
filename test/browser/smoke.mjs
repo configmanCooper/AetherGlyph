@@ -123,7 +123,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.10\.0/.test(titleState.version)
+  if (!titleState.titleClass || !/Version 1\.11\.0/.test(titleState.version)
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -195,9 +195,10 @@ try {
       || /Ward/.test(spellReference.leechCounters) || !/Soaked/.test(spellReference.chainDetails)
       || !/protected wizard, not the cover/i.test(spellReference.stoneShardDetails)
       || !/Both duelists become Wet/i.test(spellReference.rainDetails)
-      || !/globally enables weather reactions/i.test(spellReference.rainDetails)
+      || !/maximum Static/i.test(spellReference.rainDetails)
+      || !/25% Storm spell damage/i.test(spellReference.rainDetails)
       || /prevents lightning payoff/i.test(spellReference.rainCounters)
-      || !/leaves Soaked active/i.test(spellReference.thunderDetails) || spellReference.clippedGlyphs !== 0) {
+      || !/Soaked remains/i.test(spellReference.thunderDetails) || spellReference.clippedGlyphs !== 0) {
     fail('public spell roster is incomplete or reveals secrets: ' + JSON.stringify(spellReference));
   }
   await activate(page, '#panel-spell-roster [data-action="back"]');
@@ -1339,6 +1340,7 @@ try {
     fogBounds: window.__aegVfx.zoneBounds('Fog'),
     blind: window.__aegVfx.blindVeil(true),
     cover: window.__aegVfx.zoneBounds('Cover'),
+    fracturedCover: window.__aegVfx.fracturedCover(),
     guardsVisible: window.__aegVfx.guardVisibility(0),
     guardsHidden: window.__aegVfx.guardVisibility(180),
   }));
@@ -1364,6 +1366,9 @@ try {
   }
   if (perceptionVfx.cover.height < 2.2 || perceptionVfx.cover.width < 2.4) {
     fail('Stone Wall visual is not substantially taller and wider: ' + JSON.stringify(perceptionVfx.cover));
+  }
+  if (!perceptionVfx.fracturedCover.fractured || !perceptionVfx.fracturedCover.holeVisible) {
+    fail('Fractured Cover does not show a Fireball-sized wall hole: ' + JSON.stringify(perceptionVfx.fracturedCover));
   }
   const statusNames = ['Burning', 'Chilled', 'Sloth', 'Wet', 'Soaked', 'Static', 'Sundered', 'Weakened',
     'Marked', 'Blinded', 'Veiled', 'Rooted', 'Frozen', 'Stunned', 'Haste', 'Grounded',

@@ -103,6 +103,23 @@ export function run() {
     'the first Focus lesson explicitly teaches the Focus controls');
   ok(CAMPAIGN_BY_ID.L03.narration.some((line) => /double-tap.*left or right.*switch guides/i.test(line)),
     'the tutorial teaches draw-pad double-tap guide switching');
+  ok(CAMPAIGN_BY_ID.L04.narration.some((line) => /Chilled.*removes Burning.*Burning.*removes Chilled/i.test(line)),
+    'Clean Hands teaches opposing elemental status cancellation');
+  ok(CAMPAIGN_BY_ID.L07.narration.some((line) => /maximum Static.*25% damage/i.test(line)),
+    'Rain Conducts teaches the strengthened Conductive Arc');
+  ok(CAMPAIGN_BY_ID.L08.objectives.some((objective) => objective.predicate === 'reaction:SpreadingFlame'),
+    'Fire Changes the Ground requires the player to spread a Fire zone');
+  ok(CAMPAIGN_BY_ID.L09.narration.some((line) => /Chilled or Soaked/i.test(line))
+      && CAMPAIGN_BY_ID.L09.narration.some((line) => /strips buffs.*25%/i.test(line)),
+  'The Cold Lock teaches both Frost Bind setups and Freeze vulnerability');
+  ok(CAMPAIGN_BY_ID.L10.narration.some((line) => /6 seconds.*5\.5 seconds/i.test(line))
+      && CAMPAIGN_BY_ID.L10.narration.some((line) => /10% more damage/i.test(line)),
+  'Wind Answers teaches Gust timing and Knock Down vulnerability');
+  ok(CAMPAIGN_BY_ID.L11.objectives.some((objective) => objective.predicate === 'reaction:FracturedCover'),
+    'Cover and Ruin teaches the Fireball wall hole before Quake');
+  ok(CAMPAIGN_BY_ID.A13.objectives.some((objective) => objective.predicate === 'veil-cooldown-tax')
+      && CAMPAIGN_BY_ID.A13.narration.some((line) => /one second.*active enemy cooldown/i.test(line)),
+  'Resource War teaches Veil Hex cooldown extension');
   ok(CAMPAIGN_BY_ID.L12.maxTicks >= (MATCH.roundLimitS + 5) * TICK_HZ,
     'First Formal Duel allows the complete expanded round timer');
   ok([CAMPAIGN_BY_ID.A16, CAMPAIGN_BY_ID.EXAM, CAMPAIGN_BY_ID.EXAM_GM]

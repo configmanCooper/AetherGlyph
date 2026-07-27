@@ -1385,7 +1385,7 @@ export class Arena {
       if (z.kind === 'Fog' && sim.wizardInZone(sim.wizards[0], z)) {
         fogStrength = Math.max(fogStrength, fade);
       }
-      handle.update({ dtMs: 16, fade, time: this._t, reduced: this.reduced });
+      handle.update({ dtMs: 16, fade, time: this._t, reduced: this.reduced, zone: z });
     }
     for (const [id, handle] of this.zoneMeshes) {
       if (!seen.has(id)) { this.scene.remove(handle.object3D); handle.dispose(); this.zoneMeshes.delete(id); }
@@ -1664,6 +1664,17 @@ export class Arena {
     box.getSize(size);
     handle.dispose();
     return { width: size.x, height: size.y, depth: size.z };
+  }
+
+  debugFracturedCover() {
+    const handle = makeZoneVfx('Cover', this.reduced, 2.6);
+    handle.update({
+      dtMs: 16, fade: 1, time: this._t, reduced: this.reduced,
+      zone: { kind: 'Cover', fractured: true, fractureRadius: 0.34 },
+    });
+    const result = { ...handle.object3D.userData.coverVisual };
+    handle.dispose();
+    return result;
   }
 
   // Spawn any of the three persistent guard visuals (Ward / Barrier Dome /

@@ -92,6 +92,7 @@ export function run() {
   };
   assertHashChanges('focus duration', (sim) => { sim.wizards[0].focusTicks = 9; });
   assertHashChanges('stationary Stamina timer', (sim) => { sim.wizards[0].staminaIdleTicks = 121; });
+  assertHashChanges('Veil cooldown pulse timer', (sim) => { sim.wizards[0].veilPulseTicks = 31; });
   assertHashChanges('facing direction', (sim) => { sim.wizards[0].facing = 0.42; });
   assertHashChanges('channel state', (sim) => {
     sim.wizards[0].channel = {
@@ -110,6 +111,16 @@ export function run() {
   assertHashChanges('damage tie-break total', (sim) => { sim.wizards[0].damageDealt = 3.5; });
   assertHashChanges('resolved cast count', (sim) => { sim.wizards[0].castsResolved = 2; });
   assertHashChanges('healing lock', (sim) => { sim.healingDisabled = true; });
+  assertHashChanges('zone elemental damage bonus', (sim) => {
+    const zone = sim.addZone(0, 'Wet');
+    zone.damageSchool = 'Storm';
+    zone.damageMul = 1.25;
+  });
+  assertHashChanges('fractured cover hole', (sim) => {
+    const zone = sim.addZone(0, 'Cover');
+    zone.fractured = true;
+    zone.fractureRadius = 0.34;
+  });
 
   // Determinism WITH zones + statuses + reactions: a scripted environmental
   // sequence (Oil -> ignite -> Rain douse) hashes identically across runs.

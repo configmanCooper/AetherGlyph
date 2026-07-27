@@ -101,6 +101,63 @@ export function run() {
   eq(applied, false, 'Tenacity blocks a new hard control');
   ok(!b.statuses.Stunned, 'no Stun applied under Tenacity');
 
+  // Opposing elemental status hits cancel each other completely.
+  sim = freshSim(); b = sim.wizards[1];
+  sim.applyStatus(b, 'Burning', 2);
+  sim.applyStatus(b, 'Chilled', 1);
+  ok(!b.statuses.Burning && !!b.statuses.Chilled,
+    'applying Chilled removes every Burning stack');
+  sim.applyStatus(b, 'Burning', 1);
+  ok(!b.statuses.Chilled && !!b.statuses.Burning,
+    'applying Burning removes Chilled');
+
+  // Veil Hex offsets normal cooldown recovery once per full active second.
+  sim = freshSim(); b = sim.wizards[1];
+  b.cooldowns[1] = 300;
+  b.cooldowns[2] = 0;
+  sim.applyStatus(b, 'Veiled', 1);
+  const veilEvents = [];
+  for (let t = 0; t < TICK_HZ; t++) veilEvents.push(...sim.step({ 0: {}, 1: {} }));
+  eq(b.cooldowns[1], 300, 'one second of Veil adds one second to an active cooldown');
+  eq(b.cooldowns[2], 0, 'Veil does not restart a completed cooldown');
+  ok(veilEvents.some((event) => event.type === 'veilCooldownTax' && event.target === 1),
+    'Veil emits deterministic cooldown-tax feedback each second');
+
+  // Control states create the requested direct-spell damage vulnerabilities.
+  sim = freshSim(); a = sim.wizards[0]; b = sim.wizards[1];
+  sim.applyStatus(b, 'Frozen', 1, { ignoreHardCap: true });
+  near(sim.dealDamage(a, b, 10, { spellId: 2, school: 'Tide' }), 12.5, 0.01,
+    'Frozen takes 25% extra non-Ember spell damage');
+  near(sim.dealDamage(a, b, 10, { spellId: 1, school: 'Ember' }), 10, 0.01,
+    'Frozen does not amplify Ember spell damage');
+  delete b.statuses.Frozen;
+  b.tenacityTicks = 0;
+  sim.applyStatus(b, 'Stunned', 1, { ignoreHardCap: true });
+  near(sim.dealDamage(a, b, 10, { spellId: 1, school: 'Ember' }), 12.5, 0.01,
+    'Stunned/paralyzed takes 25% extra damage from every spell');
+  delete b.statuses.Stunned;
+  b.tenacityTicks = 0;
+  sim.applyStatus(b, 'KnockedDown', 1);
+  near(sim.dealDamage(a, b, 10, { spellId: 1, school: 'Ember' }), 11, 0.01,
+    'Knocked Down takes 10% extra spell damage');
+
+  // Successful Freeze and Stun strip every beneficial status buff.
+  sim = freshSim(); b = sim.wizards[1];
+  for (const buff of ['Haste', 'Grounded', 'AetherSurge', 'Attunement', 'Phoenix']) {
+    sim.applyStatus(b, buff, 1);
+  }
+  sim.applyStatus(b, 'Frozen', 1, { ignoreHardCap: true });
+  ok(['Haste', 'Grounded', 'AetherSurge', 'Attunement', 'Phoenix']
+    .every((buff) => !b.statuses[buff]),
+  'Freeze removes every active beneficial status buff');
+  delete b.statuses.Frozen;
+  b.tenacityTicks = 0;
+  sim.applyStatus(b, 'Haste', 1);
+  sim.applyStatus(b, 'Phoenix', 1);
+  sim.applyStatus(b, 'Stunned', 1, { ignoreHardCap: true });
+  ok(!b.statuses.Haste && !b.statuses.Phoenix,
+    'Stun/paralysis removes active beneficial status buffs');
+
   // Frozen prevents casting.
   sim = freshSim();
   sim.applyStatus(sim.wizards[0], 'Frozen', 1);

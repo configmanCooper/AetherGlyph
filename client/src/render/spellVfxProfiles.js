@@ -110,7 +110,7 @@ export const SPELL_VFX = Object.freeze({
     colors: pal('Arcane'), budget: { meshes: 5, particles: 8, trail: 0 }, reducedSafe: true },
   15: { kind: 'stoneWall', family: 'zone', school: 'Stone', role: 'zone', target: 'zone',
     silhouette: 'stone-columns', motion: 'jagged destructible stone wall of columns', windup: 'stone-rise',
-    colors: pal('Stone'), budget: { meshes: 8, particles: 0, trail: 0 }, reducedSafe: true },
+    colors: pal('Stone'), budget: { meshes: 9, particles: 0, trail: 0 }, reducedSafe: true },
 
   // === Buffs ==============================================================
   16: { kind: 'haste', family: 'haste', school: 'Gale', role: 'buff', target: 'self',
@@ -255,7 +255,7 @@ export const REACTION_VFX = Object.freeze({
     colors: pal('Stone'), silhouette: 'rock-burst', motion: 'stone fragments bursting out of collapsing cover',
     budget: { meshes: 12, particles: 14, trail: 0 }, reducedSafe: true },
   FracturedCover: { kind: 'reaction:fracturedCover', vfx: 'fracture', school: 'Stone', anchor: 'center',
-    colors: pal('Stone', { glow: 0xd85a2a }), silhouette: 'crack-burst', motion: 'a cracked fracture splitting the cover open',
+    colors: pal('Stone', { glow: 0xd85a2a }), silhouette: 'fireball-hole', motion: 'a Fireball-sized scorched hole opening through the cover',
     budget: { meshes: 7, particles: 12, trail: 0 }, reducedSafe: true },
   Spectrum: { kind: 'reaction:spectrum', vfx: 'spectrum', school: 'Prismatic', anchor: 'center',
     colors: pal('Prismatic'), silhouette: 'spectral-burst', motion: 'concentric multicolor spectral rings',

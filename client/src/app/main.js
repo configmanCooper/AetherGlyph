@@ -2408,6 +2408,7 @@ if (typeof window !== 'undefined') {
     spawn: (id) => { try { return arena.debugSpawn(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnZone: (kind) => { try { return arena.debugSpawnZone(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     zoneBounds: (kind) => { try { return arena.debugZoneBounds(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
+    fracturedCover: () => { try { return arena.debugFracturedCover(); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnGuard: (kind) => { try { return arena.debugSpawnGuard(String(kind)); } catch (e) { return { error: String(e && e.message || e) }; } },
     decoyState: () => { try { return arena.debugDecoyState(); } catch (e) { return { error: String(e && e.message || e) }; } },
     wizardState: (playerStatuses, enemyStatuses, playerInvisibleTicks, enemyInvisibleTicks) => {

@@ -669,16 +669,49 @@ const ZONE_BUILDERS = {
   Cover(reduced, r, c) {
     const g = new THREE.Group();
     const cols = [-0.82, 0, 0.82];
+    let centerColumn = null, centerLower = null, centerUpper = null;
     let maxHeight = 0;
     for (let i = 0; i < cols.length; i++) {
       const h = 1.9 + (i === 1 ? 0.45 : 0);
       maxHeight = Math.max(maxHeight, h + 0.2);
       const col = mesh(G.box(), matSolid(c.glow, { roughness: 1, flat: true }));
       col.scale.set(0.72, h, 0.58); col.position.set(cols[i], h / 2, (i - 1) * 0.08); col.rotation.y = (i - 1) * 0.14; g.add(col);
+      if (i === 1) {
+        centerColumn = col;
+        const segmentHeight = h * 0.34;
+        centerLower = mesh(G.box(), matSolid(c.glow, { roughness: 1, flat: true }));
+        centerLower.scale.set(0.72, segmentHeight, 0.58);
+        centerLower.position.set(0, segmentHeight / 2, 0);
+        centerLower.visible = false;
+        g.add(centerLower);
+        centerUpper = mesh(G.box(), matSolid(c.glow, { roughness: 1, flat: true }));
+        centerUpper.scale.set(0.72, segmentHeight, 0.58);
+        centerUpper.position.set(0, h - segmentHeight / 2, 0);
+        centerUpper.visible = false;
+        g.add(centerUpper);
+      }
       const cap = mesh(G.tetra(), matSolid(c.core, { roughness: 1, flat: true })); cap.scale.set(0.38, 0.38, 0.38); cap.position.set(cols[i], h + 0.08, 0); cap.rotation.y = i; g.add(cap);
     }
+    const scorch = mesh(G.torus(), matBasic(0xff6b2a, 0.85, true));
+    scorch.scale.setScalar(0.42);
+    scorch.position.set(0, 1.12, 0.31);
+    scorch.visible = false;
+    g.add(scorch);
     g.userData.coverVisual = { width: 3.08, height: maxHeight };
-    return zoneHandle('Cover', g, () => {});
+    return zoneHandle('Cover', g, (ctx) => {
+      const fractured = !!ctx.zone?.fractured;
+      centerColumn.visible = !fractured;
+      centerLower.visible = fractured;
+      centerUpper.visible = fractured;
+      scorch.visible = fractured;
+      g.userData.coverVisual.fractured = fractured;
+      g.userData.coverVisual.holeVisible = scorch.visible;
+      if (fractured) {
+        const scale = Math.max(0.28, Number(ctx.zone?.fractureRadius) || 0.34) / 0.34;
+        scorch.scale.setScalar(0.42 * scale);
+        scorch.material.opacity = 0.55 + ctx.fade * 0.3;
+      }
+    });
   },
   Hourglass(reduced, r, c) {
     const g = new THREE.Group();

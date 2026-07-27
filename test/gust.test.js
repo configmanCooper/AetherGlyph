@@ -11,9 +11,9 @@ import { SPELLS_BY_ID } from '../shared/src/balance/spellData.generated.js';
 import { effectFor, isHeavyProjectile, isLightProjectile } from '../shared/src/sim/spellEffects.js';
 
 // Cast a Gust Wall (player 0) then have the opponent fire `spellId` so it lands
-// during the deflect window (mid-window ≈ tick 70). Returns whether it was
+// during the deflect window (mid-window ≈ tick 170). Returns whether it was
 // deflected and whether the player took damage.
-function scenario(spellId, { gustAt = 0, land = 70, steps = 220 } = {}) {
+function scenario(spellId, { gustAt = 0, land = 170, steps = 460 } = {}) {
   const sim = new Sim({ seed: 7, loadouts: [makeLoadout([33]), makeLoadout([spellId])] });
   sim.wizards[1].charges = 3; sim.wizards[1].aether = 100; // afford any heavy
   const sp = SPELLS_BY_ID[spellId], eff = effectFor(spellId);
@@ -58,21 +58,21 @@ export function run() {
   }
   ok(heavyOk, 'heavy projectiles blow through a Gust Wall and deal damage');
 
-  // --- the deflect window opens after windup and lasts 1.2 s -------------
+  // --- the deflect window opens after windup and lasts 5.5 s -------------
   {
     const sim = new Sim({ seed: 1, loadouts: [makeLoadout([33]), makeLoadout([1])] });
     let opened = -1;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 90; i++) {
       sim.step({ 0: i === 0 ? { cast: 33, castQuality: 1 } : {}, 1: {} });
       if (opened < 0 && sim.wizards[0].deflectTicks > 0) opened = i;
     }
     ok(opened > 0, 'the deflect window opens only after the Gust cast resolves (non-zero windup)');
-    eq(sim.wizards[0].deflectTicks, Math.round(1.2 * 60) - (sim.tick - opened - 1), 'deflect window counts down from 1.2 s');
+    eq(sim.wizards[0].deflectTicks, Math.round(5.5 * 60) - (sim.tick - opened - 1), 'deflect window counts down from 5.5 s');
   }
 
   // --- a late shot (after the window) is NOT deflected --------------------
   {
-    const r = scenario(1, { land: 160 }); // Gust window is ~[37,109]; land at ~160
+    const r = scenario(1, { land: 410 }); // Gust window is ~[37,367]; land at ~410
     ok(!r.deflected && r.damaged, 'a light shot arriving after the Gust window expires is not deflected');
   }
 

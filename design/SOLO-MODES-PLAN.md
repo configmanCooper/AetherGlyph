@@ -321,7 +321,8 @@ Teach:
 
 - shared Wet zones,
 - Soaked,
-- Conductive Arc,
+- Conductive Arc maximum Static and Storm damage bonus,
+- Stun/paralysis buff stripping and damage vulnerability,
 - weather benefiting both players.
 
 Spells: Rain Glyph, Spark Dart.
@@ -340,14 +341,16 @@ Teach:
 
 - Oil,
 - Flash Fire,
+- Spreading Flame and both fire-damage bonuses,
 - Rain counter,
 - two-zone ownership limit.
 
-Spells: Oil Script, Ember Bolt, Rain Glyph.
+Spells: Oil Script, Ember Bolt, Rain Glyph, Gust Wall.
 
 Pass:
 
 - ignite one Oil zone,
+- spread the resulting Fire zone,
 - wash away another before ignition.
 
 Medal clue: Phoenix Covenant.
@@ -356,8 +359,10 @@ Medal clue: Phoenix Covenant.
 
 Teach:
 
-- Chilled prerequisite,
+- Chilled or Soaked prerequisite,
 - Frost Bind,
+- Frozen Ground damage bonus,
+- Freeze buff stripping and non-fire vulnerability,
 - Tenacity,
 - Root versus Freeze,
 - Blink.
@@ -377,6 +382,8 @@ Drills: Ice Comet, Entangle.
 Teach:
 
 - Gust deflection,
+- 6-second zone and 5.5-second deflect timing,
+- Knock Down damage vulnerability,
 - Fog clearing,
 - Oil movement,
 - heavy attacks that Gust cannot stop,
@@ -400,17 +407,19 @@ Teach:
 - line of sight,
 - safe Focus,
 - Quake,
+- Fireball fracture hole,
 - cover destruction,
 - traps.
 
-Spells: Stone Wall, Quake.
+Spells: Stone Wall, Fireball, Quake.
 
 Pass:
 
 - Focus safely behind cover,
+- fracture the instructor's wall with Fireball,
 - destroy the instructor's cover during Focus.
 
-Drills: Fireball, Rune Snare.
+Drill: Rune Snare.
 
 ### Lesson 12 - First Formal Duel
 
@@ -442,12 +451,14 @@ Spells:
 - Haste,
 - Grounding Mantle,
 - Sloth Hex.
+- Veil Hex.
 
 Goal:
 
 - decide when economy is safe,
 - counter Storm with Grounding,
 - preserve enough Aether to defend.
+- delay active enemy cooldowns with Veil.
 
 Mirror clue:
 

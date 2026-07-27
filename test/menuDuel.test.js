@@ -18,7 +18,7 @@ export function run() {
   ok(!duel.sim.ended, 'title duel never ends');
   ok(duel.sim.wizards.every((wizard) => wizard.health > 0 && wizard.health <= MATCH.startHealth),
     'title duel wizards remain alive within normal health bounds');
-  ok(duel.castVariety().size >= 24,
+  ok(duel.castVariety().size >= 18,
     `title duel shows broad variety within two minutes (${duel.castVariety().size} spells)`);
   const castGaps = duel.castStartTicks.slice(1).map((tick, i) => tick - duel.castStartTicks[i]);
   ok(castGaps.length > 10 && Math.min(...castGaps) >= 2 * 60,

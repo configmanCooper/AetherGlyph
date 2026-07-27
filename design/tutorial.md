@@ -70,6 +70,7 @@ Teach:
 
 - status icons,
 - Burning and Chilled,
+- Burning and Chilled remove each other on hit,
 - Dispel timing.
 
 Spells: Frost Lance, Dispel.
@@ -107,7 +108,8 @@ Teach:
 
 - shared zones,
 - Soaked,
-- lightning reaction,
+- Conductive Arc gives both wizards maximum Static and empowers Storm spells,
+- Stun/paralysis strips buffs and creates a 25% damage window,
 - opponent can exploit your weather.
 
 Spells: Rain Glyph, Spark Dart.
@@ -120,19 +122,22 @@ Teach:
 
 - Oil Script,
 - ignition,
+- Flash Fire and Spreading Flame damage bonuses,
 - Rain counter,
 - zone cap.
 
-Spells: Oil Script, Ember Bolt, Rain Glyph.
+Spells: Oil Script, Ember Bolt, Rain Glyph, Gust Wall.
 
-Pass: ignite one Oil zone and douse another before the instructor ignites it.
+Pass: ignite and spread one Oil zone, and douse another before the instructor ignites it.
 
 ### Lesson 9 - The Cold Lock
 
 Teach:
 
-- Chilled prerequisite,
+- Chilled or Soaked prerequisite,
 - Frost Bind,
+- Frozen Ground frost bonus,
+- Freeze strips buffs and creates a non-fire damage window,
 - Tenacity,
 - hard-control cannot chain.
 
@@ -145,6 +150,8 @@ Pass: execute one legal freeze and Blink away from the instructor's attempted fo
 Teach:
 
 - Gust deflection,
+- 6-second Gust / 5.5-second deflect timing,
+- Knock Down's 10% damage window,
 - Fog clearing,
 - Oil movement,
 - no defense answers everything.
@@ -160,11 +167,12 @@ Teach:
 - Stone Wall,
 - line of sight,
 - Focus behind cover,
-- Quake and Fireball counters.
+- Fireball's visible wall hole,
+- Quake finish.
 
-Spells: Stone Wall, Quake.
+Spells: Stone Wall, Fireball, Quake.
 
-Pass: use cover safely once, then destroy the instructor's wall during Focus.
+Pass: use cover safely once, fracture the instructor's wall with Fireball, then destroy it with Quake.
 
 ### Lesson 12 - First Formal Duel
 
@@ -184,9 +192,9 @@ Reward: ranked eligibility and all public competitive spells.
 
 ### Lesson 13 - Resource War
 
-Spells: Aether Surge, Aether Leech, Weaken, Haste, Grounding Mantle.
+Spells: Aether Surge, Aether Leech, Weaken, Haste, Grounding Mantle, Veil Hex.
 
-Goal: recognize when economy setup is safe, when pressure is more valuable, and when becoming Grounded is worth reduced movement.
+Goal: recognize when economy setup is safe, when pressure is more valuable, when becoming Grounded is worth reduced movement, and how Veil delays active cooldowns.
 
 ### Lesson 14 - Reading Resonance
 

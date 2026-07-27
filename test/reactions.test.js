@@ -5,7 +5,7 @@ import { createHarness } from './tiny.js';
 import { Sim } from '../shared/src/sim/sim.js';
 import { spellWithGesture } from '../shared/src/balance/loadouts.js';
 import { REACTIONS, sortByPriority, priorityOf, prismaticUtility } from '../shared/src/sim/reactions.js';
-import { REACTION, REACTION_PRIORITY, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
+import { REACTION, REACTION_PRIORITY, STATUSES, ZONE, TICK_HZ } from '../shared/src/sim/constants.js';
 import { effectFor } from '../shared/src/sim/spellEffects.js';
 
 function mk(ids0, ids1 = [1]) {
@@ -28,7 +28,7 @@ function fire(sim, id, who = 0, ticks = 150) {
 function reactionNames(evs) { return evs.filter((e) => e.type === 'reaction').map((e) => e.name); }
 
 export function run() {
-  const { ok, eq, report } = createHarness();
+  const { ok, eq, near, report } = createHarness();
 
   eq(ZONE.durations.Oil, 21, 'Oil lasts three times the original duration');
   eq(ZONE.durations.Wet, 21, 'Wet lasts three times the original duration');
@@ -37,7 +37,7 @@ export function run() {
   eq(ZONE.durations.Cover, 24, 'Cover lasts three times the original duration');
   eq(ZONE.durations.Hourglass, 18, 'Hourglass lasts three times the original duration');
   eq(ZONE.durations.Fire, 12, 'Fire lasts three times the original duration');
-  eq(ZONE.durations.Gust, 1.8, 'Gust lasts three times the original duration');
+  eq(ZONE.durations.Gust, 6, 'Gust zone lasts 6 seconds');
   eq(ZONE.durations.Grounded, 3, 'Grounded strip lasts three times the original duration');
   eq(ZONE.snareRootS, 2, 'Rune Snare roots for 2 seconds');
   eq(REACTION.frozenGroundSlowS, 9, 'Frozen Ground reaction lasts three times as long');
@@ -118,6 +118,22 @@ export function run() {
   ok(flash.includes('FlashFire'), 'Oil + Ember -> Flash Fire');
   eq(sim.zonesOfKind('Oil').length, 0, 'Oil consumed by ignition');
   ok(sim.zonesOfKind('Fire').length >= 1, 'Flash Fire leaves a fire zone');
+  near(sim.dealDamage(sim.wizards[0], sim.wizards[1], 10, { spellId: 1, school: 'Ember' }),
+    12.5, 0.01, 'Flash Fire boosts Ember spell damage by 25% against the opponent');
+  near(sim.dealDamage(sim.wizards[1], sim.wizards[0], 10, { spellId: 1, school: 'Ember' }),
+    12.5, 0.01, 'Flash Fire boosts Ember spell damage by 25% against its caster too');
+
+  const fireBeforeSpread = sim.zonesOfKind('Fire')[0].ticks;
+  const spread = reactionNames(fire(sim, 33));
+  ok(spread.includes('SpreadingFlame'), 'Fire + Gust -> Spreading Flame');
+  const spreadFire = sim.zonesOfKind('Fire')[0];
+  ok(spreadFire.ticks < fireBeforeSpread,
+    'Spreading Flame keeps the shortened Fire-zone duration');
+  delete sim.wizards[1].statuses.KnockedDown; // isolate zone bonus from the separate control bonus
+  near(sim.dealDamage(sim.wizards[0], sim.wizards[1], 10, { spellId: 1, school: 'Ember' }),
+    15, 0.01, 'Spreading Flame boosts Ember spells by 50% against the non-triggering wizard');
+  near(sim.dealDamage(sim.wizards[1], sim.wizards[0], 10, { spellId: 1, school: 'Ember' }),
+    12.5, 0.01, 'Spreading Flame keeps the base 25% Ember bonus against its triggering wizard');
 
   // Oil + Rain -> Washed Ground (douse): oil removed.
   sim = mk([31, 32]);
@@ -132,6 +148,12 @@ export function run() {
   const cond = reactionNames(fire(sim, 3));
   ok(cond.includes('ConductiveArc'), 'Wet + Storm -> Conductive Arc');
   ok(sim.hasStatus(sim.wizards[1], 'Soaked'), 'Conductive Arc applies Soaked');
+  eq(sim.statusStacks(sim.wizards[0], 'Static'), STATUSES.Static.maxStacks,
+    'Conductive Arc gives the caster maximum Static');
+  eq(sim.statusStacks(sim.wizards[1], 'Static'), STATUSES.Static.maxStacks,
+    'Conductive Arc gives the opponent maximum Static');
+  near(sim.dealDamage(sim.wizards[1], sim.wizards[0], 10, { spellId: 3, school: 'Storm' }),
+    12.5, 0.01, 'Conductive Wet zone boosts Storm spells by 25%');
 
   // The reaction event additively carries spatial fields (targetId + center) so
   // the renderer can anchor its VFX (e.g. a caster->target lightning arc) without
@@ -152,6 +174,10 @@ export function run() {
   const froze = reactionNames(fire(sim, 2));
   ok(froze.includes('FrozenGround'), 'Wet + Frost -> Frozen Ground');
   ok(sim.zonesOfKind('Frozen').length >= 1, 'Frozen Ground surface created');
+  ok(sim.hasStatus(sim.wizards[0], 'Chilled') && sim.hasStatus(sim.wizards[1], 'Chilled'),
+    'Frozen Ground applies Chilled to both wizards');
+  near(sim.dealDamage(sim.wizards[0], sim.wizards[1], 10, { spellId: 2, school: 'Tide' }),
+    12.5, 0.01, 'Frozen Ground boosts frost/Tide spell damage by 25%');
   const frozenStart = sim.wizards[0].arcPos;
   sim.step({ 0: { move: 1 }, 1: {} });
   const frozenDelta = sim.wizards[0].arcPos - frozenStart;
@@ -206,6 +232,13 @@ export function run() {
   ok(!sim.wizards[1].casting, 'Frost Bind target cannot cast');
   for (let t = 0; t < 185 && sim.hasStatus(sim.wizards[1], 'Frozen'); t++) sim.step({ 0: {}, 1: {} });
   ok(sim.wizards[1].tenacityTicks > 0, 'Frost Bind grants Tenacity after the 3s Freeze');
+
+  // Soaked is also a legal Frost Bind setup and is consumed by the Freeze.
+  sim = mk([27], [1]);
+  sim.applyStatus(sim.wizards[1], 'Soaked', 1);
+  fire(sim, 27);
+  ok(sim.hasStatus(sim.wizards[1], 'Frozen'), 'Frost Bind freezes a Soaked target');
+  ok(!sim.hasStatus(sim.wizards[1], 'Soaked'), 'Frost Bind consumes the Soaked setup');
 
   // Soaked + Thunderclap -> Stun (hard control) + Tenacity.
   sim = mk([30], [1]);

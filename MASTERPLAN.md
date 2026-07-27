@@ -289,7 +289,8 @@ Roster rules:
 
 - Every spell has at least two named counter paths.
 - Every heavy spell costs at least one Sigil Charge.
-- No single resolved cast deals more than 30 direct damage.
+- No single resolved cast deals more than 30 base direct damage before explicit
+  environmental and control-state vulnerability multipliers.
 - No uninterrupted combo from full health may exceed 45 damage before the defender receives a legal action window.
 - Every hard-control payoff requires setup or a charge.
 - Zones are limited to two active zones per player.
@@ -320,6 +321,11 @@ Core rules:
 - The same reaction cannot trigger more than once per second.
 - Reactions use deterministic priority ordering.
 - Crowd control created by an environmental reaction obeys Tenacity.
+- Burning-applying hits remove Chilled, and Chilled-applying hits remove Burning.
+- Freeze and Stun strip active buffs and open short spell-damage vulnerability windows.
+- Knock Down opens a smaller spell-damage vulnerability window.
+- Active Fire, Frozen Ground, and Conductive Wet zones can empower their matching schools.
+- Veil Hex extends every still-active cooldown once per full second.
 - Zones have visible borders and high-contrast accessibility outlines.
 - Random weather is excluded from ranked. Tutorial or special casual modes may use seeded scripted weather.
 
