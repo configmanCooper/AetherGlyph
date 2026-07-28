@@ -26,16 +26,16 @@
   <p class="muted">Aetherglyph: Arcane Duels · Publisher: Cooper Unlimited Games ·
     Contact: <a href="mailto:rocmat21@gmail.com">rocmat21@gmail.com</a></p>
 
-  <p>Aetherglyph currently has <strong>no sign-in</strong>. Your identity is a random, anonymous
-  identifier stored on your device and used by the online server for reconnect and ranked records.
-  Because there is no personal account yet, deletion is mostly under your direct control.</p>
+  <p>Aetherglyph currently uses a temporary wizard-name and six-digit PIN sign-in for online testing.
+  It does not require an email address or Google account. The PIN is stored by the server only as a
+  one-way derived hash.</p>
 
   <h2>1. Delete everything on your device</h2>
   <p>In the app, open <strong>Settings → Delete my data</strong>. This immediately erases from this
   device:</p>
   <ul>
-    <li>your anonymous identifier,</li>
-    <li>your optional display name,</li>
+    <li>your local online session and legacy anonymous identifier,</li>
+    <li>your locally remembered wizard name,</li>
     <li>your saved settings and configured service URL,</li>
     <li>any saved reconnect token for an in-progress duel,</li>
     <li>your solo progress: tutorial &amp; campaign completion, gesture calibration, mastery medals,
@@ -47,22 +47,20 @@
   never uploaded. Uninstalling the app also removes all of this local data.</p>
 
   <h2>2. Delete your server-side ranking record</h2>
-  <p>Ranked online play stores a Glyph total, world rank statistics, optional display name, and match results tied to your anonymous
-  identifier on the game service. To request deletion of that record:</p>
+  <p>Ranked online play stores a Glyph total, world-rank statistics, wizard name, hashed PIN,
+  temporary sessions, and match results. To request deletion of that record:</p>
   <ol>
-    <li>Before deleting local data, note your anonymous identifier (Settings shows it, or it is the
-      <code>aeth-client-id</code> value in local storage).</li>
+    <li>Note your wizard name before deleting local data.</li>
     <li>Email <a href="mailto:rocmat21@gmail.com">rocmat21@gmail.com</a> with the subject
-      “Aetherglyph data deletion” and include that identifier.</li>
+      “Aetherglyph data deletion” and include that wizard name.</li>
     <li>The associated ranking/result record will be deleted within 30 days. Short-lived connection and
       security logs expire automatically within 30 days.</li>
   </ol>
-  <p class="muted">We can only match a deletion request to a record via the anonymous identifier, so
-  please capture it before wiping local data.</p>
+  <p class="muted">Please capture the wizard name before wiping local data.</p>
 
   <h2>What is retained</h2>
-  <p>Nothing that identifies you personally is retained. No name, email, or account is required to play.
-  We keep no advertising or analytics profiles.</p>
+  <p>No email, phone number, or verified personal identity is required. We keep no advertising or
+  analytics profiles.</p>
 
   <a class="back" href="./index.html">Back to game</a>
 </body>

@@ -476,6 +476,13 @@ body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
 
 /* ------------------------------------------------------------ online duel UI */
 .ranking-summary { color: #ffd66b; font-size: 13px; }
+.online-account-banner {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  margin: 8px 0 2px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,214,107,0.1); border: 1px solid rgba(255,214,107,0.4);
+}
+.online-account-banner strong { color: var(--ink); }
+.online-account-banner span { color: #ffd66b; font-size: 18px; font-weight: 800; }
 .rankings-table-wrap { overflow-x: auto; margin: 12px 0; }
 .rankings-table {
   width: 100%; border-collapse: collapse; text-align: left;

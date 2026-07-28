@@ -389,9 +389,13 @@ duel while preserving the deterministic shared simulation and all offline modes.
   `DATABASE_URL` is set and an explicit in-memory adapter otherwise. Ranked
   wizards begin at 100 Glyphs; equal matches transfer 25, underdog/favorite
   results scale from 5–50, and losers cannot fall below zero. Match settlement
-  is atomic and idempotent, the top ten and personal world rank are available
+  is atomic and idempotent, the top 100 and personal world rank are available
   in-game, and Jan/Apr/Jul/Oct resets apply the documented 300-minus-50
   compression. Private and unranked matches never change Glyphs.
+  Online testing requires a case-insensitive alphanumeric wizard name and
+  scrypt-hashed six-digit PIN. The username is the durable ranking identity,
+  PIN attempts have persistent cooldowns, and hashed sessions last up to 30
+  days until Firebase/Google authentication replaces this temporary system.
 - **Client.** `client/src/net/onlineMatch.js` + `net.js` add the Online menu
   (Create Private Duel, Join Code, Quick Match), waiting/cancel states, room-code
   display/copy, connection-quality + reconnect status, and the authoritative

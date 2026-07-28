@@ -38,6 +38,13 @@ class FakeSocket {
         ok: true, state: 'private-lobby', code: payload.code,
         slot: 0, readyCount: 0, playerCount: 2, selfReady: false, resumed: true,
       });
+    } else if (name === EVENTS.ACCOUNT_AUTH) {
+      ack({
+        ok: true,
+        accountId: 'account-wizard',
+        name: payload.username,
+        token: 'account-session-token',
+      });
     } else if (name === EVENTS.LEAVE && typeof ack === 'function') {
       ack(this.leaveAck);
     } else if (typeof ack === 'function') {
@@ -152,6 +159,12 @@ export async function run() {
   eq(lobbyStatus.state, 'lobby-resumed', 'automatic lobby reclaim reports resumed status');
   const unready = await lobbyOnline.privateUnready();
   eq(unready.ok, true, 'client can unready before editing lobby guides');
+  const account = await lobbyOnline.authenticate('Wizard7', '123456');
+  eq(account.accountId, 'account-wizard', 'temporary account authentication returns account identity');
+  eq(lobbyOnline.identity.accountToken, 'account-session-token',
+    'temporary account session is retained for reconnect');
+  eq(lobbySocket.auth.accountToken, 'account-session-token',
+    'socket reconnect handshake is updated with the account session');
   await lobbyOnline.quickMatch(false);
   const unrankedQuick = lobbySocket.emitted.findLast(
     (entry) => entry.name === EVENTS.QUICK_MATCH_UNRANKED,

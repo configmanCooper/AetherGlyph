@@ -99,7 +99,7 @@ export function createGameServer(opts = {}) {
 
   // Compatibility gate: reject mismatched protocol/balance/roster up front with
   // a clear reason (never a silent mismatch).
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const auth = socket.handshake.auth || {};
     if (Number(auth.protocol) !== PROTOCOL_VERSION
       || Number(auth.balance) !== BALANCE_VERSION
@@ -108,7 +108,14 @@ export function createGameServer(opts = {}) {
       err.data = { code: 'incompatible', server: versionTag() };
       return next(err);
     }
-    next();
+    try {
+      if (auth.accountToken && ratingStore) {
+        socket.data.verifiedAccount = await ratingStore.resolveTemporarySession(auth.accountToken);
+      }
+      next();
+    } catch (error) {
+      next(new Error(`Account session verification failed: ${error.message}`));
+    }
   });
 
   async function listen(port) {
@@ -121,6 +128,7 @@ export function createGameServer(opts = {}) {
       privateLobbyGraceMs: opts.privateLobbyGraceMs,
       rankedRange: opts.rankedRange,
       rankedRangeWaitMs: opts.rankedRangeWaitMs,
+      requireAccounts: opts.requireAccounts,
       log: (...a) => console.warn('[rooms]', ...a),
     });
     io.on('connection', (socket) => rooms.register(socket));

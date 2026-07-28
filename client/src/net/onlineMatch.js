@@ -161,6 +161,24 @@ export class OnlineMatch {
   stopPing() { if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; } }
 
   // --- lobby actions (each returns the server ack) ------------------------
+  accountStatus() { return this.request(EVENTS.ACCOUNT_STATUS, {}); }
+  async authenticate(username, pin) {
+    const result = await this.request(EVENTS.ACCOUNT_AUTH, { username, pin });
+    if (result?.ok) {
+      this.identity.id = result.accountId;
+      this.identity.name = result.name;
+      this.identity.accountToken = result.token;
+      if (this.socket) {
+        this.socket.auth = {
+          ...(this.socket.auth || {}),
+          clientId: result.accountId,
+          name: result.name,
+          accountToken: result.token,
+        };
+      }
+    }
+    return result;
+  }
   createRoom() { return this.request(EVENTS.CREATE_ROOM, { loadout: this.loadoutIds, name: this.identity.name }); }
   joinRoom(code) { return this.request(EVENTS.JOIN_ROOM, { code, loadout: this.loadoutIds, name: this.identity.name }); }
   quickMatch(ranked = true) {

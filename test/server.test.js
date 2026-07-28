@@ -66,6 +66,7 @@ async function main() {
     privateLobbyGraceMs: 800,
     rankedRange: 50,
     rankedRangeWaitMs: 120,
+    requireAccounts: false,
   });
   const port = await gs.listen(0);
   const url = `http://127.0.0.1:${port}`;
@@ -73,6 +74,64 @@ async function main() {
   const track = (s) => { openSockets.push(s); return s; };
 
   try {
+    // --- 0. Temporary username/PIN gate ----------------------------------
+    {
+      const accountServer = createGameServer({
+        secret: 'account-test-secret',
+        allowedOrigins: [],
+      });
+      const accountPort = await accountServer.listen(0);
+      const accountUrl = `http://127.0.0.1:${accountPort}`;
+      const guest = await connect(accountUrl, goodAuth('guest-device'));
+      const blocked = await emitAck(guest, EVENTS.CREATE_ROOM, { loadout: emberIds });
+      eq(blocked.code, ERR.AUTH_REQUIRED, 'online actions require a temporary account');
+      const invalidName = await emitAck(guest, EVENTS.ACCOUNT_AUTH, {
+        username: 'Bad Name', pin: '123456',
+      });
+      eq(invalidName.code, ERR.INVALID_USERNAME, 'account gate rejects spaces in usernames');
+      const createdAccount = await emitAck(guest, EVENTS.ACCOUNT_AUTH, {
+        username: 'ServerWizard1', pin: '123456',
+      });
+      ok(createdAccount.ok && createdAccount.created && createdAccount.token,
+        'valid username and six-digit PIN create a temporary account');
+      const createdRoom = await emitAck(guest, EVENTS.CREATE_ROOM, {
+        loadout: emberIds, name: 'ImpostorName',
+      });
+      ok(createdRoom.ok, 'authenticated temporary account can use Online Duel');
+      eq(accountServer.rooms.privateLobbies.get(createdRoom.code).seats[0].name, 'ServerWizard1',
+        'authenticated clients cannot overwrite their verified wizard name');
+      await emitAck(guest, EVENTS.LEAVE, {});
+      guest.disconnect();
+
+      const wrong = await connect(accountUrl, goodAuth('other-device'));
+      const wrongPin = await emitAck(wrong, EVENTS.ACCOUNT_AUTH, {
+        username: 'ServerWizard1', pin: '654321',
+      });
+      eq(wrongPin.code, ERR.NAME_TAKEN, 'existing username rejects the wrong PIN');
+      wrong.disconnect();
+
+      let limited = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const attacker = await connect(accountUrl, goodAuth(`attacker-${attempt}`));
+        limited = await emitAck(attacker, EVENTS.ACCOUNT_AUTH, {
+          username: 'ServerWizard1', pin: '000000',
+        });
+        attacker.disconnect();
+      }
+      eq(limited.code, ERR.RATE,
+        'username authentication limiter persists across reconnects');
+
+      const restored = await connect(accountUrl, {
+        ...goodAuth('restored-device'),
+        accountToken: createdAccount.token,
+      });
+      const restoredStatus = await emitAck(restored, EVENTS.ACCOUNT_STATUS, {});
+      ok(restoredStatus.authenticated && restoredStatus.accountId === createdAccount.accountId,
+        'saved session restores the same database ranking account');
+      restored.disconnect();
+      await accountServer.close('account-gate-test');
+    }
+
     // --- 1. Compatibility rejection --------------------------------------
     await (async () => {
       try {

@@ -11,7 +11,10 @@ import { MovementControl } from '../input/movement.js';
 import { LocalMatch } from '../game/localMatch.js';
 import { MenuDuel } from '../game/menuDuel.js';
 import { OnlineMatch, formatOnlinePopulation } from '../net/onlineMatch.js';
-import { clientIdentity, setDisplayName, loadResume } from '../net/net.js';
+import {
+  clientIdentity, loadResume, loadAccountSession,
+  saveAccountSession, clearAccountSession,
+} from '../net/net.js';
 import {
   effectiveServerUrl, getStoredServerUrl, setStoredServerUrl, describeServerTarget,
   PACKAGED_SERVER_URL, FULL_GAME_SERVER_URL, serverPresetForUrl,
@@ -1536,16 +1539,90 @@ function updateOnlineSummary() {
 }
 
 function openOnline() {
+  const account = loadAccountSession();
+  if (!account) {
+    openOnlineAccountGate();
+    return;
+  }
   updateOnlineSummary();
-  const id = clientIdentity();
-  $('#online-name').value = id.name || '';
+  $('#online-account-name').textContent = account.name;
+  $('#online-glyphs-top').textContent = 'Loading Glyphs…';
   $('#online-error').textContent = '';
   $('#online-code').value = '';
   showPanel('panel-online');
   updateConnBadges({ state: online && online.connected ? 'connected' : 'idle', rttMs: online ? online.rtt : null });
   ensureOnline()
-    .then(() => refreshOnlineRankingSummary())
+    .then(async () => {
+      const status = await online.accountStatus();
+      if (!status?.authenticated) {
+        clearAccountSession();
+        disposeOnline();
+        openOnlineAccountGate('Your saved session expired. Enter your wizard name and PIN again.');
+        return;
+      }
+      online.identity.id = status.accountId;
+      online.identity.name = status.name;
+      await refreshOnlineRankingSummary();
+    })
     .catch((err) => onOnlineError(err));
+}
+
+function openOnlineAccountGate(message = '') {
+  const storedName = clientIdentity().name;
+  $('#account-username').value = /^[A-Za-z0-9]{1,24}$/.test(storedName) ? storedName : '';
+  $('#account-pin').value = '';
+  $('#account-pin-confirm').value = '';
+  $('#account-error').textContent = message;
+  showPanel('panel-online-account');
+  showOverlay(true);
+}
+
+function accountErrorText(ack) {
+  const map = {
+    'invalid-username': 'Use 1–24 letters and numbers only, with no spaces.',
+    'invalid-pin': 'PIN must contain exactly six numbers.',
+    'name-taken': 'That wizard name already exists. Enter its correct PIN or choose another name.',
+    rate: 'Too many attempts. Wait a few seconds and try again.',
+    timeout: 'The server did not respond. Try again.',
+    offline: 'Cannot reach the online server.',
+  };
+  return map[ack?.code] || 'Could not create or open that wizard account.';
+}
+
+async function submitTemporaryAccount() {
+  const username = $('#account-username').value.trim();
+  const pin = $('#account-pin').value;
+  const confirmation = $('#account-pin-confirm').value;
+  const error = $('#account-error');
+  if (!/^[A-Za-z0-9]{1,24}$/.test(username)) {
+    error.textContent = accountErrorText({ code: 'invalid-username' });
+    return;
+  }
+  if (!/^\d{6}$/.test(pin)) {
+    error.textContent = accountErrorText({ code: 'invalid-pin' });
+    return;
+  }
+  if (pin !== confirmation) {
+    error.textContent = 'The two PIN entries do not match.';
+    return;
+  }
+  error.textContent = 'Checking wizard name…';
+  try {
+    await ensureOnline();
+    const ack = await online.authenticate(username, pin);
+    if (!ack?.ok) {
+      error.textContent = accountErrorText(ack);
+      return;
+    }
+    saveAccountSession(ack);
+    online.identity.id = ack.accountId;
+    online.identity.name = ack.name;
+    online.identity.accountToken = ack.token;
+    toast(ack.created ? `Wizard ${ack.name} created.` : `Welcome back, ${ack.name}.`);
+    openOnline();
+  } catch (failure) {
+    error.textContent = failure.message || 'Could not reach the online server.';
+  }
 }
 
 function rankingSummaryText(profile) {
@@ -1559,9 +1636,17 @@ async function refreshOnlineRankingSummary() {
   const ack = await online.rankings();
   const el = $('#online-ranking-summary');
   if (!el) return;
-  el.textContent = ack?.ok
-    ? `Ranked: ${rankingSummaryText(ack.self)}`
-    : 'Ranked: rankings temporarily unavailable';
+  if (ack?.ok) {
+    el.textContent = `World ranking: ${rankingSummaryText(ack.self)}`;
+    $('#online-glyphs-top').textContent = `${ack.self?.glyphs ?? 100} Glyphs`;
+  } else {
+    el.textContent = 'World ranking: temporarily unavailable';
+    if (ack?.code === 'auth-required') {
+      clearAccountSession();
+      disposeOnline();
+      openOnlineAccountGate('Enter your wizard name and PIN to continue.');
+    }
+  }
 }
 
 function renderRankings(data) {
@@ -1601,6 +1686,10 @@ function renderRankings(data) {
 }
 
 async function openOnlineRankings() {
+  if (!loadAccountSession()) {
+    openOnlineAccountGate();
+    return;
+  }
   $('#rankings-season').textContent = 'Loading world rankings…';
   $('#rankings-body').innerHTML = '';
   $('#rankings-self').textContent = '';
@@ -1608,6 +1697,12 @@ async function openOnlineRankings() {
   try {
     await ensureOnline();
     const ack = await online.rankings();
+    if (ack?.code === 'auth-required') {
+      clearAccountSession();
+      disposeOnline();
+      openOnlineAccountGate('Enter your wizard name and PIN to continue.');
+      return;
+    }
     if (!ack?.ok) throw new Error(onlineErrorText(ack));
     renderRankings(ack);
   } catch (error) {
@@ -1627,6 +1722,7 @@ function onlineErrorText(ack) {
     draining: 'Server is restarting. Try again shortly.',
     offline: 'Cannot reach the server.',
     timeout: 'The server did not respond.',
+    'auth-required': 'Enter your wizard name and PIN before using Online Duel.',
   };
   return map[code] || (ack && ack.errors && ack.errors[0]) || 'Something went wrong. Try again.';
 }
@@ -1659,12 +1755,9 @@ function wireOnlineCallbacks(o) {
 
 async function startOnlineAction(kind, code) {
   abandonPausedGameForNewMode();
-  const nm = $('#online-name').value.trim();
-  if (nm) setDisplayName(nm);
   rebuildForLoadout(); // refresh full-roster recognition + selected guide shortcuts
   try { await ensureOnline(); } catch (err) { onOnlineError(err); return; }
   online.setLoadout(playerIds);
-  if (nm) online.identity.name = nm;
   let ack;
   const quickRanked = kind !== 'quick-unranked';
   if (kind === 'quick-ranked' || kind === 'quick-unranked') {
@@ -1672,6 +1765,12 @@ async function startOnlineAction(kind, code) {
   }
   else if (kind === 'create') ack = await online.createRoom();
   else if (kind === 'join') ack = await online.joinRoom(String(code || '').toUpperCase());
+  if (ack?.code === 'auth-required') {
+    clearAccountSession();
+    disposeOnline();
+    openOnlineAccountGate('Enter your wizard name and PIN to continue.');
+    return;
+  }
   if (!ack || !ack.ok) { showOnlineError(onlineErrorText(ack)); return; }
   const incompatibleQueue = kind === 'quick-unranked'
     ? ack.ranked !== false
@@ -2047,6 +2146,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-quick-ranked') startOnlineAction('quick-ranked');
     else if (a === 'online-quick-unranked') startOnlineAction('quick-unranked');
     else if (a === 'online-rankings') openOnlineRankings();
+    else if (a === 'account-submit') submitTemporaryAccount();
     else if (a === 'online-create') startOnlineAction('create');
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
     else if (a === 'online-cancel') cancelOnline();
@@ -2371,7 +2471,9 @@ function deleteMyData() {
   if (!window.confirm('Delete all local data? This erases your device identity, name, settings, and your solo progress — tutorial completion, calibration, medals, secret-clue and secret-spell discoveries, Practice vs AI settings and results, and local coaching statistics. This cannot be undone.')) return;
   if (online) { try { online.leave(); } catch { /* ignore */ } disposeOnline(); }
   try {
-    ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-server-url', ORIENTATION_KEY].forEach((k) => localStorage.removeItem(k));
+    ['aeth-client-id', 'aeth-name', 'aeth-resume', 'aeth-private-lobby',
+      'aeth-server-url', ORIENTATION_KEY].forEach((k) => localStorage.removeItem(k));
+    clearAccountSession();
   } catch { /* ignore */ }
   settings.orientation = 'auto';
   const orientation = $('#set-orientation'); if (orientation) orientation.value = 'auto';
@@ -2380,7 +2482,7 @@ function deleteMyData() {
   tutorial = null; tutorialLesson = null;
   initPractice();
   const su = $('#set-server-url'); if (su) su.value = '';
-  const on = $('#online-name'); if (on) on.value = '';
+  const accountName = $('#account-username'); if (accountName) accountName.value = '';
   setServerStatus('Local data deleted, including solo progress, calibration, medals, clues, secret discoveries, Practice settings + results, and coaching stats.', 'ok');
   toast('Your local data was deleted.');
 }

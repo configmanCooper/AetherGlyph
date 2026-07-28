@@ -45,12 +45,12 @@ export function clientIdentity() {
     id = 'demo-' + Date.now().toString(36);
     localStorage.setItem(ID_KEY, id);
   }
-  return { clientId: id, name: localStorage.getItem(NAME_KEY) || '' };
-}
-export function setDisplayName(name) {
-  localStorage.setItem(NAME_KEY, String(name || '').slice(0, 24));
+  return { id, name: localStorage.getItem(NAME_KEY) || '', accountToken: null };
 }
 export function loadResume() { return null; }
+export function loadAccountSession() { return null; }
+export function saveAccountSession() {}
+export function clearAccountSession() {}
 `);
 
   write('client/src/net/serverConfig.js', `export const PACKAGED_SERVER_URL = '';

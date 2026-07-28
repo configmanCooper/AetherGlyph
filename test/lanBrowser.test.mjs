@@ -57,9 +57,28 @@ try {
     timeout: 30000,
   });
   await page.waitForFunction(() => !!window.__aegTest);
+  await page.evaluate(async (port) => {
+    const config = await import('./src/net/serverConfig.js');
+    config.setStoredServerUrl(`http://127.0.0.1:${port}`);
+  }, PORT);
+  assert(await effectiveUrl(page) === `http://127.0.0.1:${PORT}`,
+    'LAN test could not select its local account server.');
 
   await page.click('[data-action="online"]');
-  await page.waitForSelector('#panel-online:not(.hidden)');
+  await page.waitForSelector('#panel-online-account:not(.hidden)');
+  await page.type('#account-username', 'LanWizard');
+  await page.type('#account-pin', '123456');
+  await page.type('#account-pin-confirm', '123456');
+  await page.click('[data-action="account-submit"]');
+  await page.waitForFunction(() =>
+    !document.querySelector('#panel-online')?.classList.contains('hidden')
+    || (!!document.querySelector('#account-error')?.textContent
+      && !/Checking wizard name/i.test(document.querySelector('#account-error').textContent)));
+  const accountState = await page.evaluate(() => ({
+    online: !document.querySelector('#panel-online')?.classList.contains('hidden'),
+    error: document.querySelector('#account-error')?.textContent || '',
+  }));
+  assert(accountState.online, `LAN test account setup failed: ${accountState.error}`);
   await page.click('[data-action="lan-duel"]');
   await page.waitForSelector('#panel-lan-duel:not(.hidden)');
   await page.waitForSelector('#lan-host-info:not(.hidden)');

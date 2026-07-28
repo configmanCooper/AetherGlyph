@@ -208,7 +208,31 @@ try {
   // Online menu smoke: create a private lobby end-to-end, confirm it does not
   // auto-start, edit guides, ready up, then cancel.
   await activate(page, '[data-action="online"]');
+  await page.waitForSelector('#panel-online-account:not(.hidden)', { timeout: 5000 });
+  await page.type('#account-username', 'Browser Wizard');
+  await page.type('#account-pin', '123456');
+  await page.type('#account-pin-confirm', '123456');
+  await activate(page, '[data-action="account-submit"]');
+  await page.waitForFunction(() => /letters and numbers only/i.test(
+    document.querySelector('#account-error')?.textContent || ''), { timeout: 5000 });
+  await page.evaluate(() => {
+    document.querySelector('#account-username').value = 'BrowserWizard7';
+    document.querySelector('#account-pin').value = '123456';
+    document.querySelector('#account-pin-confirm').value = '654321';
+  });
+  await activate(page, '[data-action="account-submit"]');
+  await page.waitForFunction(() => /do not match/i.test(
+    document.querySelector('#account-error')?.textContent || ''), { timeout: 5000 });
+  await page.evaluate(() => { document.querySelector('#account-pin-confirm').value = '123456'; });
+  await activate(page, '[data-action="account-submit"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
+  const accountBanner = await page.evaluate(() => ({
+    name: document.querySelector('#online-account-name')?.textContent || '',
+    glyphs: document.querySelector('#online-glyphs-top')?.textContent || '',
+  }));
+  if (accountBanner.name !== 'BrowserWizard7' || accountBanner.glyphs !== '100 Glyphs') {
+    fail('temporary account did not restore its name and Glyph total: ' + JSON.stringify(accountBanner));
+  }
   await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
     document.querySelector('#online-population')?.textContent || ''), { timeout: 10000 });
   await activate(page, '[data-action="online-rankings"]');

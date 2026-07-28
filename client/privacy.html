@@ -25,16 +25,17 @@
   <h1>Aetherglyph: Arcane Duels — Privacy Policy</h1>
   <p class="muted">Last updated: July 28, 2026. Publisher: Cooper Unlimited Games. Contact: <a href="mailto:rocmat21@gmail.com">rocmat21@gmail.com</a></p>
 
-  <p>Aetherglyph is a paid, one-time-purchase wizard dueling game. There are <strong>no accounts,
-  no sign-in, no advertising, no in-app purchases, and no sale of personal data</strong>. This
+  <p>Aetherglyph is a paid, one-time-purchase wizard dueling game. Online testing currently uses a
+  temporary wizard-name and six-digit PIN account. There is <strong>no email requirement,
+  no advertising, no in-app purchases, and no sale of personal data</strong>. This
   policy explains the small amount of data the game uses.</p>
 
-  <h2>Anonymous identity</h2>
-  <p>The game creates a random, anonymous identifier in browser/app local storage. It is not linked to
-  your email, phone number, Google account, or real-world identity. During online play, the identifier
-  is sent to the authoritative server to reconnect duels and associate ranked Glyph totals and match
-  history. You may enter an optional display name; it is stored locally and with the anonymous ranking
-  record, and is visible to opponents and on the public top-ten leaderboard.</p>
+  <h2>Temporary online identity</h2>
+  <p>For online testing, you choose an alphanumeric wizard name and a six-digit PIN. The server stores
+  a one-way derived PIN hash, never the readable PIN. This temporary account is not linked to an email,
+  phone number, Google account, or verified real-world identity. The wizard name is visible to
+  opponents and on the public top-100 leaderboard. A hashed temporary session token can remain valid
+  for up to 30 days so the same device can sign in again without re-entering the PIN.</p>
 
   <h2>Offline play</h2>
   <p>The tutorial and bot practice run entirely on your device and require no network connection. No
@@ -45,7 +46,7 @@
   (<code>aetherglyph-server.onrender.com</code> by default; you may configure a different service URL in
   Settings). To run a fair, server-authoritative match, the service processes:</p>
   <ul>
-    <li>your anonymous identifier and optional display name;</li>
+    <li>your temporary account identifier and wizard name;</li>
     <li>your selected guide shortcuts and the gestures/inputs you send during a match;</li>
     <li>network metadata inherent to any internet connection, including your IP address, used only for
       connectivity, security, abuse prevention, and short-lived connection logs;</li>
@@ -69,7 +70,7 @@
       you play online.</li>
     <li><strong>Server-side Glyph ranking record:</strong> see the
       <a href="./account-deletion.html">account &amp; data deletion</a> page to request deletion of the
-      ranking and match-history record associated with your anonymous id.</li>
+      ranking, credential, session, and match-history record associated with your wizard name.</li>
   </ul>
 
   <h2>Children</h2>

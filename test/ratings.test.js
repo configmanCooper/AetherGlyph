@@ -1,7 +1,7 @@
 import { createHarness } from './tiny.js';
 import {
   MemoryRatingStore, DEFAULT_GLYPHS, glyphTransfer, nextGlyphs,
-  quarterStart, resetGlyphTotal, seasonKey,
+  quarterStart, resetGlyphTotal, seasonKey, validateTemporaryCredentials,
 } from '../server/ratings.js';
 
 export async function run() {
@@ -27,6 +27,10 @@ export async function run() {
   eq(resetGlyphTotal(899), 550, 'quarterly reset uses the next-lowest 300 multiple');
   eq(resetGlyphTotal(100), 0, 'literal quarterly rule can reset low totals to zero');
   eq(seasonKey(new Date('2026-07-01T00:00:00Z')), '2026-Q3', 'season keys use UTC quarters');
+  eq(validateTemporaryCredentials('Bad Name', '123456').code, 'invalid-username',
+    'temporary usernames reject spaces');
+  eq(validateTemporaryCredentials('Wizard7', '12345a').code, 'invalid-pin',
+    'temporary PIN requires exactly six digits');
 
   const currentStart = quarterStart(new Date());
   const nextStart = new Date(Date.UTC(
@@ -35,11 +39,34 @@ export async function run() {
     1,
   ));
   const store = await new MemoryRatingStore().init(new Date());
+  const createdAccount = await store.authenticateTemporary('Wizard7', '123456');
+  ok(createdAccount.ok && createdAccount.created, 'new username and PIN create an account');
+  eq(createdAccount.profile.glyphs, 100, 'new username account starts with 100 Glyphs');
+  const storedCredential = store.credentials.get('wizard7');
+  ok(storedCredential.hash !== '123456', 'PIN is stored as a derived hash, not plaintext');
+  const wrongPin = await store.authenticateTemporary('Wizard7', '654321');
+  eq(wrongPin.code, 'name-taken', 'existing username rejects an incorrect PIN');
+  const login = await store.authenticateTemporary('wizard7', '123456');
+  ok(login.ok && !login.created, 'existing username accepts its correct PIN case-insensitively');
+  eq(login.accountId, createdAccount.accountId, 'username login restores the same ranking account');
+  const restoredSession = await store.resolveTemporarySession(login.token);
+  eq(restoredSession.accountId, createdAccount.accountId, 'session token restores the database account');
+  const concurrentStore = await new MemoryRatingStore().init();
+  const concurrent = await Promise.all([
+    concurrentStore.authenticateTemporary('RaceWizard', '123456'),
+    concurrentStore.authenticateTemporary('racewizard', '654321'),
+  ]);
+  eq(concurrent.filter((result) => result.created).length, 1,
+    'concurrent case-insensitive registrations create only one username account');
+  eq(concurrentStore.credentials.size, 1,
+    'memory account store retains one credential for a racing username');
+  await concurrentStore.close();
   const players = [
     { accountId: 'glyph-a', name: 'Alpha' },
     { accountId: 'glyph-b', name: 'Beta' },
   ];
 
+  const accountCountBeforeUnranked = store.accounts.size;
   const unranked = await store.recordResult({
     matchId: 'unranked-result',
     ranked: false,
@@ -47,7 +74,7 @@ export async function run() {
     winnerSlot: 0,
   });
   eq(unranked.applied, false, 'unranked match does not enter ranking persistence');
-  eq(store.accounts.size, 0, 'unranked match creates no ranking accounts');
+  eq(store.accounts.size, accountCountBeforeUnranked, 'unranked match creates no ranking accounts');
 
   const ranked = await store.recordResult({
     matchId: 'ranked-result',
@@ -86,5 +113,18 @@ export async function run() {
   eq(repeated.applied, false, 'quarterly reset is idempotent within a season');
 
   await store.close();
+
+  const largeBoard = await new MemoryRatingStore().init();
+  for (let i = 1; i <= 105; i++) {
+    const account = largeBoard.ensureAccount(`rank-${i}`, `Wizard${i}`);
+    account.rankedGames = 1;
+    account.wins = i;
+    account.glyphs = 1000 - i;
+  }
+  const topHundred = await largeBoard.getLeaderboard('rank-105', 'Wizard105', 100);
+  eq(topHundred.top.length, 100, 'world rankings return only the top 100');
+  eq(topHundred.self.rank, 105, 'wizard outside the top 100 still sees their world rank');
+  await largeBoard.close();
+
   return report('ratings');
 }

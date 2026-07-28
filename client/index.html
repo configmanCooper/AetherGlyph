@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.12.0-glyph1" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.12.0-account1" />
   <script type="importmap">
   {
     "imports": {
@@ -211,14 +211,34 @@
       </div>
     </div>
 
+    <div class="panel hidden" id="panel-online-account">
+      <h2>Choose Your Wizard Name</h2>
+      <p>Online play requires a temporary wizard name and six-digit PIN. Names use letters and numbers only, with no spaces.</p>
+      <label class="field">Wizard name
+        <input type="text" id="account-username" maxlength="24" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="ArcaneWizard7" />
+      </label>
+      <label class="field">Six-digit PIN
+        <input type="password" id="account-pin" maxlength="6" inputmode="numeric" autocomplete="new-password" placeholder="123456" />
+      </label>
+      <label class="field">Type the PIN again
+        <input type="password" id="account-pin-confirm" maxlength="6" inputmode="numeric" autocomplete="new-password" placeholder="123456" />
+      </label>
+      <p id="account-error" class="ls-err-line"></p>
+      <div class="menu-list">
+        <button class="menu-btn" data-action="account-submit">Continue to Online Duel</button>
+        <button class="menu-btn ghost" data-action="back">Back</button>
+      </div>
+    </div>
+
     <div class="panel hidden" id="panel-online">
       <h2>Online Duel</h2>
+      <div class="online-account-banner">
+        <strong id="online-account-name">Wizard</strong>
+        <span id="online-glyphs-top">100 Glyphs</span>
+      </div>
+      <p id="online-ranking-summary" class="ranking-summary">World rank: loading…</p>
       <p>Play a best-of-three against another device. Casting is by drawing on the glyph pad — the server validates every spell.</p>
-      <label class="field">Display name (optional)
-        <input type="text" id="online-name" maxlength="24" placeholder="Anonymous wizard" />
-      </label>
       <p id="online-loadout-summary" class="loadout-summary"></p>
-      <p id="online-ranking-summary" class="ranking-summary">Ranked: loading Glyphs…</p>
       <div class="menu-list">
         <button class="menu-btn" data-action="online-quick-ranked">Quick Match — Ranked</button>
         <button class="menu-btn ghost" data-action="online-quick-unranked">Quick Match — Unranked</button>
@@ -238,7 +258,7 @@
     </div>
 
     <div class="panel hidden wide" id="panel-rankings">
-      <h2>World Rankings</h2>
+      <h2>World Rankings — Top 100</h2>
       <p id="rankings-season" class="ranking-summary"></p>
       <div class="rankings-table-wrap">
         <table class="rankings-table">
@@ -361,7 +381,7 @@
       </div>
 
       <div class="settings-section">
-        <p class="settings-note">Anonymous play — no account or sign-in yet. A random device id links online reconnects and your server-side Glyph ranking.</p>
+        <p class="settings-note">Temporary username/PIN accounts are used for online play until Google sign-in replaces them.</p>
         <div class="menu-list compact">
           <button class="menu-btn ghost" data-action="privacy">Privacy &amp; deletion</button>
           <button class="menu-btn ghost" data-action="delete-data">Delete my data</button>
@@ -433,6 +453,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.12.0-glyph1"></script>
+  <script type="module" src="./src/app/main.js?v=1.12.0-account1"></script>
 </body>
 </html>

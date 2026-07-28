@@ -12,10 +12,34 @@ const ID_KEY = 'aeth-client-id';
 const NAME_KEY = 'aeth-name';
 const RESUME_KEY = 'aeth-resume';
 const PRIVATE_LOBBY_KEY = 'aeth-private-lobby';
+const ACCOUNT_SESSION_KEY = 'aeth-account-session';
+
+export function loadAccountSession() {
+  try {
+    const value = JSON.parse(localStorage.getItem(ACCOUNT_SESSION_KEY) || 'null');
+    if (!value || typeof value.token !== 'string' || typeof value.name !== 'string') return null;
+    return value;
+  } catch { return null; }
+}
+
+export function saveAccountSession(value) {
+  try {
+    localStorage.setItem(ACCOUNT_SESSION_KEY, JSON.stringify({
+      accountId: String(value.accountId || ''),
+      name: String(value.name || ''),
+      token: String(value.token || ''),
+    }));
+  } catch { /* ignore */ }
+}
+
+export function clearAccountSession() {
+  try { localStorage.removeItem(ACCOUNT_SESSION_KEY); } catch { /* ignore */ }
+}
 
 // A stable, anonymous client id persisted locally (no account required). Used
 // as the temporary Glyph-ranking account key and to bind resume tokens.
 export function clientIdentity() {
+  const account = loadAccountSession();
   let id = null; let name = '';
   try {
     id = localStorage.getItem(ID_KEY);
@@ -27,7 +51,11 @@ export function clientIdentity() {
   } catch {
     id = id || `anon-${Math.random().toString(36).slice(2, 10)}`;
   }
-  return { id, name };
+  return {
+    id: account?.accountId || id,
+    name: account?.name || name,
+    accountToken: account?.token || null,
+  };
 }
 
 export function setDisplayName(name) {
@@ -69,6 +97,7 @@ export function openSocket(url, identity) {
     roster: ROSTER_CHECKSUM,
     clientId: identity.id,
     name: identity.name,
+    accountToken: identity.accountToken || undefined,
   };
   return io(url || undefined, {
     transports: ['websocket'],
