@@ -64,6 +64,8 @@ async function main() {
     graceMs: 700,
     intermissionMs: 160,
     privateLobbyGraceMs: 800,
+    rankedRange: 50,
+    rankedRangeWaitMs: 120,
   });
   const port = await gs.listen(0);
   const url = `http://127.0.0.1:${port}`;
@@ -127,7 +129,7 @@ async function main() {
     eq(hostStart.slot, 0, 'host match-start slot 0');
     eq(joinStart.slot, 1, 'joiner match-start slot 1');
     ok(typeof hostStart.token === 'string' && hostStart.token.length > 10, 'host receives a resume token');
-    eq(hostStart.ranked, false, 'private match is unranked (does not affect rating)');
+    eq(hostStart.ranked, false, 'private match is unranked (does not affect Glyphs)');
 
     // --- 4. Full-roster trace classification + forged spell id ignored ----
     // Collect host snapshots to observe authoritative state.
@@ -224,6 +226,7 @@ async function main() {
       });
       ok(rankedAck.ok && rankedAck.ranked === true,
         'quick match defaults to the backward-compatible ranked queue');
+      eq(rankedAck.glyphs, 100, 'new ranked wizard enters matchmaking with 100 Glyphs');
       ok(unrankedAck.ok && unrankedAck.ranked === false,
         'unranked quick match enters the unranked queue');
       await sleep(80);
@@ -237,6 +240,22 @@ async function main() {
       ok(rankedStart1.ranked === true && rankedStart2.ranked === true,
         'two ranked players start a ranked match');
       eq(gs.rooms.queue.length, 1, 'unranked player remains queued after ranked pairing');
+      const rankedUpdate1P = once(ranked1, EVENTS.RANKING_UPDATE);
+      const rankedUpdate2P = once(ranked2, EVENTS.RANKING_UPDATE);
+      const rankedMatch = [...gs.rooms.matches.values()].find((match) =>
+        match.seats.some((seat) => seat.accountId === 'acc-q-ranked-1'));
+      ok(!!rankedMatch, 'ranked quick match has an authoritative match room');
+      rankedMatch.endMatch(rankedStart1.slot, 'series');
+      const rankedUpdate1 = await rankedUpdate1P;
+      const rankedUpdate2 = await rankedUpdate2P;
+      eq(rankedUpdate1.ok, true, 'ranked settlement reports persistence success');
+      eq(rankedUpdate1.delta, 25, 'equal-Glyph ranked winner gains 25');
+      eq(rankedUpdate1.glyphsAfter, 125, 'ranked winner reaches 125 Glyphs');
+      eq(rankedUpdate2.delta, -25, 'equal-Glyph ranked loser loses 25');
+      eq(rankedUpdate2.glyphsAfter, 75, 'ranked loser falls to 75 Glyphs');
+      const rankings = await emitAck(ranked1, EVENTS.RANKINGS_REQUEST, {});
+      ok(rankings.ok && rankings.top.length === 2, 'world rankings list ranked participants');
+      eq(rankings.self.glyphs, 125, 'rankings response includes the requesting wizard total');
 
       const unranked2 = track(await connect(url, goodAuth('acc-q-unranked-2')));
       const unranked2Start = once(unranked2, EVENTS.MATCH_START);
@@ -245,6 +264,14 @@ async function main() {
       const unrankedStart2 = await unranked2Start;
       ok(unrankedStart1.ranked === false && unrankedStart2.ranked === false,
         'two unranked players start an unranked match');
+      const unrankedMatch = [...gs.rooms.matches.values()].find((match) =>
+        match.seats.some((seat) => seat.accountId === 'acc-q-unranked-1'));
+      unrankedMatch.endMatch(unrankedStart1.slot, 'series');
+      await sleep(40);
+      eq(gs.rooms.ratingStore.accounts.has('acc-q-unranked-1'), false,
+        'unranked winner creates no ranking record');
+      eq(gs.rooms.ratingStore.accounts.has('acc-q-unranked-2'), false,
+        'unranked loser creates no ranking record');
       ok((rankedStart1.slot === 0 && rankedStart2.slot === 1)
           || (rankedStart1.slot === 1 && rankedStart2.slot === 0),
       'ranked quick match assigns distinct slots');
@@ -252,7 +279,34 @@ async function main() {
       unranked1.disconnect(); unranked2.disconnect();
     }
 
-    // --- 10. Disconnect forfeit + match termination ----------------------
+    // --- 10. Ranked search waits for ±50, then chooses closest -----------
+    {
+      await gs.rooms.ratingStore.getGlyphs('acc-range-low', 'Low');
+      await gs.rooms.ratingStore.getGlyphs('acc-range-high', 'High');
+      gs.rooms.ratingStore.accounts.get('acc-range-low').glyphs = 100;
+      gs.rooms.ratingStore.accounts.get('acc-range-high').glyphs = 300;
+      const low = track(await connect(url, goodAuth('acc-range-low')));
+      const high = track(await connect(url, goodAuth('acc-range-high')));
+      const lowStartP = once(low, EVENTS.MATCH_START);
+      const highStartP = once(high, EVENTS.MATCH_START);
+      await emitAck(low, EVENTS.QUICK_MATCH, { loadout: emberIds });
+      await emitAck(high, EVENTS.QUICK_MATCH, { loadout: tideIds });
+      await sleep(60);
+      gs.rooms.matchmake();
+      eq(gs.rooms.queue.length, 2, 'ranked players over 50 Glyphs apart wait initially');
+      await sleep(80);
+      gs.rooms.matchmake();
+      const lowStart = await lowStartP;
+      const highStart = await highStartP;
+      ok(lowStart.ranked && highStart.ranked,
+        'closest available ranked players pair after the configured wait');
+      const match = [...gs.rooms.matches.values()].find((room) =>
+        room.seats.some((seat) => seat.accountId === 'acc-range-low'));
+      match.endMatch('draw', 'series');
+      low.disconnect(); high.disconnect();
+    }
+
+    // --- 11. Disconnect forfeit + match termination ----------------------
     {
       const h = track(await connect(url, goodAuth('acc-fh')));
       const j = track(await connect(url, goodAuth('acc-fj')));

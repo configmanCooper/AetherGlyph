@@ -61,6 +61,7 @@ export async function run() {
   let start = null;
   let status = null;
   let population = null;
+  let rankingUpdate = null;
   let room = null;
   let ended = null;
   const online = new OnlineMatch({
@@ -71,6 +72,7 @@ export async function run() {
     onMatchStart: (p) => { start = p; },
     onStatus: (p) => { status = p; },
     onPopulation: (p) => { population = p; },
+    onRankingUpdate: (p) => { rankingUpdate = p; },
     onRoom: (p) => { room = p; },
     onMatchEnd: (p) => { ended = p; },
   });
@@ -89,6 +91,18 @@ export async function run() {
 
   socket.trigger(EVENTS.POPULATION, { online: 123 });
   eq(population.online, 123, 'population updates reach the app callback');
+  socket.trigger(EVENTS.RANKING_UPDATE, {
+    matchId: 'reload-match', glyphsAfter: 125, delta: 25, rank: 1,
+  });
+  eq(rankingUpdate.glyphsAfter, 125, 'personalized Glyph updates reach the app callback');
+  socket.trigger(EVENTS.RANKING_UPDATE, {
+    matchId: 'stale-match', glyphsAfter: 999, delta: 50, rank: 1,
+  });
+  eq(rankingUpdate.glyphsAfter, 125, 'stale Glyph updates from another match are ignored');
+  socket.trigger(EVENTS.RANKING_UPDATE, {
+    matchId: 'reload-match', ok: false, code: 'persistence-failed',
+  });
+  eq(rankingUpdate.ok, false, 'ranking persistence failures reach the app callback');
   socket.trigger(EVENTS.ROOM_UPDATE, { state: 'private-lobby', code: 'ABCDE', readyCount: 0 });
   eq(room.code, 'ABCDE', 'private-lobby updates reach the app callback');
   eq(online.privateCode, 'ABCDE', 'private room code is retained between matches');

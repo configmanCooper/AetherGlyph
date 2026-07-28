@@ -63,6 +63,7 @@ export class OnlineMatch {
     this.onStatus = opts.onStatus || (() => {});
     this.onRoom = opts.onRoom || (() => {});
     this.onPopulation = opts.onPopulation || (() => {});
+    this.onRankingUpdate = opts.onRankingUpdate || (() => {});
     this.onConnection = opts.onConnection || (() => {});
     this.onError = opts.onError || (() => {});
     this.onCastAck = opts.onCastAck || (() => {});
@@ -138,6 +139,10 @@ export class OnlineMatch {
       socket.on(EVENTS.MATCH_END, (p) => this.handleMatchEnd(p || {}));
       socket.on(EVENTS.OPPONENT_STATUS, (p) => this.onStatus(p || {}));
       socket.on(EVENTS.RESUME_TOKEN, (p) => { if (p && p.token) { this.resumeToken = p.token; saveResume(this.matchId, p.token); } });
+      socket.on(EVENTS.RANKING_UPDATE, (p) => {
+        if (p?.matchId && this.matchId && p.matchId !== this.matchId) return;
+        this.onRankingUpdate(p || {});
+      });
       socket.on(EVENTS.ABORTED, (p) => this.handleAborted(p || {}));
       socket.on(EVENTS.PONG, (p) => { if (p && Number.isFinite(p.t)) { this.rtt = Math.max(0, Date.now() - p.t); this.emitConnection(this.connected ? 'connected' : 'disconnected'); } });
     });
@@ -166,6 +171,7 @@ export class OnlineMatch {
     });
   }
   cancelQueue() { return this.request(EVENTS.CANCEL_QUEUE, {}); }
+  rankings() { return this.request(EVENTS.RANKINGS_REQUEST, {}); }
   privateReady() {
     return this.request(EVENTS.PRIVATE_READY, {
       loadout: this.loadoutIds,

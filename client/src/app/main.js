@@ -209,6 +209,8 @@ let onlineRoundIndex = 0;
 let onlinePrivateCode = null;
 let onlineSurrenderPending = false;
 let onlineLobbyState = null;
+let onlineRankingUpdate = null;
+let onlineResultMatchId = null;
 let serviceWorkerReloadPending = false;
 
 function haptic(kind) {
@@ -1541,7 +1543,76 @@ function openOnline() {
   $('#online-code').value = '';
   showPanel('panel-online');
   updateConnBadges({ state: online && online.connected ? 'connected' : 'idle', rttMs: online ? online.rtt : null });
-  ensureOnline().catch((err) => onOnlineError(err));
+  ensureOnline()
+    .then(() => refreshOnlineRankingSummary())
+    .catch((err) => onOnlineError(err));
+}
+
+function rankingSummaryText(profile) {
+  if (!profile) return 'Ranked: unavailable';
+  const rank = profile.rank == null ? 'Unranked' : `World #${profile.rank}`;
+  return `${profile.glyphs} Glyphs · ${rank} · ${profile.wins}W–${profile.losses}L`;
+}
+
+async function refreshOnlineRankingSummary() {
+  if (!online) return;
+  const ack = await online.rankings();
+  const el = $('#online-ranking-summary');
+  if (!el) return;
+  el.textContent = ack?.ok
+    ? `Ranked: ${rankingSummaryText(ack.self)}`
+    : 'Ranked: rankings temporarily unavailable';
+}
+
+function renderRankings(data) {
+  $('#rankings-season').textContent = data?.season
+    ? `${data.season} season · resets January, April, July, and October`
+    : 'Current season';
+  const body = $('#rankings-body');
+  body.innerHTML = '';
+  const top = Array.isArray(data?.top) ? data.top : [];
+  if (!top.length) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 5;
+    cell.textContent = 'No ranked duels have been completed yet.';
+    row.appendChild(cell);
+    body.appendChild(row);
+  } else {
+    for (const wizard of top) {
+      const row = document.createElement('tr');
+      for (const value of [
+        wizard.rank == null ? '—' : wizard.rank,
+        wizard.name || 'Anonymous wizard',
+        wizard.glyphs,
+        wizard.wins,
+        wizard.losses,
+      ]) {
+        const cell = document.createElement('td');
+        cell.textContent = String(value);
+        row.appendChild(cell);
+      }
+      body.appendChild(row);
+    }
+  }
+  $('#rankings-self').textContent = data?.self?.games > 0
+    ? `You: ${rankingSummaryText(data.self)}`
+    : `You: ${data?.self?.glyphs ?? 100} Glyphs · Complete a ranked duel to enter the world rankings.`;
+}
+
+async function openOnlineRankings() {
+  $('#rankings-season').textContent = 'Loading world rankings…';
+  $('#rankings-body').innerHTML = '';
+  $('#rankings-self').textContent = '';
+  showPanel('panel-rankings');
+  try {
+    await ensureOnline();
+    const ack = await online.rankings();
+    if (!ack?.ok) throw new Error(onlineErrorText(ack));
+    renderRankings(ack);
+  } catch (error) {
+    $('#rankings-season').textContent = `Rankings unavailable: ${error.message || error}`;
+  }
 }
 
 function onlineErrorText(ack) {
@@ -1580,6 +1651,7 @@ function wireOnlineCallbacks(o) {
   o.onStatus = (p) => onOnlineStatus(p);
   o.onRoom = (p) => onOnlineRoom(p);
   o.onPopulation = (p) => updateOnlinePopulation(p);
+  o.onRankingUpdate = (p) => onOnlineRankingUpdate(p);
   o.onConnection = (p) => updateConnBadges(p);
   o.onError = (err) => onOnlineError(err);
   o.onCastAck = (ack) => { if (ack && !ack.ok && ack.code === 'rate') toast('Slow down — too many casts.'); };
@@ -1632,7 +1704,7 @@ function showWaiting(kind, ack) {
     const ranked = kind !== 'quick-unranked';
     $('#wait-title').textContent = ranked ? 'Finding a ranked duel…' : 'Finding an unranked duel…';
     $('#wait-text').textContent = ranked
-      ? 'Matching you with an opponent of similar rating.'
+      ? `${ack.glyphs ?? 100} Glyphs · searching within 50 Glyphs for 3 seconds, then the closest available wizard.`
       : 'Matching you for a casual duel. Rankings will not change.';
     codeBox.classList.add('hidden');
   }
@@ -1712,6 +1784,9 @@ function cancelOnline() {
 function onOnlineMatchStart(p = {}) {
   onlinePrivateCode = p.code || online?.privateCode || null;
   onlineSurrenderPending = false;
+  onlineRankingUpdate = null;
+  onlineResultMatchId = null;
+  $('#ranking-result').classList.add('hidden');
   online?.setActive(true);
   mode = 'online';
   document.body.classList.remove('mode-lab', 'mode-tutorial');
@@ -1753,6 +1828,7 @@ function onOnlineRoundEnd(p) {
 
 function onOnlineMatchEnd(p) {
   running = false;
+  onlineResultMatchId = p.matchId || online?.matchId || null;
   const win = p.winner === 'win';
   onlinePrivateCode = p.code || online?.privateCode || null;
   if (onlineSurrenderPending) {
@@ -1774,12 +1850,43 @@ function onOnlineMatchEnd(p) {
   const score = Array.isArray(p.score) ? `${p.score[0]}–${p.score[1]}` : '';
   const matchType = p.ranked === false ? 'Unranked online duel' : 'Ranked online duel';
   $('#result-text').textContent = `${matchType}${score ? ` ${score}` : ''}${reason}.`;
+  if (p.ranked === false) {
+    $('#ranking-result').classList.add('hidden');
+  } else {
+    renderRankingResult();
+  }
   $('#btn-next-round').classList.add('hidden');
   $('#coach-report').classList.add('hidden');
   const rematch = document.querySelector('#panel-result [data-action="rematch"]');
   if (rematch) rematch.textContent = onlinePrivateCode ? 'Return to private room' : 'Online Duel menu';
   setNetStatus(null);
   showPanel('panel-result'); showOverlay(true);
+}
+
+function renderRankingResult() {
+  const el = $('#ranking-result');
+  el.classList.remove('hidden');
+  if (!onlineRankingUpdate
+      || (onlineResultMatchId && onlineRankingUpdate.matchId !== onlineResultMatchId)) {
+    el.textContent = 'Updating your Glyph ranking…';
+    return;
+  }
+  const update = onlineRankingUpdate;
+  if (update.ok === false) {
+    el.textContent = 'Glyph ranking update failed. Open World Rankings shortly to check the result.';
+    return;
+  }
+  const delta = Number(update.delta) || 0;
+  const signed = delta > 0 ? `+${delta}` : String(delta);
+  const rank = update.rank == null ? 'Unranked' : `World #${update.rank}`;
+  el.textContent = `${signed} Glyphs · ${update.glyphsBefore} → ${update.glyphsAfter} · ${rank}`;
+}
+
+function onOnlineRankingUpdate(update) {
+  if (update?.matchId && online?.matchId && update.matchId !== online.matchId) return;
+  onlineRankingUpdate = update;
+  if (activePanelId === 'panel-result') renderRankingResult();
+  refreshOnlineRankingSummary();
 }
 
 function onOnlineRoom(p) {
@@ -1939,6 +2046,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     }
     else if (a === 'online-quick-ranked') startOnlineAction('quick-ranked');
     else if (a === 'online-quick-unranked') startOnlineAction('quick-unranked');
+    else if (a === 'online-rankings') openOnlineRankings();
     else if (a === 'online-create') startOnlineAction('create');
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
     else if (a === 'online-cancel') cancelOnline();

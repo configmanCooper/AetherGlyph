@@ -14,7 +14,7 @@ const RESUME_KEY = 'aeth-resume';
 const PRIVATE_LOBBY_KEY = 'aeth-private-lobby';
 
 // A stable, anonymous client id persisted locally (no account required). Used
-// as the rating account key and to bind resume tokens.
+// as the temporary Glyph-ranking account key and to bind resume tokens.
 export function clientIdentity() {
   let id = null; let name = '';
   try {

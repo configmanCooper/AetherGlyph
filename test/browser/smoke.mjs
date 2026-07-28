@@ -211,6 +211,22 @@ try {
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
     document.querySelector('#online-population')?.textContent || ''), { timeout: 10000 });
+  await activate(page, '[data-action="online-rankings"]');
+  await page.waitForSelector('#panel-rankings:not(.hidden)', { timeout: 10000 });
+  await page.waitForFunction(() => /100 Glyphs/.test(
+    document.querySelector('#rankings-self')?.textContent || ''), { timeout: 10000 });
+  const rankingsState = await page.evaluate(() => ({
+    self: document.querySelector('#rankings-self')?.textContent || '',
+    empty: document.querySelector('#rankings-body')?.textContent || '',
+    columns: document.querySelectorAll('#panel-rankings thead th').length,
+  }));
+  if (!/Complete a ranked duel/i.test(rankingsState.self)
+      || !/No ranked duels/i.test(rankingsState.empty)
+      || rankingsState.columns !== 5) {
+    fail('world rankings panel is incomplete: ' + JSON.stringify(rankingsState));
+  }
+  await activate(page, '#panel-rankings [data-action="online"]');
+  await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   const quickChoices = await page.evaluate(() => [...document.querySelectorAll('#panel-online [data-action^="online-quick-"]')]
     .map((button) => ({ action: button.dataset.action, text: button.textContent })));
   if (quickChoices.length !== 2

@@ -365,7 +365,8 @@ duel while preserving the deterministic shared simulation and all offline modes.
   advances the best-of-three series, and broadcasts personalized snapshots +
   domain events at a bounded 15 Hz. Clients never set health, resources, spell
   ids, or results. `server/roomManager.js` owns private rooms (create/join by
-  short code), a **quick-match queue with a widening rating band**, anonymous
+  short code), separate ranked/unranked quick-match queues, a ranked ±50 Glyph
+  search window that expands to the closest available wizard after three seconds, anonymous
   stable identity, per-socket rate limiting, disconnect routing, and drain.
 - **Draw-to-cast is authoritative.** A cast intent sends a **bounded, quantized
   gesture trace + timing**, never a trusted spell id. The server re-runs the
@@ -384,10 +385,13 @@ duel while preserving the deterministic shared simulation and all offline modes.
   resume, and a **25-second grace** (shortened on repeat disconnects). A
   disconnected player stops issuing actions (the match pauses); after grace the
   round/series is forfeited. Render sticky sessions are not assumed.
-- **Rating persistence adapter.** `server/ratings.js` uses **Postgres** when
-  `DATABASE_URL` is set (idempotent schema init, parameterized queries) and an
-  **explicit in-memory development adapter** otherwise. Quick match is ranked
-  (widening band); private matches do not affect rating. No secrets in source.
+- **Glyph ranking persistence.** `server/ratings.js` uses **Postgres** when
+  `DATABASE_URL` is set and an explicit in-memory adapter otherwise. Ranked
+  wizards begin at 100 Glyphs; equal matches transfer 25, underdog/favorite
+  results scale from 5–50, and losers cannot fall below zero. Match settlement
+  is atomic and idempotent, the top ten and personal world rank are available
+  in-game, and Jan/Apr/Jul/Oct resets apply the documented 300-minus-50
+  compression. Private and unranked matches never change Glyphs.
 - **Client.** `client/src/net/onlineMatch.js` + `net.js` add the Online menu
   (Create Private Duel, Join Code, Quick Match), waiting/cancel states, room-code
   display/copy, connection-quality + reconnect status, and the authoritative

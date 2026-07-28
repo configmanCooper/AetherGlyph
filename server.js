@@ -119,6 +119,8 @@ export function createGameServer(opts = {}) {
       graceMs: opts.graceMs,
       intermissionMs: opts.intermissionMs,
       privateLobbyGraceMs: opts.privateLobbyGraceMs,
+      rankedRange: opts.rankedRange,
+      rankedRangeWaitMs: opts.rankedRangeWaitMs,
       log: (...a) => console.warn('[rooms]', ...a),
     });
     io.on('connection', (socket) => rooms.register(socket));

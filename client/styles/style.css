@@ -475,6 +475,22 @@ body.mode-lab .action-buttons {
 body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
 
 /* ------------------------------------------------------------ online duel UI */
+.ranking-summary { color: #ffd66b; font-size: 13px; }
+.rankings-table-wrap { overflow-x: auto; margin: 12px 0; }
+.rankings-table {
+  width: 100%; border-collapse: collapse; text-align: left;
+  background: rgba(15,10,28,0.72); border-radius: 12px; overflow: hidden;
+}
+.rankings-table th, .rankings-table td {
+  padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.rankings-table th { color: var(--accent2); font-size: 12px; }
+.rankings-table td { color: var(--ink); font-size: 13px; }
+.rankings-table td:first-child, .rankings-table td:nth-child(3) { color: #ffd66b; font-weight: 700; }
+.ranking-self, .ranking-result {
+  padding: 9px 12px; border-radius: 10px; color: #ffd66b;
+  background: rgba(255,214,107,0.1); border: 1px solid rgba(255,214,107,0.35);
+}
 .join-row { display: flex; gap: 8px; align-items: stretch; }
 .join-row input {
   flex: 1; min-width: 0; padding: 10px; border-radius: 10px; background: #1a1230;
