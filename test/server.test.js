@@ -271,6 +271,10 @@ async function main() {
     eq(reuse.code, ERR.BAD_TOKEN, 'reused token reports bad-token');
     host3.disconnect();
     host2.disconnect();
+    const attacker = track(await connect(url, goodAuth('acc-resume-attacker')));
+    const stolen = await emitAck(attacker, EVENTS.RESUME, { token: resumeRes.token });
+    eq(stolen.code, ERR.BAD_TOKEN, 'resume token cannot be used by a different account');
+    attacker.disconnect();
     joiner.disconnect();
 
     // --- 9. Ranked and unranked quick-match queues stay separate --------
