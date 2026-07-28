@@ -70,6 +70,8 @@ const requiredStaged = [
   'client/src/ui/spellReference.js',
   'client/src/game/localMatch.js',
   'client/src/game/menuDuel.js',
+  'client/src/render/arena.js',
+  'client/src/render/zoneGeometry.js',
   'client/styles/style.css',
   'client/manifest.webmanifest',
   'client/sw.js',

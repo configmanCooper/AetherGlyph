@@ -1337,6 +1337,7 @@ try {
     fog: window.__aegVfx.fogVeil(1),
     fogInside: window.__aegVfx.fogForPosition(0.1, 0, 0.55),
     fogOutside: window.__aegVfx.fogForPosition(0.9, 0, 0.55),
+    onlineFog: window.__aegVfx.plainFogSnapshot(),
     fogBounds: window.__aegVfx.zoneBounds('Fog'),
     blind: window.__aegVfx.blindVeil(true),
     cover: window.__aegVfx.zoneBounds('Cover'),
@@ -1349,6 +1350,10 @@ try {
   }
   if (!perceptionVfx.fogInside.visible || perceptionVfx.fogOutside.visible) {
     fail('Fog screen haze does not clear after leaving the zone: ' + JSON.stringify(perceptionVfx));
+  }
+  if (perceptionVfx.onlineFog.error || !perceptionVfx.onlineFog.visible
+      || !perceptionVfx.onlineFog.zoneRendered) {
+    fail('plain authoritative Fog snapshot freezes or fails to render: ' + JSON.stringify(perceptionVfx.onlineFog));
   }
   if (perceptionVfx.fogBounds.height < 4.6) {
     fail('Fog Cloud world bank is not 50% taller: ' + JSON.stringify(perceptionVfx.fogBounds));

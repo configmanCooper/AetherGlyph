@@ -30,6 +30,7 @@ import { run as cooldowns } from './cooldowns.test.js';
 import { run as protection } from './protection.test.js';
 import { run as menuDuel } from './menuDuel.test.js';
 import { run as movement } from './movement.test.js';
+import { run as zoneGeometry } from './zoneGeometry.test.js';
 
 console.log('Aetherglyph Phase 2 test suite');
 console.log('--------------------------------');
@@ -64,6 +65,7 @@ const modules = [
   ['protection', protection],
   ['menuDuel', menuDuel],
   ['movement', movement],
+  ['zoneGeometry', zoneGeometry],
 ];
 
 let pass = 0, fail = 0;

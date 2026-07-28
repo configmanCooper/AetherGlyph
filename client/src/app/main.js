@@ -2424,6 +2424,10 @@ if (typeof window !== 'undefined') {
       try { return arena.debugFogForPosition(playerArc, zoneCenter, radius); }
       catch (e) { return { error: String(e && e.message || e) }; }
     },
+    plainFogSnapshot: () => {
+      try { return arena.debugPlainFogSnapshot(); }
+      catch (e) { return { error: String(e && e.message || e) }; }
+    },
     blindVeil: (enabled) => { try { return arena.debugBlindVeil(enabled); } catch (e) { return { error: String(e && e.message || e) }; } },
     spawnReaction: (name) => { try { return arena.debugSpawnReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },
     productionReaction: (name) => { try { return arena.debugProductionReaction(String(name)); } catch (e) { return { error: String(e && e.message || e) }; } },

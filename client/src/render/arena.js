@@ -20,6 +20,7 @@ import {
   makeWardVfx, makeDomeVfx, makeMirrorDecoyVfx, makeReflectGuardVfx,
   makeBeamVfx, makeCastCueVfx, makeReactionVfx,
 } from './spellVfx.js';
+import { wizardInsideZone } from './zoneGeometry.js';
 
 const ARC_W = 3.2;
 const SEP = 11;
@@ -1382,7 +1383,7 @@ export class Arena {
         ? (z.owner === 0 ? PLAYER_Z - 1.4 : ENEMY_Z + 1.4)
         : 0;
       const fade = Math.min(1, z.ticks / Math.max(1, z.totalTicks || 1));
-      if (z.kind === 'Fog' && sim.wizardInZone(sim.wizards[0], z)) {
+      if (z.kind === 'Fog' && wizardInsideZone(sim.wizards?.[0], z)) {
         fogStrength = Math.max(fogStrength, fade);
       }
       handle.update({ dtMs: 16, fade, time: this._t, reduced: this.reduced, zone: z });
@@ -1398,6 +1399,23 @@ export class Arena {
     this._updateFogVeil(inside ? 1 : 0);
     const result = { inside, visible: !!this.fogVeil?.visible };
     this._updateFogVeil(0);
+    return result;
+  }
+
+  debugPlainFogSnapshot() {
+    const snapshot = {
+      wizards: [{ id: 0, arcPos: 0 }, { id: 1, arcPos: 0.6 }],
+      zones: [{
+        id: 98765, owner: 1, kind: 'Fog', center: 0, radius: 0.8,
+        ticks: 300, totalTicks: 360, hp: 0,
+      }],
+    };
+    this._syncZones(snapshot);
+    const result = {
+      visible: !!this.fogVeil?.visible,
+      zoneRendered: this.zoneMeshes.has(98765),
+    };
+    this._syncZones({ wizards: snapshot.wizards, zones: [] });
     return result;
   }
 
