@@ -1594,10 +1594,21 @@ async function startOnlineAction(kind, code) {
   online.setLoadout(playerIds);
   if (nm) online.identity.name = nm;
   let ack;
-  if (kind === 'quick') ack = await online.quickMatch();
+  const quickRanked = kind !== 'quick-unranked';
+  if (kind === 'quick-ranked' || kind === 'quick-unranked') {
+    ack = await online.quickMatch(quickRanked);
+  }
   else if (kind === 'create') ack = await online.createRoom();
   else if (kind === 'join') ack = await online.joinRoom(String(code || '').toUpperCase());
   if (!ack || !ack.ok) { showOnlineError(onlineErrorText(ack)); return; }
+  const incompatibleQueue = kind === 'quick-unranked'
+    ? ack.ranked !== false
+    : kind === 'quick-ranked' && ack.ranked === false;
+  if (incompatibleQueue) {
+    await online.cancelQueue();
+    showOnlineError('This duel server needs an update before it can separate ranked and unranked matchmaking.');
+    return;
+  }
   if (kind === 'create' || kind === 'join') showPrivateLobby(ack.code, ack);
   else showWaiting(kind, ack);
 }
@@ -1618,8 +1629,11 @@ function showWaiting(kind, ack) {
     $('#wait-text').textContent = 'Connecting to the room.';
     codeBox.classList.add('hidden');
   } else {
-    $('#wait-title').textContent = 'Finding a duel…';
-    $('#wait-text').textContent = 'Matching you with an opponent of similar rating.';
+    const ranked = kind !== 'quick-unranked';
+    $('#wait-title').textContent = ranked ? 'Finding a ranked duel…' : 'Finding an unranked duel…';
+    $('#wait-text').textContent = ranked
+      ? 'Matching you with an opponent of similar rating.'
+      : 'Matching you for a casual duel. Rankings will not change.';
     codeBox.classList.add('hidden');
   }
   showPanel('panel-online-wait');
@@ -1724,7 +1738,9 @@ function onOnlineMatchStart(p = {}) {
     setDrawHint('draw spell — select a guide below for the dotted shape');
   }
   setNetStatus('connected');
-  toast('Duel found! Draw glyphs to cast.');
+  toast(p.ranked === false
+    ? 'Unranked duel found! Draw glyphs to cast.'
+    : 'Ranked duel found! Draw glyphs to cast.');
 }
 
 function onOnlineRoundEnd(p) {
@@ -1756,7 +1772,8 @@ function onOnlineMatchEnd(p) {
   const reason = p.reason === 'disconnect' ? ' (opponent left)' : p.reason === 'forfeit' ? (win ? ' (opponent surrendered)' : ' (you surrendered)')
     : p.reason === 'connection-lost' ? ' (you lost connection)' : '';
   const score = Array.isArray(p.score) ? `${p.score[0]}–${p.score[1]}` : '';
-  $('#result-text').textContent = `Online duel${score ? ` ${score}` : ''}${reason}.`;
+  const matchType = p.ranked === false ? 'Unranked online duel' : 'Ranked online duel';
+  $('#result-text').textContent = `${matchType}${score ? ` ${score}` : ''}${reason}.`;
   $('#btn-next-round').classList.add('hidden');
   $('#coach-report').classList.add('hidden');
   const rematch = document.querySelector('#panel-result [data-action="rematch"]');
@@ -1920,7 +1937,8 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
         openOnline();
       }
     }
-    else if (a === 'online-quick') startOnlineAction('quick');
+    else if (a === 'online-quick-ranked') startOnlineAction('quick-ranked');
+    else if (a === 'online-quick-unranked') startOnlineAction('quick-unranked');
     else if (a === 'online-create') startOnlineAction('create');
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
     else if (a === 'online-cancel') cancelOnline();

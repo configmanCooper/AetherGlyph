@@ -30,6 +30,7 @@ class FakeSocket {
         slot: 1,
         epoch: 2,
         token: 'rotated-token',
+        ranked: false,
       });
     } else if (name === EVENTS.JOIN_ROOM) {
       this.joinPayload = payload;
@@ -83,6 +84,7 @@ export async function run() {
   eq(online.matchId, 'reload-match', 'reload resume restores match id');
   eq(online.resumeToken, 'rotated-token', 'reload resume stores rotated token');
   ok(start && start.resumed === true, 'reload resume invokes match-start UI callback');
+  eq(start.ranked, false, 'reload resume preserves unranked match labeling');
   eq(status.state, 'resumed', 'reload resume reports resumed status');
 
   socket.trigger(EVENTS.POPULATION, { online: 123 });
@@ -136,6 +138,14 @@ export async function run() {
   eq(lobbyStatus.state, 'lobby-resumed', 'automatic lobby reclaim reports resumed status');
   const unready = await lobbyOnline.privateUnready();
   eq(unready.ok, true, 'client can unready before editing lobby guides');
+  await lobbyOnline.quickMatch(false);
+  const unrankedQuick = lobbySocket.emitted.findLast(
+    (entry) => entry.name === EVENTS.QUICK_MATCH_UNRANKED,
+  );
+  ok(!!unrankedQuick, 'client uses the dedicated unranked event so legacy servers cannot rank it');
+  await lobbyOnline.quickMatch();
+  const rankedQuick = lobbySocket.emitted.findLast((entry) => entry.name === EVENTS.QUICK_MATCH);
+  ok(!!rankedQuick, 'client keeps the legacy ranked event as the compatibility default');
   lobbyOnline.dispose();
   return report('onlineMatch');
 }

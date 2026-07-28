@@ -211,6 +211,24 @@ try {
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
     document.querySelector('#online-population')?.textContent || ''), { timeout: 10000 });
+  const quickChoices = await page.evaluate(() => [...document.querySelectorAll('#panel-online [data-action^="online-quick-"]')]
+    .map((button) => ({ action: button.dataset.action, text: button.textContent })));
+  if (quickChoices.length !== 2
+      || !quickChoices.some((choice) => choice.action === 'online-quick-ranked' && /Ranked/i.test(choice.text))
+      || !quickChoices.some((choice) => choice.action === 'online-quick-unranked' && /Unranked/i.test(choice.text))) {
+    fail('online menu does not offer separate ranked and unranked quick match: ' + JSON.stringify(quickChoices));
+  }
+  await activate(page, '[data-action="online-quick-unranked"]');
+  await page.waitForSelector('#panel-online-wait:not(.hidden)', { timeout: 10000 });
+  const unrankedWait = await page.evaluate(() => ({
+    title: document.querySelector('#wait-title')?.textContent || '',
+    text: document.querySelector('#wait-text')?.textContent || '',
+  }));
+  if (!/unranked/i.test(unrankedWait.title) || !/will not change/i.test(unrankedWait.text)) {
+    fail('unranked queue does not clearly identify casual matchmaking: ' + JSON.stringify(unrankedWait));
+  }
+  await activate(page, '[data-action="online-cancel"]');
+  await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   await activate(page, '[data-action="lan-duel"]');
   await page.waitForSelector('#panel-lan-duel:not(.hidden)', { timeout: 5000 });
   await page.evaluate(() => window.__aegTest.nativeBack());

@@ -198,6 +198,7 @@ async function main() {
     const resumeRes = await emitAck(host2, EVENTS.RESUME, { token: hostStart.token });
     ok(resumeRes.ok, 'valid resume token re-attaches the player');
     ok(resumeRes.token && resumeRes.token !== hostStart.token, 'resume rotates to a fresh single-use token');
+    eq(resumeRes.ranked, false, 'resume acknowledgement preserves private/unranked mode');
     const resumeSnap = await resumeSnapP;
     ok(resumeSnap.full === true && resumeSnap.state && resumeSnap.state.wizards.length === 2,
       'resumed client receives a full authoritative snapshot');
@@ -211,20 +212,44 @@ async function main() {
     host2.disconnect();
     joiner.disconnect();
 
-    // --- 9. Quick match --------------------------------------------------
+    // --- 9. Ranked and unranked quick-match queues stay separate --------
     {
-      const q1 = track(await connect(url, goodAuth('acc-q1')));
-      const q2 = track(await connect(url, goodAuth('acc-q2')));
-      const q1Start = once(q1, EVENTS.MATCH_START);
-      const q2Start = once(q2, EVENTS.MATCH_START);
-      const r1 = await emitAck(q1, EVENTS.QUICK_MATCH, { loadout: emberIds });
-      ok(r1.ok, 'quick match enqueues');
-      const r2 = await emitAck(q2, EVENTS.QUICK_MATCH, { loadout: tideIds });
-      ok(r2.ok, 'second quick match enqueues');
-      const s1 = await q1Start; const s2 = await q2Start;
-      ok(s1.ranked === true && s2.ranked === true, 'quick match starts a ranked match');
-      ok((s1.slot === 0 && s2.slot === 1) || (s1.slot === 1 && s2.slot === 0), 'quick match assigns distinct slots');
-      q1.disconnect(); q2.disconnect();
+      const ranked1 = track(await connect(url, goodAuth('acc-q-ranked-1')));
+      const unranked1 = track(await connect(url, goodAuth('acc-q-unranked-1')));
+      const ranked1Start = once(ranked1, EVENTS.MATCH_START);
+      const unranked1Start = once(unranked1, EVENTS.MATCH_START);
+      const rankedAck = await emitAck(ranked1, EVENTS.QUICK_MATCH, { loadout: emberIds });
+      const unrankedAck = await emitAck(unranked1, EVENTS.QUICK_MATCH_UNRANKED, {
+        loadout: tideIds,
+      });
+      ok(rankedAck.ok && rankedAck.ranked === true,
+        'quick match defaults to the backward-compatible ranked queue');
+      ok(unrankedAck.ok && unrankedAck.ranked === false,
+        'unranked quick match enters the unranked queue');
+      await sleep(80);
+      eq(gs.rooms.queue.length, 2, 'ranked and unranked players do not cross-match');
+
+      const ranked2 = track(await connect(url, goodAuth('acc-q-ranked-2')));
+      const ranked2Start = once(ranked2, EVENTS.MATCH_START);
+      await emitAck(ranked2, EVENTS.QUICK_MATCH, { loadout: tideIds, ranked: true });
+      const rankedStart1 = await ranked1Start;
+      const rankedStart2 = await ranked2Start;
+      ok(rankedStart1.ranked === true && rankedStart2.ranked === true,
+        'two ranked players start a ranked match');
+      eq(gs.rooms.queue.length, 1, 'unranked player remains queued after ranked pairing');
+
+      const unranked2 = track(await connect(url, goodAuth('acc-q-unranked-2')));
+      const unranked2Start = once(unranked2, EVENTS.MATCH_START);
+      await emitAck(unranked2, EVENTS.QUICK_MATCH_UNRANKED, { loadout: emberIds });
+      const unrankedStart1 = await unranked1Start;
+      const unrankedStart2 = await unranked2Start;
+      ok(unrankedStart1.ranked === false && unrankedStart2.ranked === false,
+        'two unranked players start an unranked match');
+      ok((rankedStart1.slot === 0 && rankedStart2.slot === 1)
+          || (rankedStart1.slot === 1 && rankedStart2.slot === 0),
+      'ranked quick match assigns distinct slots');
+      ranked1.disconnect(); ranked2.disconnect();
+      unranked1.disconnect(); unranked2.disconnect();
     }
 
     // --- 10. Disconnect forfeit + match termination ----------------------

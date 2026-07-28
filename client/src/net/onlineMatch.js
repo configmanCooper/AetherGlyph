@@ -158,7 +158,13 @@ export class OnlineMatch {
   // --- lobby actions (each returns the server ack) ------------------------
   createRoom() { return this.request(EVENTS.CREATE_ROOM, { loadout: this.loadoutIds, name: this.identity.name }); }
   joinRoom(code) { return this.request(EVENTS.JOIN_ROOM, { code, loadout: this.loadoutIds, name: this.identity.name }); }
-  quickMatch() { return this.request(EVENTS.QUICK_MATCH, { loadout: this.loadoutIds, name: this.identity.name }); }
+  quickMatch(ranked = true) {
+    const event = ranked === false ? EVENTS.QUICK_MATCH_UNRANKED : EVENTS.QUICK_MATCH;
+    return this.request(event, {
+      loadout: this.loadoutIds,
+      name: this.identity.name,
+    });
+  }
   cancelQueue() { return this.request(EVENTS.CANCEL_QUEUE, {}); }
   privateReady() {
     return this.request(EVENTS.PRIVATE_READY, {
@@ -285,6 +291,11 @@ export class OnlineMatch {
         this.slot = ack.slot != null ? ack.slot : this.slot;
         this.epoch = ack.epoch || this.epoch;
         this.resumeToken = ack.token || this.resumeToken;
+        if (ack.ranked != null) this.ranked = !!ack.ranked;
+        if (ack.code) {
+          this.privateCode = ack.code;
+          savePrivateLobby(ack.code);
+        }
         if (ack.token) saveResume(this.matchId, ack.token);
         if (restoringAfterReload) {
           this.onMatchStart({
@@ -292,6 +303,8 @@ export class OnlineMatch {
             slot: this.slot,
             epoch: this.epoch,
             token: this.resumeToken,
+            ranked: this.ranked,
+            code: this.privateCode,
             resumed: true,
           });
         }
@@ -301,7 +314,14 @@ export class OnlineMatch {
         this.inMatch = false;
         clearResume();
         this.onStatus({ state: 'resume-failed', code: ack && ack.code });
-        if (!restoringAfterReload) this.onMatchEnd({ winner: 'loss', reason: 'connection-lost' });
+        if (!restoringAfterReload) {
+          this.onMatchEnd({
+            winner: 'loss',
+            reason: 'connection-lost',
+            ranked: this.ranked,
+            code: this.privateCode,
+          });
+        }
       }
     });
   }
