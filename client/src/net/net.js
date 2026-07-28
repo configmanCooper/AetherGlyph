@@ -11,6 +11,7 @@ import {
 const ID_KEY = 'aeth-client-id';
 const NAME_KEY = 'aeth-name';
 const RESUME_KEY = 'aeth-resume';
+const PRIVATE_LOBBY_KEY = 'aeth-private-lobby';
 
 // A stable, anonymous client id persisted locally (no account required). Used
 // as the rating account key and to bind resume tokens.
@@ -44,6 +45,19 @@ export function loadResume() {
 }
 export function clearResume() {
   try { localStorage.removeItem(RESUME_KEY); } catch { /* ignore */ }
+}
+
+export function savePrivateLobby(code) {
+  try {
+    const normalized = String(code || '').toUpperCase();
+    if (normalized) localStorage.setItem(PRIVATE_LOBBY_KEY, JSON.stringify({ code: normalized, at: Date.now() }));
+  } catch { /* ignore */ }
+}
+export function loadPrivateLobby() {
+  try { return JSON.parse(localStorage.getItem(PRIVATE_LOBBY_KEY) || 'null'); } catch { return null; }
+}
+export function clearPrivateLobby() {
+  try { localStorage.removeItem(PRIVATE_LOBBY_KEY); } catch { /* ignore */ }
 }
 
 // Open a Socket.IO connection with the compatibility handshake auth. `url`

@@ -71,7 +71,7 @@ export class HUD {
   }
 
   _statuses(container, w) {
-    const chips = Object.entries(w.statuses)
+    const chips = Object.entries(w.statuses || {})
       .filter(([, v]) => v.ticks > 0)
       .map(([name, v]) => {
         const cls = BUFFS.has(name) ? 'status-chip buff' : 'status-chip';
@@ -200,8 +200,9 @@ export class HUD {
   _updateSpellbar(w) {
     for (const [id, btn] of this.spellButtons) {
       const sp = SPELLS_BY_ID[id];
+      const cooldowns = w.cooldowns || {};
       if (btn.dataset.guideOnly === 'true') {
-        const ticks = Math.max(0, w.cooldowns[id] || 0);
+        const ticks = Math.max(0, cooldowns[id] || 0);
         const cd = ticks > 0;
         btn.classList.toggle('cooldown', cd);
         btn.classList.toggle('disabled', cd);
@@ -214,24 +215,26 @@ export class HUD {
           : `${sp.school} - ${sp.category}\n${sp.effect}`;
         continue;
       }
-      const cd = (w.cooldowns[id] || 0) > 0;
+      const cd = (cooldowns[id] || 0) > 0;
       const poor = w.aether < sp.aether;
       const noCharge = (sp.charges || 0) > w.charges;
       btn.classList.toggle('cooldown', cd);
       btn.classList.toggle('disabled', cd || poor || noCharge);
       const cdEl = btn.querySelector('.sb-cost');
-      if (cd && cdEl) cdEl.textContent = cooldownText(w.cooldowns[id]);
+      if (cd && cdEl) cdEl.textContent = cooldownText(cooldowns[id]);
       else if (cdEl) cdEl.textContent = `${sp.aether}${sp.charges ? ' ' + '#'.repeat(sp.charges) : ''}`;
     }
   }
 
   _environment(sim) {
     if (!this.el.environment) return;
-    const chips = sim.zones.map((z) => {
+    const chips = (Array.isArray(sim?.zones) ? sim.zones : [])
+      .filter((z) => z && typeof z.kind === 'string')
+      .map((z) => {
       const owner = z.owner === 0 ? 'you' : 'foe';
-      const secs = Math.ceil(z.ticks / 60);
+      const secs = Math.ceil(Math.max(0, Number(z.ticks) || 0) / 60);
       return `<span class="zone-chip zone-${z.kind.toLowerCase()}">${ZONE_ICON[z.kind] || z.kind} ${secs}s <em>${owner}</em></span>`;
-    });
+      });
     this.el.environment.innerHTML = chips.join('');
   }
 
@@ -251,6 +254,7 @@ export class HUD {
   }
 
   update(sim) {
+    if (!Array.isArray(sim?.wizards) || sim.wizards.length < 2) return;
     const [p, e] = sim.wizards;
     this.el.playerHealth.style.width = `${(Math.max(0, p.health) / MATCH.startHealth) * 100}%`;
     this.el.enemyHealth.style.width = `${(Math.max(0, e.health) / MATCH.startHealth) * 100}%`;

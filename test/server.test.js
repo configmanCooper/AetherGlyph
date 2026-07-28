@@ -63,6 +63,7 @@ async function main() {
     allowedOrigins: [],
     graceMs: 700,
     intermissionMs: 160,
+    privateLobbyGraceMs: 800,
   });
   const port = await gs.listen(0);
   const url = `http://127.0.0.1:${port}`;
@@ -90,7 +91,7 @@ async function main() {
       s.disconnect();
     }
 
-    // --- 3. Private room create/join + match start -----------------------
+    // --- 3. Private room create/join + two-player ready lobby ------------
     const host = track(await connect(url, goodAuth('acc-host')));
     const joiner = track(await connect(url, goodAuth('acc-join')));
     const populationP = once(host, EVENTS.POPULATION);
@@ -100,11 +101,27 @@ async function main() {
     populationProbe.disconnect();
     const created = await emitAck(host, EVENTS.CREATE_ROOM, { loadout: emberIds, name: 'Host' });
     ok(created.ok && created.code && created.slot === 0, 'private room created with code, host is slot 0');
+    eq(created.state, 'private-lobby', 'private room creator enters the lobby');
+    eq(created.playerCount, 1, 'private lobby initially contains only the host');
 
     const hostStartP = once(host, EVENTS.MATCH_START);
     const joinStartP = once(joiner, EVENTS.MATCH_START);
     const joined = await emitAck(joiner, EVENTS.JOIN_ROOM, { code: created.code, loadout: tideIds, name: 'Join' });
     ok(joined.ok && joined.slot === 1, 'joined private room as slot 1');
+    eq(joined.state, 'private-lobby', 'joining does not immediately start combat');
+    await sleep(80);
+    eq(gs.rooms.stats().matches, 0, 'private match waits for both players to ready');
+
+    const hostReady = await emitAck(host, EVENTS.PRIVATE_READY, { loadout: emberIds, name: 'Host' });
+    ok(hostReady.ok && hostReady.readyCount === 1, 'host can ready in the initial lobby');
+    const hostUnready = await emitAck(host, EVENTS.PRIVATE_UNREADY, {});
+    ok(hostUnready.ok && hostUnready.readyCount === 0, 'host can unready before editing guides');
+    const joinReady = await emitAck(joiner, EVENTS.PRIVATE_READY, { loadout: tideIds, name: 'Join' });
+    ok(joinReady.ok && joinReady.readyCount === 1, 'joiner can ready while host edits guides');
+    await sleep(40);
+    eq(gs.rooms.stats().matches, 0, 'one ready player cannot start the private match');
+    const hostReadyAgain = await emitAck(host, EVENTS.PRIVATE_READY, { loadout: emberIds, name: 'Host' });
+    ok(hostReadyAgain.ok && hostReadyAgain.readyCount === 2, 'second ready player starts the private match');
     const hostStart = await hostStartP;
     const joinStart = await joinStartP;
     eq(hostStart.slot, 0, 'host match-start slot 0');
@@ -217,6 +234,8 @@ async function main() {
       const cr = await emitAck(h, EVENTS.CREATE_ROOM, { loadout: emberIds });
       const jStart = once(j, EVENTS.MATCH_START);
       await emitAck(j, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds });
+      await emitAck(h, EVENTS.PRIVATE_READY, { loadout: emberIds });
+      await emitAck(j, EVENTS.PRIVATE_READY, { loadout: tideIds });
       await jStart;
       const matchEndP = once(j, EVENTS.MATCH_END, 4000);
       h.disconnect(); // never reconnect -> grace (700ms) expires -> forfeit
@@ -236,6 +255,8 @@ async function main() {
       const hStartP = once(h, EVENTS.MATCH_START);
       const jStartP = once(j, EVENTS.MATCH_START);
       await emitAck(j, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds, name: 'Join' });
+      await emitAck(h, EVENTS.PRIVATE_READY, { loadout: emberIds, name: 'Host' });
+      await emitAck(j, EVENTS.PRIVATE_READY, { loadout: tideIds, name: 'Join' });
       await hStartP;
       await jStartP;
 
@@ -283,6 +304,8 @@ async function main() {
       const hStartP = once(h, EVENTS.MATCH_START);
       const jStartP = once(j, EVENTS.MATCH_START);
       await emitAck(j, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds });
+      await emitAck(h, EVENTS.PRIVATE_READY, { loadout: emberIds });
+      await emitAck(j, EVENTS.PRIVATE_READY, { loadout: tideIds });
       const hStart = await hStartP;
       await jStartP;
       const loc = h.data && h.data.loc;
@@ -300,6 +323,52 @@ async function main() {
       ok(nextRound, 'intermission timer is rearmed and next round begins after resume');
       h2.disconnect();
       j.disconnect();
+    }
+
+    // --- 13. Private lobby survives both players disconnecting -----------
+    {
+      const h = track(await connect(url, goodAuth('acc-lobby-h')));
+      const j = track(await connect(url, goodAuth('acc-lobby-j')));
+      const cr = await emitAck(h, EVENTS.CREATE_ROOM, { loadout: emberIds });
+      await emitAck(j, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds });
+      h.disconnect();
+      j.disconnect();
+      await sleep(200);
+      ok(gs.rooms.privateLobbies.has(cr.code),
+        'empty private lobby remains reserved during reconnect grace');
+
+      const h2 = track(await connect(url, goodAuth('acc-lobby-h')));
+      const j2 = track(await connect(url, goodAuth('acc-lobby-j')));
+      const hResume = await emitAck(h2, EVENTS.JOIN_ROOM, { code: cr.code, loadout: emberIds });
+      const jResume = await emitAck(j2, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds });
+      ok(hResume.ok && hResume.resumed && hResume.slot === 0,
+        'host reclaims the original private-lobby seat');
+      ok(jResume.ok && jResume.resumed && jResume.slot === 1,
+        'joiner reclaims the original private-lobby seat');
+      const hStartP = once(h2, EVENTS.MATCH_START);
+      const jStartP = once(j2, EVENTS.MATCH_START);
+      await emitAck(h2, EVENTS.PRIVATE_READY, { loadout: emberIds });
+      await emitAck(j2, EVENTS.PRIVATE_READY, { loadout: tideIds });
+      const hStart = await hStartP;
+      const jStart = await jStartP;
+      eq(hStart.code, cr.code, 'reconnected host starts with the same private code');
+      eq(jStart.code, cr.code, 'reconnected joiner starts with the same private code');
+      h2.disconnect();
+      j2.disconnect();
+    }
+
+    // --- 14. Abandoned private lobby expires after the grace period -------
+    {
+      const h = track(await connect(url, goodAuth('acc-lobby-expire')));
+      const cr = await emitAck(h, EVENTS.CREATE_ROOM, { loadout: emberIds });
+      h.disconnect();
+      await sleep(900);
+      eq(gs.rooms.privateLobbies.has(cr.code), false,
+        'abandoned private lobby is removed after reconnect grace');
+      const probe = track(await connect(url, goodAuth('acc-lobby-expire-probe')));
+      const expired = await emitAck(probe, EVENTS.JOIN_ROOM, { code: cr.code, loadout: tideIds });
+      eq(expired.code, ERR.NO_ROOM, 'expired private lobby code cannot be joined');
+      probe.disconnect();
     }
   } catch (err) {
     ok(false, `unexpected error: ${err && err.stack ? err.stack : err}`);

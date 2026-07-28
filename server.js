@@ -118,6 +118,7 @@ export function createGameServer(opts = {}) {
       ratingStore,
       graceMs: opts.graceMs,
       intermissionMs: opts.intermissionMs,
+      privateLobbyGraceMs: opts.privateLobbyGraceMs,
       log: (...a) => console.warn('[rooms]', ...a),
     });
     io.on('connection', (socket) => rooms.register(socket));

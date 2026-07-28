@@ -208,6 +208,8 @@ let online = null;
 let onlineRoundIndex = 0;
 let onlinePrivateCode = null;
 let onlineSurrenderPending = false;
+let onlineLobbyState = null;
+let serviceWorkerReloadPending = false;
 
 function haptic(kind) {
   if (!settings.haptics) return;
@@ -1437,6 +1439,9 @@ function saveLoadout() {
   } else if (loadoutDestination === 'online') {
     loadoutDestination = 'practice';
     openOnline();
+  } else if (loadoutDestination === 'online-lobby') {
+    loadoutDestination = 'practice';
+    showPrivateLobby();
   } else {
     loadoutDestination = 'practice';
     openPractice();
@@ -1593,13 +1598,16 @@ async function startOnlineAction(kind, code) {
   else if (kind === 'create') ack = await online.createRoom();
   else if (kind === 'join') ack = await online.joinRoom(String(code || '').toUpperCase());
   if (!ack || !ack.ok) { showOnlineError(onlineErrorText(ack)); return; }
-  showWaiting(kind, ack);
+  if (kind === 'create' || kind === 'join') showPrivateLobby(ack.code, ack);
+  else showWaiting(kind, ack);
 }
 
 function showWaiting(kind, ack) {
   mode = 'online-wait';
   const codeBox = $('#wait-code');
   $('#btn-private-ready').classList.add('hidden');
+  $('#btn-private-guides').classList.add('hidden');
+  $('#wait-spinner').classList.remove('hidden');
   if (kind === 'create') {
     $('#wait-title').textContent = 'Waiting for opponent';
     $('#wait-text').textContent = 'Share your code. The duel starts when they join.';
@@ -1617,21 +1625,32 @@ function showWaiting(kind, ack) {
   showPanel('panel-online-wait');
 }
 
-function showPrivateLobby(code = onlinePrivateCode) {
+function showPrivateLobby(code = onlinePrivateCode, state = onlineLobbyState || {}) {
   if (!code) { openOnline(); return; }
   onlinePrivateCode = code;
+  onlineLobbyState = { ...onlineLobbyState, ...state, code };
   mode = 'online-lobby';
   running = false;
   match = null;
   gameMenuPaused = false;
   updateResumeGameButton();
   $('#wait-title').textContent = 'Private Duel Room';
-  $('#wait-text').textContent = 'Both players are back in the room. Ready up when you want a rematch.';
+  const playerCount = Number(onlineLobbyState.playerCount) || 1;
+  const connectedCount = Number(onlineLobbyState.connectedCount) || playerCount;
+  const readyCount = Number(onlineLobbyState.readyCount) || 0;
+  const selfReady = onlineLobbyState.selfReady === true;
+  $('#wait-text').textContent = playerCount < 2
+    ? 'Waiting for the second player. You can edit guides or ready up now.'
+    : connectedCount < 2
+      ? `Opponent disconnected — holding this room and code for two minutes. ${readyCount}/2 ready.`
+      : `${readyCount}/2 players ready. The duel starts when both players are ready.`;
   $('#wait-code-value').textContent = code;
   $('#wait-code').classList.remove('hidden');
   $('#btn-private-ready').classList.remove('hidden');
-  $('#btn-private-ready').disabled = false;
-  $('#btn-private-ready').textContent = 'Ready for rematch';
+  $('#btn-private-ready').disabled = selfReady;
+  $('#btn-private-ready').textContent = selfReady ? 'Ready — waiting for opponent' : 'Ready to duel';
+  $('#btn-private-guides').classList.remove('hidden');
+  $('#wait-spinner').classList.add('hidden');
   showPanel('panel-online-wait');
   showOverlay(true);
 }
@@ -1650,6 +1669,17 @@ async function readyPrivateRematch() {
   }
 }
 
+async function openPrivateLobbyGuides() {
+  if (!online || !onlinePrivateCode) return;
+  const ack = await online.privateUnready();
+  if (!ack?.ok) {
+    $('#wait-text').textContent = onlineErrorText(ack);
+    return;
+  }
+  onlineLobbyState = { ...onlineLobbyState, ...ack, selfReady: false };
+  openLoadoutBuilder('online-lobby');
+}
+
 function copyRoomCode() {
   const code = $('#wait-code-value').textContent;
   if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => toast('Code copied')).catch(() => toast(code));
@@ -1659,6 +1689,7 @@ function copyRoomCode() {
 function cancelOnline() {
   if (online) online.leave();
   onlinePrivateCode = null;
+  onlineLobbyState = null;
   onlineSurrenderPending = false;
   mode = null;
   openOnline();
@@ -1737,12 +1768,16 @@ function onOnlineMatchEnd(p) {
 function onOnlineRoom(p) {
   if (p?.state === 'private-lobby' && p.code) {
     onlinePrivateCode = p.code;
-    if (mode === 'online-lobby' || onlineSurrenderPending) showPrivateLobby(p.code);
-    if (mode === 'online-lobby') {
-      $('#wait-text').textContent = `${p.readyCount || 0}/${p.playerCount || 2} players ready.`;
+    onlineLobbyState = { ...onlineLobbyState, ...p };
+    const editingLobbyGuides = activePanelId === 'panel-loadout'
+      && loadoutDestination === 'online-lobby';
+    if (!editingLobbyGuides && (p.resumed || mode === 'online-lobby' || mode === 'online-wait'
+        || onlineSurrenderPending || activePanelId === 'panel-online')) {
+      showPrivateLobby(p.code, p);
     }
   } else if (p?.state === 'closed') {
     onlinePrivateCode = null;
+    onlineLobbyState = null;
     if (mode === 'online-lobby') {
       toast('The private room was closed.');
       openOnline();
@@ -1780,6 +1815,9 @@ function onOnlineStatus(p) {
   if (s === 'reconnecting') { setNetStatus('reconnecting'); toast('Connection lost — reconnecting…'); }
   else if (s === 'resuming') setNetStatus('resuming');
   else if (s === 'resumed') { setNetStatus('connected'); toast('Reconnected.'); }
+  else if (s === 'lobby-reconnecting') toast('Private lobby connection lost — reconnecting…');
+  else if (s === 'lobby-resuming') toast('Rejoining private lobby…');
+  else if (s === 'lobby-resumed') toast('Private lobby rejoined.');
   else if (s === 'resume-failed') { setNetStatus('lost'); toast('Could not rejoin the duel.'); }
   else if (s === 'disconnected') { setNetStatus('opponent'); toast('Opponent disconnected — waiting…'); }
   else if (s === 'returned') { setNetStatus('connected'); toast('Opponent reconnected.'); }
@@ -1839,6 +1877,12 @@ function showOverlay(v) {
   audio.setMusicScene(v && activePanelId === 'panel-main' ? 'menu' : (gameplayMusic ? 'duel' : 'menu'));
 }
 function showPanel(id) {
+  if (id === 'panel-main' && serviceWorkerReloadPending
+      && !online?.inMatch) {
+    serviceWorkerReloadPending = false;
+    window.location.reload();
+    return;
+  }
   document.querySelectorAll('#overlay .panel').forEach((p) => p.classList.add('hidden'));
   $('#' + id).classList.remove('hidden');
   activePanelId = id;
@@ -1882,6 +1926,7 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-cancel') cancelOnline();
     else if (a === 'online-copy') copyRoomCode();
     else if (a === 'online-ready') readyPrivateRematch();
+    else if (a === 'online-lobby-loadout') openPrivateLobbyGuides();
     else if (a === 'online-surrender') surrenderOnlineDuel();
     else if (a === 'lan-duel') openLanDuel();
     else if (a === 'lan-connect') connectToLanHost();
@@ -1956,6 +2001,8 @@ function backFromSubpanel() {
     openTutorialHub();
   } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'online') {
     openOnline();
+  } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'online-lobby') {
+    showPrivateLobby();
   } else if (activePanelId === 'panel-loadout' && loadoutDestination === 'practice') {
     openPractice();
   } else if (activePanelId === 'panel-lan-duel') {
@@ -2494,6 +2541,11 @@ function registerServiceWorker() {
   if (replacingWorker) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (refreshing) return;
+      if (online?.inMatch) {
+        serviceWorkerReloadPending = true;
+        toast('Update ready — it will apply after this duel.');
+        return;
+      }
       refreshing = true;
       loc.reload();
     });

@@ -11,7 +11,10 @@
 import { EVENTS } from '../../../shared/src/protocol/events.js';
 import { NET } from '../../../shared/src/protocol/net.js';
 import { MATCH } from '../../../shared/src/sim/constants.js';
-import { openSocket, clientIdentity, saveResume, loadResume, clearResume, qualityFromRtt } from './net.js';
+import {
+  openSocket, clientIdentity, saveResume, loadResume, clearResume,
+  savePrivateLobby, loadPrivateLobby, clearPrivateLobby, qualityFromRtt,
+} from './net.js';
 
 const INPUT_INTERVAL_MS = 1000 / NET.INPUT_HZ;
 const PING_INTERVAL_MS = 2000;
@@ -78,7 +81,7 @@ export class OnlineMatch {
     this.rtt = null;
     this.pingTimer = null;
     this.pendingEvents = [];
-    this.privateCode = null;
+    this.privateCode = opts.privateCode || loadPrivateLobby()?.code || null;
     this.ranked = false;
   }
 
@@ -111,6 +114,7 @@ export class OnlineMatch {
         this.startPing();
         // A reconnect while a match is live -> resume with the rotating token.
         if (this.inMatch || this.resumeToken || this.resumeLoader()) this.tryResume();
+        else if (this.privateCode) this.tryPrivateLobby();
         if (!settled) { settled = true; resolve(); }
       });
       socket.on('connect_error', (err) => {
@@ -123,11 +127,7 @@ export class OnlineMatch {
         this.stopPing();
         this.emitConnection('disconnected');
         if (this.inMatch) this.onStatus({ state: 'reconnecting' });
-        else if (this.privateCode) {
-          const code = this.privateCode;
-          this.privateCode = null;
-          this.onRoom({ state: 'closed', code, reason: 'disconnect' });
-        }
+        else if (this.privateCode) this.onStatus({ state: 'lobby-reconnecting', code: this.privateCode });
       });
 
       socket.on(EVENTS.ROOM_UPDATE, (p) => this.handleRoomUpdate(p || {}));
@@ -166,6 +166,7 @@ export class OnlineMatch {
       name: this.identity.name,
     });
   }
+  privateUnready() { return this.request(EVENTS.PRIVATE_UNREADY, {}); }
   async surrender() {
     const result = await this.request(EVENTS.LEAVE, { surrender: true });
     if (result?.ok) {
@@ -178,6 +179,7 @@ export class OnlineMatch {
     clearResume();
     this.inMatch = false;
     this.privateCode = null;
+    clearPrivateLobby();
     return this.request(EVENTS.LEAVE, {});
   }
 
@@ -216,8 +218,13 @@ export class OnlineMatch {
 
   // --- inbound ------------------------------------------------------------
   handleRoomUpdate(p) {
-    if (p.state === 'private-lobby' && p.code) this.privateCode = p.code;
-    else if (p.state === 'closed') this.privateCode = null;
+    if (p.state === 'private-lobby' && p.code) {
+      this.privateCode = p.code;
+      savePrivateLobby(p.code);
+    } else if (p.state === 'closed') {
+      this.privateCode = null;
+      clearPrivateLobby();
+    }
     this.onRoom(p);
   }
 
@@ -228,6 +235,7 @@ export class OnlineMatch {
     this.epoch = p.epoch || 1;
     this.resumeToken = p.token || null;
     this.privateCode = p.code || null;
+    if (this.privateCode) savePrivateLobby(this.privateCode);
     this.ranked = !!p.ranked;
     if (p.token) saveResume(this.matchId, p.token);
     this.inputSeq = 0;
@@ -251,6 +259,7 @@ export class OnlineMatch {
     this.inMatch = false;
     clearResume();
     if (p.code) this.privateCode = p.code;
+    if (this.privateCode) savePrivateLobby(this.privateCode);
     this.onMatchEnd({
       ...p,
       code: p.code || this.privateCode,
@@ -286,6 +295,7 @@ export class OnlineMatch {
             resumed: true,
           });
         }
+
         this.onStatus({ state: 'resumed' });
       } else {
         this.inMatch = false;
@@ -294,6 +304,21 @@ export class OnlineMatch {
         if (!restoringAfterReload) this.onMatchEnd({ winner: 'loss', reason: 'connection-lost' });
       }
     });
+  }
+
+  async tryPrivateLobby() {
+    const code = this.privateCode;
+    if (!code || this.inMatch) return;
+    this.onStatus({ state: 'lobby-resuming', code });
+    const ack = await this.joinRoom(code);
+    if (ack?.ok && ack.state === 'private-lobby') {
+      this.handleRoomUpdate(ack);
+      this.onStatus({ state: 'lobby-resumed', code });
+      return;
+    }
+    this.privateCode = null;
+    clearPrivateLobby();
+    this.onRoom({ state: 'closed', code, reason: ack?.code || 'resume-failed' });
   }
 
   // --- lifecycle ----------------------------------------------------------

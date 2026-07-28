@@ -9,6 +9,7 @@ class FakeSocket {
     this.connected = true;
     this.handlers = new Map();
     this.resumePayload = null;
+    this.joinPayload = null;
     this.emitted = [];
     this.leaveAck = { ok: true };
   }
@@ -29,6 +30,12 @@ class FakeSocket {
         slot: 1,
         epoch: 2,
         token: 'rotated-token',
+      });
+    } else if (name === EVENTS.JOIN_ROOM) {
+      this.joinPayload = payload;
+      ack({
+        ok: true, state: 'private-lobby', code: payload.code,
+        slot: 0, readyCount: 0, playerCount: 2, selfReady: false, resumed: true,
       });
     } else if (name === EVENTS.LEAVE && typeof ack === 'function') {
       ack(this.leaveAck);
@@ -104,8 +111,31 @@ export async function run() {
   eq(online.privateCode, 'ABCDE', 'rejected surrender keeps the private room context');
   online.inMatch = false; // simulate the between-match private lobby
   socket.trigger('disconnect');
-  eq(online.privateCode, null, 'disconnect from a private lobby clears stale room state');
-  eq(room.state, 'closed', 'private lobby disconnect reports a closed room to the app');
+  eq(online.privateCode, 'ABCDE', 'disconnect retains private lobby state for automatic reclaim');
+  eq(status.state, 'lobby-reconnecting', 'private lobby disconnect reports reconnecting state');
   online.dispose();
+
+  const lobbySocket = new FakeSocket();
+  let lobbyRoom = null;
+  let lobbyStatus = null;
+  const lobbyOnline = new OnlineMatch({
+    loadoutIds: [1, 6, 31, 28, 22, 10, 13, 16],
+    identity: { id: 'lobby-account', name: 'Lobby' },
+    socketFactory: () => lobbySocket,
+    resumeLoader: () => null,
+    privateCode: 'ABCDE',
+    onRoom: (payload) => { lobbyRoom = payload; },
+    onStatus: (payload) => { lobbyStatus = payload; },
+  });
+  const lobbyConnected = lobbyOnline.connect();
+  lobbySocket.trigger('connect');
+  await lobbyConnected;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  eq(lobbySocket.joinPayload.code, 'ABCDE', 'reconnect automatically reclaims the saved private lobby code');
+  eq(lobbyRoom.state, 'private-lobby', 'automatic lobby reclaim restores private-lobby state');
+  eq(lobbyStatus.state, 'lobby-resumed', 'automatic lobby reclaim reports resumed status');
+  const unready = await lobbyOnline.privateUnready();
+  eq(unready.ok, true, 'client can unready before editing lobby guides');
+  lobbyOnline.dispose();
   return report('onlineMatch');
 }

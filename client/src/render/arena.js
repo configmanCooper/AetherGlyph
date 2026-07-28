@@ -1139,6 +1139,7 @@ export class Arena {
 
   // ---- per-frame update from live sim state ----
   update(sim, alpha, dtMs) {
+    if (!Array.isArray(sim?.wizards) || sim.wizards.length < 2) return;
     this._showcaseMode = false;
     this._t += dtMs * 0.001;
     const player = sim.wizards[0];
@@ -1267,7 +1268,7 @@ export class Arena {
 
   _syncCastCues(sim) {
     const active = new Set();
-    for (const w of sim.wizards) {
+    for (const w of (Array.isArray(sim?.wizards) ? sim.wizards : [])) {
       if (!w.casting) continue;
       const spellId = w.casting.spellId;
       active.add(w.id);
@@ -1299,7 +1300,7 @@ export class Arena {
 
   _syncBeams(sim) {
     const active = new Set();
-    for (const w of sim.wizards) {
+    for (const w of (Array.isArray(sim?.wizards) ? sim.wizards : [])) {
       if (!w.channel) continue;
       active.add(w.id);
       let beam = this.beams.get(w.id);
@@ -1321,7 +1322,7 @@ export class Arena {
 
   _syncProjectiles(sim, alpha) {
     const seen = new Set();
-    for (const p of sim.projectiles) {
+    for (const p of (Array.isArray(sim?.projectiles) ? sim.projectiles : [])) {
       seen.add(p.id);
       let entry = this.projMeshes.get(p.id);
       if (!entry) {
@@ -1368,7 +1369,9 @@ export class Arena {
   _syncZones(sim) {
     const seen = new Set();
     let fogStrength = 0;
-    for (const z of sim.zones) {
+    const zones = (Array.isArray(sim?.zones) ? sim.zones : [])
+      .filter((z) => z && Number.isFinite(z.id) && typeof z.kind === 'string');
+    for (const z of zones) {
       seen.add(z.id);
       let handle = this.zoneMeshes.get(z.id);
       if (!handle) {

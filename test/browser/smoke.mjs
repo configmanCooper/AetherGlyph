@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { GESTURE_TEMPLATES } from '../../shared/src/gesture/templates.js';
 import { GESTURE_KEYS } from '../../shared/src/balance/loadouts.js';
+import { APP_VERSION } from '../../shared/src/protocol/version.js';
 
 const PORT = process.env.PORT || 8132;
 const URL = `http://localhost:${PORT}/client/index.html`;
@@ -123,7 +124,7 @@ try {
     duel: window.__aegTest.info(),
     showcase: window.__aegVfx.showcase(),
   }));
-  if (!titleState.titleClass || !/Version 1\.11\.0/.test(titleState.version)
+  if (!titleState.titleClass || titleState.version !== `Version ${APP_VERSION}`
       || titleState.masterPlanLink || !titleState.duel.menuDuelActive
       || !titleState.showcase.playerVisible || !titleState.showcase.enemyVisible
       || !titleState.showcase.firstPersonHidden
@@ -204,8 +205,8 @@ try {
   await activate(page, '#panel-spell-roster [data-action="back"]');
   await page.waitForSelector('#panel-main:not(.hidden)', { timeout: 5000 });
 
-  // Online menu smoke: open it, create a private room end-to-end (real socket
-  // to the authoritative server), confirm a share code appears, then cancel.
+  // Online menu smoke: create a private lobby end-to-end, confirm it does not
+  // auto-start, edit guides, ready up, then cancel.
   await activate(page, '[data-action="online"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
@@ -217,8 +218,40 @@ try {
   await activate(page, '[data-action="online-create"]');
   await page.waitForSelector('#panel-online-wait:not(.hidden)', { timeout: 15000 });
   await page.waitForFunction(() => /^[A-Z0-9]{5}$/.test(document.querySelector('#wait-code-value')?.textContent || ''), { timeout: 15000 });
-  const roomCode = await page.evaluate(() => document.querySelector('#wait-code-value')?.textContent);
+  const privateLobby = await page.evaluate(() => ({
+    code: document.querySelector('#wait-code-value')?.textContent,
+    text: document.querySelector('#wait-text')?.textContent || '',
+    readyVisible: !document.querySelector('#btn-private-ready')?.classList.contains('hidden'),
+    guidesVisible: !document.querySelector('#btn-private-guides')?.classList.contains('hidden'),
+    mode: window.__aegTest.info().mode,
+  }));
+  const roomCode = privateLobby.code;
   if (!/^[A-Z0-9]{5}$/.test(roomCode || '')) fail('online create did not yield a room code: ' + roomCode);
+  if (privateLobby.mode !== 'online-lobby' || !/Waiting for the second player/i.test(privateLobby.text)
+      || !privateLobby.readyVisible || !privateLobby.guidesVisible) {
+    fail('private room did not open a ready/edit-guides lobby: ' + JSON.stringify(privateLobby));
+  }
+  await activate(page, '[data-action="online-lobby-loadout"]');
+  try {
+    await page.waitForSelector('#panel-loadout:not(.hidden)', { timeout: 7000 });
+  } catch {
+    const editState = await page.evaluate(() => ({
+      waitText: document.querySelector('#wait-text')?.textContent || '',
+      buttonDisabled: document.querySelector('#btn-private-guides')?.disabled,
+      panel: [...document.querySelectorAll('.panel:not(.hidden)')].map((el) => el.id),
+    }));
+    fail('private lobby guide editor did not open: ' + JSON.stringify(editState));
+  }
+  await activate(page, '#panel-loadout [data-action="back"]');
+  await page.waitForSelector('#panel-online-wait:not(.hidden) #btn-private-ready:not(.hidden)', { timeout: 5000 });
+  await activate(page, '#btn-private-ready');
+  const readyState = await page.evaluate(() => ({
+    disabled: document.querySelector('#btn-private-ready')?.disabled,
+    text: document.querySelector('#btn-private-ready')?.textContent || '',
+  }));
+  if (!readyState.disabled || !/(Ready|Waiting for opponent)/i.test(readyState.text)) {
+    fail('private lobby Ready button did not enter waiting state: ' + JSON.stringify(readyState));
+  }
   await activate(page, '[data-action="online-cancel"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   const simulatedOnline = await page.evaluate(() => window.__aegTest?.simulateOnlineStart());
