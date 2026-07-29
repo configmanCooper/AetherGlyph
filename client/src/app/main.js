@@ -214,6 +214,10 @@ let onlineSurrenderPending = false;
 let onlineLobbyState = null;
 let onlineRankingUpdate = null;
 let onlineResultMatchId = null;
+let pendingPinReset = null;
+let onlineBotOffer = null;
+let onlineEmojiReadyAt = 0;
+let spectatorMeta = null;
 let serviceWorkerReloadPending = false;
 
 function haptic(kind) {
@@ -1219,13 +1223,20 @@ function frame(now) {
     arena.updateShowcase(menuDuel.sim, menuDuel.alpha, dt);
   } else if (match && running) {
     idleRenderAcc = 0;
-    applyInputBridge();
-    updateLabEnemySchedule();
+    if (mode !== 'spectator') {
+      applyInputBridge();
+      updateLabEnemySchedule();
+    }
     match.update(dt);
     const evs = match.drainEvents();
     if (evs.length) handleEvents(evs);
     hud.update(match.sim);
-    arena.update(match.sim, match.alpha, dt);
+    if (mode === 'spectator') {
+      hud.setSpectatorInfo(spectatorMeta?.names, online?.lastCasts);
+      arena.updateShowcase(match.sim, match.alpha, dt);
+    } else {
+      arena.update(match.sim, match.alpha, dt);
+    }
   } else if (match) {
     idleRenderAcc = 0;
     arena.update(match.sim, match.alpha, dt);
@@ -1563,11 +1574,15 @@ function openOnline() {
       online.identity.id = status.accountId;
       online.identity.name = status.name;
       await refreshOnlineRankingSummary();
+      await refreshSpectateAvailability();
     })
     .catch((err) => onOnlineError(err));
 }
 
 function openOnlineAccountGate(message = '') {
+  pendingPinReset = null;
+  $('#account-title').textContent = 'Choose Your Wizard Name';
+  $('#account-username').disabled = false;
   const storedName = clientIdentity().name;
   $('#account-username').value = /^[A-Za-z0-9]{1,24}$/.test(storedName) ? storedName : '';
   $('#account-pin').value = '';
@@ -1582,6 +1597,8 @@ function accountErrorText(ack) {
     'invalid-username': 'Use 1–24 letters and numbers only, with no spaces.',
     'invalid-pin': 'PIN must contain exactly six numbers.',
     'name-taken': 'That wizard name already exists. Enter its correct PIN or choose another name.',
+    'reserved-name': 'That name belongs to an official Aetherglyph AI wizard. Choose another name.',
+    'bad-token': 'The PIN reset request expired. Sign in again with the previous PIN.',
     rate: 'Too many attempts. Wait a few seconds and try again.',
     timeout: 'The server did not respond. Try again.',
     offline: 'Cannot reach the online server.',
@@ -1594,7 +1611,7 @@ async function submitTemporaryAccount() {
   const pin = $('#account-pin').value;
   const confirmation = $('#account-pin-confirm').value;
   const error = $('#account-error');
-  if (!/^[A-Za-z0-9]{1,24}$/.test(username)) {
+  if (!pendingPinReset && !/^[A-Za-z0-9]{1,24}$/.test(username)) {
     error.textContent = accountErrorText({ code: 'invalid-username' });
     return;
   }
@@ -1609,9 +1626,32 @@ async function submitTemporaryAccount() {
   error.textContent = 'Checking wizard name…';
   try {
     await ensureOnline();
+    if (pendingPinReset) {
+      const reset = await online.resetPin(pendingPinReset.resetToken, pin);
+      if (!reset?.ok) {
+        error.textContent = accountErrorText(reset);
+        if (reset?.code === 'bad-token') openOnlineAccountGate(error.textContent);
+        return;
+      }
+      pendingPinReset = null;
+      saveAccountSession(reset);
+      toast(`PIN updated for ${reset.name}.`);
+      openOnline();
+      return;
+    }
     const ack = await online.authenticate(username, pin);
     if (!ack?.ok) {
       error.textContent = accountErrorText(ack);
+      return;
+    }
+    if (ack.resetRequired) {
+      pendingPinReset = { resetToken: ack.resetToken, name: ack.name };
+      $('#account-title').textContent = 'Choose a New PIN';
+      $('#account-username').value = ack.name;
+      $('#account-username').disabled = true;
+      $('#account-pin').value = '';
+      $('#account-pin-confirm').value = '';
+      error.textContent = 'An administrator required a PIN reset. Enter and confirm your new six-digit PIN.';
       return;
     }
     saveAccountSession(ack);
@@ -1690,6 +1730,7 @@ async function openOnlineRankings() {
     openOnlineAccountGate();
     return;
   }
+
   $('#rankings-season').textContent = 'Loading world rankings…';
   $('#rankings-body').innerHTML = '';
   $('#rankings-self').textContent = '';
@@ -1708,6 +1749,104 @@ async function openOnlineRankings() {
   } catch (error) {
     $('#rankings-season').textContent = `Rankings unavailable: ${error.message || error}`;
   }
+}
+
+async function refreshSpectateAvailability() {
+  const button = $('#btn-spectate-ranked');
+  if (!button || !online?.connected) return;
+  const result = await online.spectateList();
+  const count = result?.ok && Array.isArray(result.matches) ? result.matches.length : 0;
+  button.disabled = count === 0;
+  button.textContent = count
+    ? `Spectate Ranked Match (${count})`
+    : 'Spectate Ranked Match — none active';
+}
+
+async function openSpectateList() {
+  if (!loadAccountSession()) {
+    openOnlineAccountGate();
+    return;
+  }
+  showPanel('panel-spectate-list');
+  $('#spectate-status').textContent = 'Loading active ranked matches…';
+  $('#spectate-match-list').innerHTML = '';
+  try {
+    await ensureOnline();
+    const result = await online.spectateList();
+    if (!result?.ok) throw new Error(onlineErrorText(result));
+    const matches = Array.isArray(result.matches) ? result.matches.slice(0, 5) : [];
+    $('#spectate-status').textContent = matches.length
+      ? 'Choose a live ranked duel.'
+      : 'No ranked matches are active right now.';
+    for (const active of matches) {
+      const button = document.createElement('button');
+      button.className = 'spectate-match-btn';
+      button.innerHTML = `<strong></strong><small></small>`;
+      button.querySelector('strong').textContent =
+        `${active.names?.[0] || 'Wizard One'} vs ${active.names?.[1] || 'Wizard Two'}`;
+      button.querySelector('small').textContent =
+        `${active.glyphs?.[0] ?? 100} Glyphs vs ${active.glyphs?.[1] ?? 100} Glyphs${active.bot ? ' · AI match' : ''}`;
+      button.addEventListener('click', () => joinSpectateMatch(active.matchId));
+      $('#spectate-match-list').appendChild(button);
+    }
+  } catch (error) {
+    $('#spectate-status').textContent = `Spectating unavailable: ${error.message || error}`;
+  }
+}
+
+async function joinSpectateMatch(matchId) {
+  const result = await online.spectateJoin(matchId);
+  if (!result?.ok) $('#spectate-status').textContent = onlineErrorText(result);
+}
+
+function onSpectateStart(meta) {
+  spectatorMeta = meta;
+  mode = 'spectator';
+  match = online;
+  running = true;
+  gameMenuPaused = false;
+  document.body.classList.add('mode-spectator');
+  document.body.classList.remove('mode-lab', 'mode-tutorial');
+  menuDuel.setActive(false);
+  arena.reset();
+  hud.resetNames();
+  hud.setSeries(meta.score || [0, 0], 0);
+  $('#hud').classList.remove('hidden');
+  $('#spellbar').classList.add('hidden');
+  $('#emoji-bar').classList.add('hidden');
+  showOverlay(false);
+  audio.setMusicScene('duel');
+}
+
+async function leaveSpectating() {
+  if (online?.spectating) await online.spectateLeave();
+  finishSpectating();
+  openSpectateList();
+}
+
+function finishSpectating() {
+  running = false;
+  match = null;
+  spectatorMeta = null;
+  onlineEmojiReadyAt = 0;
+  document.body.classList.remove('mode-spectator');
+  $('#hud').classList.add('hidden');
+  hud.resetNames();
+  mode = null;
+  gameMenuPaused = false;
+  updateResumeGameButton();
+  showOverlay(true);
+}
+
+function onSpectateEnd(event = {}) {
+  finishSpectating();
+  if (event.reason === 'disconnect') {
+    showPanel('panel-spectate-list');
+    $('#spectate-status').textContent = 'Connection lost — reconnecting before refreshing matches…';
+    $('#spectate-match-list').innerHTML = '';
+    return;
+  }
+  openSpectateList();
 }
 
 function onlineErrorText(ack) {
@@ -1748,6 +1887,10 @@ function wireOnlineCallbacks(o) {
   o.onRoom = (p) => onOnlineRoom(p);
   o.onPopulation = (p) => updateOnlinePopulation(p);
   o.onRankingUpdate = (p) => onOnlineRankingUpdate(p);
+  o.onBotOffer = (p) => onOnlineBotOffer(p);
+  o.onEmoji = (p) => onOnlineEmoji(p);
+  o.onSpectateStart = (p) => onSpectateStart(p);
+  o.onSpectateEnd = (p) => onSpectateEnd(p);
   o.onConnection = (p) => updateConnBadges(p);
   o.onError = (err) => onOnlineError(err);
   o.onCastAck = (ack) => { if (ack && !ack.ok && ack.code === 'rate') toast('Slow down — too many casts.'); };
@@ -1790,6 +1933,8 @@ function showWaiting(kind, ack) {
   $('#btn-private-ready').classList.add('hidden');
   $('#btn-private-guides').classList.add('hidden');
   $('#wait-spinner').classList.remove('hidden');
+  $('#bot-offer').classList.add('hidden');
+  onlineBotOffer = null;
   if (kind === 'create') {
     $('#wait-title').textContent = 'Waiting for opponent';
     $('#wait-text').textContent = 'Share your code. The duel starts when they join.';
@@ -1876,6 +2021,8 @@ function cancelOnline() {
   onlinePrivateCode = null;
   onlineLobbyState = null;
   onlineSurrenderPending = false;
+  onlineBotOffer = null;
+  $('#bot-offer').classList.add('hidden');
   mode = null;
   openOnline();
 }
@@ -1884,8 +2031,13 @@ function onOnlineMatchStart(p = {}) {
   onlinePrivateCode = p.code || online?.privateCode || null;
   onlineSurrenderPending = false;
   onlineRankingUpdate = null;
+  onlineBotOffer = null;
+  onlineEmojiReadyAt = 0;
+  $('#bot-offer').classList.add('hidden');
   onlineResultMatchId = null;
   $('#ranking-result').classList.add('hidden');
+  $('#emoji-bar').classList.remove('hidden');
+  setEmojiButtonsEnabled(true);
   online?.setActive(true);
   mode = 'online';
   document.body.classList.remove('mode-lab', 'mode-tutorial');
@@ -1911,10 +2063,40 @@ function onOnlineMatchStart(p = {}) {
     if (canvas) { delete canvas.dataset.guideSpell; canvas.dataset.guideStage = 'none'; }
     setDrawHint('draw spell — select a guide below for the dotted shape');
   }
+
   setNetStatus('connected');
   toast(p.ranked === false
     ? 'Unranked duel found! Draw glyphs to cast.'
     : 'Ranked duel found! Draw glyphs to cast.');
+}
+
+function onOnlineBotOffer(offer) {
+  if (mode !== 'online-wait' || !offer?.offerId) return;
+  onlineBotOffer = offer;
+  $('#bot-offer-title').textContent = `${offer.bot?.name || 'AI wizard'} is available`;
+  const reward = offer.ranked
+    ? offer.maxReward > 0
+      ? `A victory can award up to ${offer.maxReward} Glyphs. You will never lose Glyphs to this bot.`
+      : offer.noGlyphReason || 'This bot duel awards no Glyphs.'
+    : 'This is an unranked duel and will not change Glyphs.';
+  $('#bot-offer-text').textContent =
+    `${offer.bot?.name || 'AI wizard'} has ${offer.bot?.glyphs ?? 100} Glyphs. ${reward}`;
+  $('#bot-offer').classList.remove('hidden');
+  $('#wait-spinner').classList.add('hidden');
+}
+
+async function answerOnlineBotOffer(accept) {
+  if (!onlineBotOffer || !online) return;
+  const offer = onlineBotOffer;
+  onlineBotOffer = null;
+  $('#bot-offer').classList.add('hidden');
+  $('#wait-spinner').classList.remove('hidden');
+  const result = await online.botOfferResponse(offer.offerId, accept);
+  if (!result?.ok) {
+    $('#wait-text').textContent = onlineErrorText(result);
+    return;
+  }
+  if (!accept) $('#wait-text').textContent = 'Still waiting for a human opponent.';
 }
 
 function onOnlineRoundEnd(p) {
@@ -1927,6 +2109,7 @@ function onOnlineRoundEnd(p) {
 
 function onOnlineMatchEnd(p) {
   running = false;
+  $('#emoji-bar').classList.add('hidden');
   onlineResultMatchId = p.matchId || online?.matchId || null;
   const win = p.winner === 'win';
   onlinePrivateCode = p.code || online?.privateCode || null;
@@ -1940,6 +2123,7 @@ function onOnlineMatchEnd(p) {
       openOnline();
       showOverlay(true);
     }
+
     return;
   }
   audio.roundEnd(win); haptic('round');
@@ -1960,6 +2144,38 @@ function onOnlineMatchEnd(p) {
   if (rematch) rematch.textContent = onlinePrivateCode ? 'Return to private room' : 'Online Duel menu';
   setNetStatus(null);
   showPanel('panel-result'); showOverlay(true);
+}
+
+function setEmojiButtonsEnabled(enabled) {
+  document.querySelectorAll('[data-emoji]').forEach((button) => {
+    button.disabled = !enabled;
+  });
+}
+
+async function sendOnlineEmoji(kind) {
+  if (mode !== 'online' || !online?.inMatch || Date.now() < onlineEmojiReadyAt) return;
+  setEmojiButtonsEnabled(false);
+  const result = await online.sendEmoji(kind);
+  if (!result?.ok) {
+    onlineEmojiReadyAt = Date.now() + Math.max(0, Number(result?.cooldownMs) || 0);
+    if (!result?.cooldownMs) setEmojiButtonsEnabled(true);
+  } else {
+    onlineEmojiReadyAt = Date.now() + 10000;
+  }
+  const delay = Math.max(0, onlineEmojiReadyAt - Date.now());
+  setTimeout(() => {
+    if (Date.now() >= onlineEmojiReadyAt && mode === 'online') setEmojiButtonsEnabled(true);
+  }, delay + 30);
+}
+
+function onOnlineEmoji(event) {
+  const sender = event?.sender === 1 ? 1 : 0;
+  if (!arena.showWizardEmoji(sender, event?.kind, event?.durationMs || 2000)) return;
+  audio.emoji(event.kind);
+  if (sender === 0 && !event?.spectator) {
+    onlineEmojiReadyAt = Date.now() + (event.cooldownMs || 10000);
+    setEmojiButtonsEnabled(false);
+  }
 }
 
 function renderRankingResult() {
@@ -2082,6 +2298,10 @@ function updateConnBadges(p) {
     if (el) { el.textContent = text; el.className = `conn-badge cq-${(p && p.state) || 'idle'}${q ? ' q-' + q : ''}`; }
   }
   if (mode === 'online' && online && online.inMatch && p && p.state === 'connected') setNetStatus('connected');
+  if (p?.state === 'connected' && activePanelId === 'panel-spectate-list'
+      && /reconnecting/i.test($('#spectate-status')?.textContent || '')) {
+    openSpectateList();
+  }
 }
 
 function disposeOnline() { if (online) { online.dispose(); online = null; } }
@@ -2146,7 +2366,11 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
     else if (a === 'online-quick-ranked') startOnlineAction('quick-ranked');
     else if (a === 'online-quick-unranked') startOnlineAction('quick-unranked');
     else if (a === 'online-rankings') openOnlineRankings();
+    else if (a === 'spectate-ranked') openSpectateList();
+    else if (a === 'spectate-leave') leaveSpectating();
     else if (a === 'account-submit') submitTemporaryAccount();
+    else if (a === 'bot-offer-accept') answerOnlineBotOffer(true);
+    else if (a === 'bot-offer-decline') answerOnlineBotOffer(false);
     else if (a === 'online-create') startOnlineAction('create');
     else if (a === 'online-join') startOnlineAction('join', $('#online-code').value);
     else if (a === 'online-cancel') cancelOnline();
@@ -2194,6 +2418,13 @@ document.querySelectorAll('[data-action]').forEach((btn) => {
       } else if (mode === 'practice') startPractice();
       else startLab();
     }
+  });
+
+  document.querySelectorAll('[data-emoji]').forEach((button) => {
+    button.addEventListener('click', () => {
+      audio.unlock();
+      sendOnlineEmoji(button.dataset.emoji);
+    });
   });
 });
 
@@ -2260,6 +2491,7 @@ function pauseToGameMenu() {
   gameMenuPaused = !!mode && (!!match || !!tutorial || mode === 'online');
   running = false;
   if (mode === 'online' && online) online.setActive(false);
+  $('#emoji-bar').classList.add('hidden');
   if (mode === 'tutorial' && tutorial) tutorial.pause();
   updateResumeGameButton();
   showPanel('panel-main');
@@ -2273,6 +2505,8 @@ function updateResumeGameButton() {
   if (button) button.classList.toggle('hidden', !gameMenuPaused);
   const surrender = $('#btn-surrender-game');
   if (surrender) surrender.classList.toggle('hidden', !(gameMenuPaused && mode === 'online' && online?.inMatch));
+  const leaveSpectate = $('#btn-leave-spectate');
+  if (leaveSpectate) leaveSpectate.classList.toggle('hidden', !(gameMenuPaused && mode === 'spectator'));
 }
 
 function resumeActiveGame() {
@@ -2281,6 +2515,7 @@ function resumeActiveGame() {
   $('#hud').classList.remove('hidden');
   running = true;
   if (mode === 'online' && online) online.setActive(true);
+  if (mode === 'online' && online?.inMatch) $('#emoji-bar').classList.remove('hidden');
   if (mode === 'tutorial' && tutorial) tutorial.resume();
   gameMenuPaused = false;
   updateResumeGameButton();
@@ -2288,6 +2523,10 @@ function resumeActiveGame() {
 
 function abandonPausedGameForNewMode() {
   if (!gameMenuPaused) return;
+  if (mode === 'spectator' && online) {
+    online.spectateLeave();
+    finishSpectating();
+  }
   if (mode === 'online' && online) {
     try { online.leave(); } catch { /* connection cleanup continues below */ }
     disposeOnline();
@@ -2642,6 +2881,32 @@ if (typeof window !== 'undefined') {
         }
         onOnlineMatchStart(payload);
         return true;
+      } catch (error) {
+        console.error('simulateOnlineStart failed', error);
+        return false;
+      }
+    },
+    simulateSpectateStart: (payload = {}) => {
+      try {
+        if (!online) return false;
+        online.spectating = true;
+        online.inMatch = false;
+        online.matchId = payload.matchId || 'spectator-test';
+        if (payload.state) online.view = payload.state;
+        onSpectateStart({
+          matchId: online.matchId,
+          names: payload.names || ['Alpha', 'Beta'],
+          glyphs: payload.glyphs || [100, 150],
+          score: [0, 0],
+        });
+        return true;
+      } catch { return false; }
+    },
+    stopSpectating: () => {
+      try {
+        if (online) online.spectating = false;
+        finishSpectating();
+        return true;
       } catch { return false; }
     },
     dispatchEvents: (events) => {
@@ -2711,6 +2976,12 @@ if (typeof window !== 'undefined') {
     productionRelease: (id) => { try { return arena.debugProductionRelease(Number(id)); } catch (e) { return { error: String(e && e.message || e) }; } },
     productionMotion: () => { try { return arena.debugProductionMotion(); } catch { return null; } },
     productionCount: () => { try { return arena.debugProductionCount(); } catch { return -1; } },
+    wizardEmoji: (kind) => {
+      try {
+        if (!arena.showWizardEmoji(1, String(kind), 2000)) return null;
+        return arena.effects[arena.effects.length - 1]?.handle?.kind || null;
+      } catch (e) { return { error: String(e && e.message || e) }; }
+    },
     playerHitSafety: (id) => { try { return arena.debugPlayerHitSafety(Number(id)); } catch { return []; } },
     kinds: () => { try { return arena.debugKinds(); } catch { return []; } },
     clear: () => { try { arena.debugClear(); } catch { /* ignore */ } },
@@ -2781,3 +3052,7 @@ function registerServiceWorker() {
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => { /* fallback is best-effort */ });
 }
 registerServiceWorker();
+
+setInterval(() => {
+  if (activePanelId === 'panel-online' && online?.connected) refreshSpectateAvailability();
+}, 5000);

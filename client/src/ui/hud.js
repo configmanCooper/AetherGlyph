@@ -36,11 +36,14 @@ export class HUD {
       enemyCharges: root.querySelector('#enemy-charges'),
       enemyStatus: root.querySelector('#enemy-status'),
       enemyCast: root.querySelector('#enemy-cast'),
+      enemyName: root.querySelector('#enemy-name'),
       playerHealth: root.querySelector('#player-health'),
       playerAether: root.querySelector('#player-aether'),
       playerStamina: root.querySelector('#player-stamina'),
       playerCharges: root.querySelector('#player-charges'),
       playerStatus: root.querySelector('#player-status'),
+      playerCast: root.querySelector('#player-cast'),
+      playerName: root.querySelector('#player-name'),
       timer: root.querySelector('#round-timer'),
       pressure: root.querySelector('#pressure'),
       diag: root.querySelector('#diag'),
@@ -244,6 +247,25 @@ export class HUD {
     this.el.series.classList.remove('hidden');
     this.el.series.innerHTML = `<span class="you">You ${score[0]}</span> - <span class="foe">${score[1]} Foe</span>` +
       `<span class="rd">Round ${Math.min(roundIndex + 1, 3)}/3</span>`;
+  }
+
+  setSpectatorInfo(names = [], lastCasts = []) {
+    if (this.el.playerName) this.el.playerName.textContent = names[0] || 'Wizard One';
+    if (this.el.enemyName) this.el.enemyName.textContent = names[1] || 'Wizard Two';
+    if (this.el.playerCast) {
+      const spell = SPELLS_BY_ID[lastCasts[0]];
+      this.el.playerCast.textContent = spell ? `Last: ${spell.name}` : '';
+    }
+    if (this.el.enemyCast) {
+      const spell = SPELLS_BY_ID[lastCasts[1]];
+      this.el.enemyCast.textContent = spell ? `Last: ${spell.name}` : '';
+    }
+  }
+
+  resetNames() {
+    if (this.el.playerName) this.el.playerName.textContent = 'You';
+    if (this.el.enemyName) this.el.enemyName.textContent = 'Opponent';
+    if (this.el.playerCast) this.el.playerCast.textContent = '';
   }
 
   pulseDodge() {

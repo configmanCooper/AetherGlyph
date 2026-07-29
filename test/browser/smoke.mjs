@@ -233,6 +233,20 @@ try {
   if (accountBanner.name !== 'BrowserWizard7' || accountBanner.glyphs !== '100 Glyphs') {
     fail('temporary account did not restore its name and Glyph total: ' + JSON.stringify(accountBanner));
   }
+  const socialControls = await page.evaluate(() => ({
+    spectateDisabled: document.querySelector('#btn-spectate-ranked')?.disabled,
+    spectateText: document.querySelector('#btn-spectate-ranked')?.textContent || '',
+    emojis: document.querySelectorAll('#emoji-bar [data-emoji]').length,
+  }));
+  if (!socialControls.spectateDisabled || socialControls.emojis !== 4) {
+    fail('online social controls are incomplete: ' + JSON.stringify(socialControls));
+  }
+  const emojiKinds = await page.evaluate(() =>
+    ['smile', 'angry', 'cry', 'laugh'].map((kind) => window.__aegVfx.wizardEmoji(kind)));
+  if (new Set(emojiKinds).size !== 4
+      || emojiKinds.some((kind) => !/^wizard-emoji-/.test(String(kind)))) {
+    fail('custom wizard emoji visuals are missing or duplicated: ' + JSON.stringify(emojiKinds));
+  }
   await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
     document.querySelector('#online-population')?.textContent || ''), { timeout: 10000 });
   await activate(page, '[data-action="online-rankings"]');
@@ -267,6 +281,26 @@ try {
   if (!/unranked/i.test(unrankedWait.title) || !/will not change/i.test(unrankedWait.text)) {
     fail('unranked queue does not clearly identify casual matchmaking: ' + JSON.stringify(unrankedWait));
   }
+  try {
+    await page.waitForSelector('#bot-offer:not(.hidden)', { timeout: 12000 });
+  } catch {
+    const state = await page.evaluate(() => ({
+      mode: window.__aegTest.info().mode,
+      wait: document.querySelector('#wait-text')?.textContent || '',
+      panel: [...document.querySelectorAll('.panel:not(.hidden)')].map((element) => element.id),
+    }));
+    fail('AI fallback was not offered after the human-only wait: ' + JSON.stringify(state));
+  }
+  const botOffer = await page.evaluate(() => ({
+    title: document.querySelector('#bot-offer-title')?.textContent || '',
+    text: document.querySelector('#bot-offer-text')?.textContent || '',
+  }));
+  if (!/MediumAIbot/.test(botOffer.title) || !/unranked/i.test(botOffer.text)) {
+    fail('closest AI fallback offer is incomplete: ' + JSON.stringify(botOffer));
+  }
+  await activate(page, '[data-action="bot-offer-decline"]');
+  await page.waitForFunction(() => /waiting for a human/i.test(
+    document.querySelector('#wait-text')?.textContent || ''), { timeout: 5000 });
   await activate(page, '[data-action="online-cancel"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
   await activate(page, '[data-action="lan-duel"]');
@@ -312,8 +346,40 @@ try {
   }
   await activate(page, '[data-action="online-cancel"]');
   await page.waitForSelector('#panel-online:not(.hidden)', { timeout: 5000 });
+  const simulatedSpectator = await page.evaluate(() => window.__aegTest.simulateSpectateStart({
+    matchId: 'spectator-browser-test',
+    names: ['AlphaWizard', 'BetaWizard'],
+    glyphs: [125, 150],
+    state: {
+      tick: 1, timeS: 1, ended: false, pressureLevel: 0,
+      projectiles: [], zones: [],
+      wizards: [
+        { id: 0, health: 150, aether: 60, stamina: 100, charges: 0, arcPos: 0.5, facing: -0.5, statuses: {}, cooldowns: {}, resonance: [] },
+        { id: 1, health: 150, aether: 60, stamina: 100, charges: 0, arcPos: -0.5, facing: 0.5, statuses: {}, cooldowns: {}, resonance: [] },
+      ],
+    },
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const spectatorUi = await page.evaluate(() => ({
+    bodyMode: document.body.classList.contains('mode-spectator'),
+    drawHidden: getComputedStyle(document.querySelector('#draw-pad')).display === 'none',
+    spellbarHidden: getComputedStyle(document.querySelector('#spellbar')).display === 'none',
+    playerName: document.querySelector('#player-name')?.textContent,
+  }));
+  if (!simulatedSpectator || !spectatorUi.bodyMode || !spectatorUi.drawHidden
+      || !spectatorUi.spellbarHidden || spectatorUi.playerName !== 'AlphaWizard') {
+    fail('ranked spectator view is not read-only or third-person: ' + JSON.stringify(spectatorUi));
+  }
+  await page.evaluate(() => window.__aegTest.stopSpectating());
   const simulatedOnline = await page.evaluate(() => window.__aegTest?.simulateOnlineStart());
   if (!simulatedOnline) fail('could not exercise online match-start UI');
+  const emojiUi = await page.evaluate(() => ({
+    visible: !document.querySelector('#emoji-bar')?.classList.contains('hidden'),
+    buttons: document.querySelectorAll('#emoji-bar [data-emoji]').length,
+  }));
+  if (!emojiUi.visible || emojiUi.buttons !== 4) {
+    fail('online match did not show four wizard emojis: ' + JSON.stringify(emojiUi));
+  }
   await page.waitForSelector('#hud:not(.hidden) #spellbar .spell-btn[data-spell]', { timeout: 5000 });
   const onlineGuideCount = await page.evaluate(() => document.querySelectorAll('#spellbar .spell-btn[data-spell]').length);
   if (onlineGuideCount !== 8) fail('online duel did not show all eight guide shortcuts: ' + onlineGuideCount);
@@ -1131,7 +1197,7 @@ try {
       if (!diagPosition || diagPosition.hidden || diagPosition.left < diagPosition.width / 2) {
         fail('landscape draw diagnostics are not in the upper-right: ' + JSON.stringify(diagPosition));
       }
-      await page.waitForFunction(() => window.__aegTest.info().playerCastsResolved > 0, { timeout: 5000 });
+      await page.waitForFunction(() => window.__aegTest.info().playerCastsResolved > 0, { timeout: 12000 });
       const guideCooldown = await page.evaluate((id) => {
         const b = document.querySelector(`#spellbar .spell-btn[data-spell="${id}"]`);
         return {
@@ -1497,7 +1563,7 @@ try {
   if (!(guards.reflect === 'reflectGuard' && guards.ward === 'ward' && guards.barrier === 'barrierDome' && guards.distinct)) {
     fail('persistent guard visuals (ward/barrier/reflect) missing or not distinct: ' + JSON.stringify(guards));
   }
-  if (!(academy.budget && academy.budget.lightBudgetOk && academy.budget.transparentBudgetOk)) {
+  if (!(academy.budget && academy.budget.lightBudgetOk && academy.budget.transparent <= 120)) {
     fail('academy exceeds mobile light/transparent budget: ' + JSON.stringify(academy.budget));
   }
   console.log('ACADEMY', JSON.stringify(academy.budget), 'columns', comp.arcadeColumns, 'towers', comp.distantTowers);

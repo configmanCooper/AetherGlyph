@@ -51,6 +51,25 @@ export async function run() {
   eq(login.accountId, createdAccount.accountId, 'username login restores the same ranking account');
   const restoredSession = await store.resolveTemporarySession(login.token);
   eq(restoredSession.accountId, createdAccount.accountId, 'session token restores the database account');
+  store.credentials.get('wizard7').pinResetRequired = true;
+  const resetLogin = await store.authenticateTemporary('Wizard7', '123456');
+  ok(resetLogin.resetRequired && resetLogin.resetToken,
+    'admin PIN-reset flag prompts for a new PIN at next login');
+  const resetPin = await store.resetTemporaryPin(resetLogin.resetToken, '222222');
+  ok(resetPin.ok && resetPin.token, 'PIN reset issues a fresh account session');
+  eq((await store.authenticateTemporary('Wizard7', '123456')).code, 'name-taken',
+    'old PIN stops working after reset');
+  ok((await store.authenticateTemporary('Wizard7', '222222')).ok,
+    'new PIN works after reset');
+  store.credentials.get('wizard7').pinResetRequired = true;
+  const pendingReset = await store.authenticateTemporary('Wizard7', '222222');
+  const invalidReset = await store.resetTemporaryPin('invalid-reset-token-value', '333333');
+  eq(invalidReset.code, 'bad-token', 'invalid PIN reset token returns a clear error');
+  const secondReset = await store.authenticateTemporary('Wizard7', '222222');
+  const completedReset = await store.resetTemporaryPin(secondReset.resetToken, '333333');
+  ok(completedReset.ok, 'valid PIN reset still succeeds after an invalid attempt');
+  const supersededReset = await store.resetTemporaryPin(pendingReset.resetToken, '444444');
+  eq(supersededReset.code, 'bad-token', 'completing a PIN reset invalidates all other reset tokens');
   const concurrentStore = await new MemoryRatingStore().init();
   const concurrent = await Promise.all([
     concurrentStore.authenticateTemporary('RaceWizard', '123456'),
@@ -100,6 +119,44 @@ export async function run() {
   eq(board.top.length, 2, 'leaderboard contains ranked participants');
   eq(board.top[0].name, 'Alpha', 'leaderboard orders highest Glyph total first');
   eq(board.self.rank, 2, 'leaderboard returns the requesting wizard rank');
+
+  const botHuman = await store.authenticateTemporary('BotFighter', '333333');
+  const botHumanAccount = store.accounts.get(botHuman.accountId);
+  const botWin = await store.recordResult({
+    matchId: 'bot-win',
+    ranked: true,
+    winnerSlot: 0,
+    reason: 'series',
+    players: [
+      { accountId: botHuman.accountId, name: 'BotFighter', glyphs: 100 },
+      { accountId: null, name: 'MediumAIbot', glyphs: 100, isBot: true, botKey: 'medium' },
+    ],
+  });
+  eq(botWin.players[0].delta, 20, 'ranked AI victory reward is capped at 20 Glyphs');
+  const beforeBotLoss = botHumanAccount.glyphs;
+  const botLoss = await store.recordResult({
+    matchId: 'bot-loss',
+    ranked: true,
+    winnerSlot: 1,
+    reason: 'series',
+    players: [
+      { accountId: botHuman.accountId, name: 'BotFighter', glyphs: beforeBotLoss },
+      { accountId: null, name: 'HardAIbot', glyphs: 150, isBot: true, botKey: 'hard' },
+    ],
+  });
+  eq(botLoss.players[0].delta, 0, 'player never loses Glyphs to an AI bot');
+  botHumanAccount.glyphs = 300;
+  const highBotWin = await store.recordResult({
+    matchId: 'bot-high-win',
+    ranked: true,
+    winnerSlot: 0,
+    reason: 'series',
+    players: [
+      { accountId: botHuman.accountId, name: 'BotFighter', glyphs: 300 },
+      { accountId: null, name: 'HardAIbot', glyphs: 150, isBot: true, botKey: 'hard' },
+    ],
+  });
+  eq(highBotWin.players[0].delta, 0, 'wizards over 299 Glyphs gain nothing from bots');
 
   const alpha = store.accounts.get('glyph-a');
   const beta = store.accounts.get('glyph-b');

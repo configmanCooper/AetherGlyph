@@ -128,6 +128,7 @@ export function createGameServer(opts = {}) {
       privateLobbyGraceMs: opts.privateLobbyGraceMs,
       rankedRange: opts.rankedRange,
       rankedRangeWaitMs: opts.rankedRangeWaitMs,
+      botOfferWaitMs: opts.botOfferWaitMs,
       requireAccounts: opts.requireAccounts,
       log: (...a) => console.warn('[rooms]', ...a),
     });

@@ -49,7 +49,9 @@ function emitAck(socket, ev, payload, timeout = 4000) {
 
 function once(socket, ev, timeout = 5000) {
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`event timeout: ${ev}`)), timeout);
+    const t = setTimeout(() => reject(new Error(
+      `event timeout: ${ev} client=${socket.auth?.clientId || socket.id || 'unknown'}`,
+    )), timeout);
     socket.once(ev, (p) => { clearTimeout(t); resolve(p); });
   });
 }
@@ -66,6 +68,7 @@ async function main() {
     privateLobbyGraceMs: 800,
     rankedRange: 50,
     rankedRangeWaitMs: 120,
+    botOfferWaitMs: 120,
     requireAccounts: false,
   });
   const port = await gs.listen(0);
@@ -89,6 +92,10 @@ async function main() {
         username: 'Bad Name', pin: '123456',
       });
       eq(invalidName.code, ERR.INVALID_USERNAME, 'account gate rejects spaces in usernames');
+      const reservedName = await emitAck(guest, EVENTS.ACCOUNT_AUTH, {
+        username: 'HardAIbot', pin: '123456',
+      });
+      eq(reservedName.code, ERR.RESERVED_NAME, 'built-in AI names are reserved');
       const createdAccount = await emitAck(guest, EVENTS.ACCOUNT_AUTH, {
         username: 'ServerWizard1', pin: '123456',
       });
@@ -129,6 +136,30 @@ async function main() {
       ok(restoredStatus.authenticated && restoredStatus.accountId === createdAccount.accountId,
         'saved session restores the same database ranking account');
       restored.disconnect();
+
+      const resetOwner = await connect(accountUrl, goodAuth('reset-owner'));
+      const resetAccount = await emitAck(resetOwner, EVENTS.ACCOUNT_AUTH, {
+        username: 'ResetWizard1', pin: '111111',
+      });
+      accountServer.rooms.ratingStore.credentials.get('resetwizard1').pinResetRequired = true;
+      resetOwner.disconnect();
+      const resetLoginSocket = await connect(accountUrl, goodAuth('reset-login'));
+      const resetLogin = await emitAck(resetLoginSocket, EVENTS.ACCOUNT_AUTH, {
+        username: 'ResetWizard1', pin: '111111',
+      });
+      ok(resetLogin.resetRequired && resetLogin.resetToken,
+        'admin reset flag requires a new PIN at next login');
+      const resetBlocked = await emitAck(resetLoginSocket, EVENTS.CREATE_ROOM, {
+        loadout: emberIds,
+      });
+      eq(resetBlocked.code, ERR.AUTH_REQUIRED,
+        'reset-required account cannot use Online Duel before choosing a new PIN');
+      const resetPin = await emitAck(resetLoginSocket, EVENTS.ACCOUNT_PIN_RESET, {
+        resetToken: resetLogin.resetToken, pin: '222222',
+      });
+      ok(resetPin.ok && resetPin.accountId === resetAccount.accountId,
+        'player can choose a new PIN and retain the same ranking account');
+      resetLoginSocket.disconnect();
       await accountServer.close('account-gate-test');
     }
 
@@ -282,7 +313,6 @@ async function main() {
       const ranked1 = track(await connect(url, goodAuth('acc-q-ranked-1')));
       const unranked1 = track(await connect(url, goodAuth('acc-q-unranked-1')));
       const ranked1Start = once(ranked1, EVENTS.MATCH_START);
-      const unranked1Start = once(unranked1, EVENTS.MATCH_START);
       const rankedAck = await emitAck(ranked1, EVENTS.QUICK_MATCH, { loadout: emberIds });
       const unrankedAck = await emitAck(unranked1, EVENTS.QUICK_MATCH_UNRANKED, {
         loadout: tideIds,
@@ -308,7 +338,39 @@ async function main() {
       const rankedMatch = [...gs.rooms.matches.values()].find((match) =>
         match.seats.some((seat) => seat.accountId === 'acc-q-ranked-1'));
       ok(!!rankedMatch, 'ranked quick match has an authoritative match room');
+      const spectator = track(await connect(url, goodAuth('acc-spectator')));
+      const activeMatches = await emitAck(spectator, EVENTS.SPECTATE_LIST, {});
+      ok(activeMatches.ok && activeMatches.matches.some((item) => item.matchId === rankedMatch.matchId),
+        'spectator list exposes active ranked matches');
+      const spectateStartP = once(spectator, EVENTS.SPECTATE_START);
+      const spectateSnapshotP = once(spectator, EVENTS.SPECTATE_SNAPSHOT);
+      const spectateJoin = await emitAck(spectator, EVENTS.SPECTATE_JOIN, {
+        matchId: rankedMatch.matchId,
+      });
+      ok(spectateJoin.ok, 'spectator can join a listed ranked match');
+      const spectateStart = await spectateStartP;
+      const spectateSnapshot = await spectateSnapshotP;
+      eq(spectateStart.names.length, 2, 'spectator receives both wizard names');
+      ok(spectateSnapshot.state?.wizards?.length === 2,
+        'spectator receives a canonical two-wizard snapshot');
+
+      const opponentEmojiP = once(ranked2, EVENTS.EMOJI_EVENT);
+      const spectatorEmojiP = once(spectator, EVENTS.EMOJI_EVENT);
+      const emoji = await emitAck(ranked1, EVENTS.EMOJI, { kind: 'smile' });
+      ok(emoji.ok && emoji.cooldownMs === 10000, 'online emoji is accepted with ten-second cooldown');
+      const opponentEmoji = await opponentEmojiP;
+      const spectatorEmoji = await spectatorEmojiP;
+      eq(opponentEmoji.sender, 1, 'opponent sees emoji attached to the other wizard');
+      eq(spectatorEmoji.sender, rankedStart1.slot,
+        'spectator sees canonical emoji sender slot');
+      const emojiRate = await emitAck(ranked1, EVENTS.EMOJI, { kind: 'laugh' });
+      eq(emojiRate.code, ERR.RATE, 'all emoji types share one server cooldown');
+
+      const spectateEndP = once(spectator, EVENTS.SPECTATE_END);
       rankedMatch.endMatch(rankedStart1.slot, 'series');
+      const spectateEnd = await spectateEndP;
+      eq(spectateEnd.matchId, rankedMatch.matchId,
+        'spectator is returned when the ranked match ends');
       const rankedUpdate1 = await rankedUpdate1P;
       const rankedUpdate2 = await rankedUpdate2P;
       eq(rankedUpdate1.ok, true, 'ranked settlement reports persistence success');
@@ -321,6 +383,7 @@ async function main() {
       eq(rankings.self.glyphs, 125, 'rankings response includes the requesting wizard total');
 
       const unranked2 = track(await connect(url, goodAuth('acc-q-unranked-2')));
+      const unranked1Start = once(unranked1, EVENTS.MATCH_START);
       const unranked2Start = once(unranked2, EVENTS.MATCH_START);
       await emitAck(unranked2, EVENTS.QUICK_MATCH_UNRANKED, { loadout: emberIds });
       const unrankedStart1 = await unranked1Start;
@@ -340,6 +403,7 @@ async function main() {
       'ranked quick match assigns distinct slots');
       ranked1.disconnect(); ranked2.disconnect();
       unranked1.disconnect(); unranked2.disconnect();
+      spectator.disconnect();
     }
 
     // --- 10. Ranked search waits for ±50, then chooses closest -----------
@@ -369,7 +433,41 @@ async function main() {
       low.disconnect(); high.disconnect();
     }
 
-    // --- 11. Disconnect forfeit + match termination ----------------------
+    // --- 11. Five-second fallback offers the closest internal bot --------
+    {
+      const human = track(await connect(url, goodAuth('acc-bot-offer')));
+      await gs.rooms.ratingStore.getGlyphs('acc-bot-offer', 'BotTester');
+      gs.rooms.ratingStore.accounts.get('acc-bot-offer').glyphs = 100;
+      const offerP = once(human, EVENTS.BOT_OFFER);
+      await emitAck(human, EVENTS.QUICK_MATCH, { loadout: emberIds });
+      await sleep(140);
+      gs.rooms.matchmake();
+      const offer = await offerP;
+      eq(offer.bot.name, 'MediumAIbot', 'closest-Glyph AI bot is offered');
+      eq(offer.maxReward, 20, 'ranked AI offer explains the 20-Glyph cap');
+      const startP = once(human, EVENTS.MATCH_START);
+      const accepted = await emitAck(human, EVENTS.BOT_OFFER_RESPONSE, {
+        offerId: offer.offerId, accept: true,
+      });
+      ok(accepted.ok && accepted.accepted, 'player can accept the AI fallback');
+      const start = await startP;
+      eq(start.names[1], 'MediumAIbot', 'accepted bot occupies the opponent seat');
+      eq(start.glyphs[1], 100, 'bot match exposes fixed bot Glyph total');
+      const rankingP = once(human, EVENTS.RANKING_UPDATE);
+      const match = [...gs.rooms.matches.values()].find((room) =>
+        room.seats.some((seat) => seat.accountId === 'acc-bot-offer'));
+      for (let tick = 0; tick < 900 && match.sim.wizards[1].castsResolved === 0; tick++) {
+        match.stepOnce();
+      }
+      ok(match.sim.wizards[1].castsResolved > 0,
+        'authoritative internal PracticeBot actively casts during the duel');
+      match.endMatch(0, 'series');
+      const ranking = await rankingP;
+      eq(ranking.delta, 20, 'ranked AI win awards at most 20 Glyphs');
+      human.disconnect();
+    }
+
+    // --- 12. Disconnect forfeit + match termination ----------------------
     {
       const h = track(await connect(url, goodAuth('acc-fh')));
       const j = track(await connect(url, goodAuth('acc-fj')));

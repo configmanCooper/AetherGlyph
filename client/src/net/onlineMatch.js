@@ -64,6 +64,10 @@ export class OnlineMatch {
     this.onRoom = opts.onRoom || (() => {});
     this.onPopulation = opts.onPopulation || (() => {});
     this.onRankingUpdate = opts.onRankingUpdate || (() => {});
+    this.onBotOffer = opts.onBotOffer || (() => {});
+    this.onEmoji = opts.onEmoji || (() => {});
+    this.onSpectateStart = opts.onSpectateStart || (() => {});
+    this.onSpectateEnd = opts.onSpectateEnd || (() => {});
     this.onConnection = opts.onConnection || (() => {});
     this.onError = opts.onError || (() => {});
     this.onCastAck = opts.onCastAck || (() => {});
@@ -72,6 +76,7 @@ export class OnlineMatch {
     this.connected = false;
     this.active = true;         // input gating (paused when backgrounded)
     this.inMatch = false;
+    this.spectating = false;
     this.matchId = null;
     this.slot = 0;
     this.epoch = 0;
@@ -82,6 +87,7 @@ export class OnlineMatch {
     this.rtt = null;
     this.pingTimer = null;
     this.pendingEvents = [];
+    this.lastCasts = [null, null];
     this.privateCode = opts.privateCode || loadPrivateLobby()?.code || null;
     this.ranked = false;
   }
@@ -128,7 +134,12 @@ export class OnlineMatch {
         this.stopPing();
         this.emitConnection('disconnected');
         if (this.inMatch) this.onStatus({ state: 'reconnecting' });
-        else if (this.privateCode) this.onStatus({ state: 'lobby-reconnecting', code: this.privateCode });
+        else if (this.spectating) {
+          const matchId = this.matchId;
+          this.spectating = false;
+          this.matchId = null;
+          this.onSpectateEnd({ matchId, reason: 'disconnect' });
+        } else if (this.privateCode) this.onStatus({ state: 'lobby-reconnecting', code: this.privateCode });
       });
 
       socket.on(EVENTS.ROOM_UPDATE, (p) => this.handleRoomUpdate(p || {}));
@@ -143,6 +154,14 @@ export class OnlineMatch {
         if (p?.matchId && this.matchId && p.matchId !== this.matchId) return;
         this.onRankingUpdate(p || {});
       });
+      socket.on(EVENTS.BOT_OFFER, (p) => this.onBotOffer(p || {}));
+      socket.on(EVENTS.EMOJI_EVENT, (p) => {
+        if (p?.matchId && this.matchId && p.matchId !== this.matchId) return;
+        this.onEmoji(p || {});
+      });
+      socket.on(EVENTS.SPECTATE_START, (p) => this.handleSpectateStart(p || {}));
+      socket.on(EVENTS.SPECTATE_SNAPSHOT, (p) => this.handleSpectateSnapshot(p || {}));
+      socket.on(EVENTS.SPECTATE_END, (p) => this.handleSpectateEnd(p || {}));
       socket.on(EVENTS.ABORTED, (p) => this.handleAborted(p || {}));
       socket.on(EVENTS.PONG, (p) => { if (p && Number.isFinite(p.t)) { this.rtt = Math.max(0, Date.now() - p.t); this.emitConnection(this.connected ? 'connected' : 'disconnected'); } });
     });
@@ -179,6 +198,23 @@ export class OnlineMatch {
     }
     return result;
   }
+  async resetPin(resetToken, pin) {
+    const result = await this.request(EVENTS.ACCOUNT_PIN_RESET, { resetToken, pin });
+    if (result?.ok) {
+      this.identity.id = result.accountId;
+      this.identity.name = result.name;
+      this.identity.accountToken = result.token;
+      if (this.socket) {
+        this.socket.auth = {
+          ...(this.socket.auth || {}),
+          clientId: result.accountId,
+          name: result.name,
+          accountToken: result.token,
+        };
+      }
+    }
+    return result;
+  }
   createRoom() { return this.request(EVENTS.CREATE_ROOM, { loadout: this.loadoutIds, name: this.identity.name }); }
   joinRoom(code) { return this.request(EVENTS.JOIN_ROOM, { code, loadout: this.loadoutIds, name: this.identity.name }); }
   quickMatch(ranked = true) {
@@ -190,6 +226,22 @@ export class OnlineMatch {
   }
   cancelQueue() { return this.request(EVENTS.CANCEL_QUEUE, {}); }
   rankings() { return this.request(EVENTS.RANKINGS_REQUEST, {}); }
+  botOfferResponse(offerId, accept) {
+    return this.request(EVENTS.BOT_OFFER_RESPONSE, { offerId, accept: !!accept });
+  }
+  sendEmoji(kind) { return this.request(EVENTS.EMOJI, { kind }); }
+  spectateList() { return this.request(EVENTS.SPECTATE_LIST, {}); }
+  spectateJoin(matchId) { return this.request(EVENTS.SPECTATE_JOIN, { matchId }); }
+  async spectateLeave() {
+    const result = await this.request(EVENTS.SPECTATE_LEAVE, {});
+    if (result?.ok) {
+      this.spectating = false;
+      this.matchId = null;
+      this.view = neutralView();
+      this.pendingEvents = [];
+    }
+    return result;
+  }
   privateReady() {
     return this.request(EVENTS.PRIVATE_READY, {
       loadout: this.loadoutIds,
@@ -297,6 +349,28 @@ export class OnlineMatch {
     });
   }
 
+  handleSpectateStart(p) {
+    this.spectating = true;
+    this.inMatch = false;
+    this.matchId = p.matchId || null;
+    this.view = neutralView();
+    this.pendingEvents = [];
+    this.onSpectateStart(p);
+  }
+
+  handleSpectateSnapshot(p) {
+    if (!this.spectating || (p.matchId && this.matchId && p.matchId !== this.matchId)) return;
+    if (p.state) this.view = p.state;
+    if (Array.isArray(p.events) && p.events.length) this.pendingEvents.push(...p.events);
+    this.lastCasts = Array.isArray(p.lastCasts) ? p.lastCasts.slice(0, 2) : [null, null];
+  }
+
+  handleSpectateEnd(p) {
+    if (p.matchId && this.matchId && p.matchId !== this.matchId) return;
+    this.spectating = false;
+    this.onSpectateEnd(p);
+  }
+
   handleAborted(p) {
     this.onError({ message: p.reason || 'Server restarting', code: 'aborted' });
     if (this.inMatch) { this.inMatch = false; this.onStatus({ state: 'aborted', reason: p.reason }); }
@@ -336,6 +410,7 @@ export class OnlineMatch {
         this.onStatus({ state: 'resumed' });
       } else {
         this.inMatch = false;
+        this.spectating = false;
         clearResume();
         this.onStatus({ state: 'resume-failed', code: ack && ack.code });
         if (!restoringAfterReload) {

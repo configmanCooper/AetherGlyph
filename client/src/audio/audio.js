@@ -160,5 +160,22 @@ export class Audio {
   reflect() { this._blip({ type: 'square', freq: 800, dur: 0.18, gain: 0.35, glideTo: 1300 }); }
   focus() { this._blip({ type: 'triangle', freq: 260, dur: 0.5, gain: 0.3, glideTo: 520 }); }
   heavyWarn() { this._blip({ type: 'sawtooth', freq: 70, dur: 0.5, gain: 0.4, glideTo: 55 }); }
+  emoji(kind) {
+    if (kind === 'smile') {
+      this._blip({ type: 'sine', freq: 520, dur: 0.16, gain: 0.28, glideTo: 780 });
+      setTimeout(() => this._blip({ type: 'sine', freq: 700, dur: 0.18, gain: 0.22, glideTo: 920 }), 90);
+    } else if (kind === 'angry') {
+      this._blip({ type: 'sawtooth', freq: 180, dur: 0.3, gain: 0.32, glideTo: 85 });
+      this._noise({ dur: 0.13, gain: 0.18, hp: 450 });
+    } else if (kind === 'cry') {
+      this._blip({ type: 'triangle', freq: 440, dur: 0.42, gain: 0.24, glideTo: 170 });
+    } else if (kind === 'laugh') {
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => this._blip({
+          type: 'square', freq: 360 + i * 70, dur: 0.11, gain: 0.18, glideTo: 520 + i * 60,
+        }), i * 120);
+      }
+    }
+  }
   roundEnd(win) { this._blip({ type: 'triangle', freq: win ? 440 : 220, dur: 0.6, gain: 0.4, glideTo: win ? 880 : 130 }); }
 }

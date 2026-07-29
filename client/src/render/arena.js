@@ -26,7 +26,7 @@ const ARC_W = 3.2;
 const SEP = 11;
 const PLAYER_Z = SEP / 2;
 const ENEMY_Z = -SEP / 2;
-const MAX_EFFECTS = 26; // hard cap on live transient effects (impacts + releases)
+const MAX_EFFECTS = 24; // includes impacts, releases, reactions, and social emojis
 
 const SCHOOL_COLOR = {
   Ember: 0xff6a3d, Tide: 0x54c8ff, Storm: 0xffe14d, Stone: 0xb08a5a,
@@ -877,6 +877,62 @@ export class Arena {
     const w = wid === 0 ? this._lastPlayer : this._lastEnemy;
     const x = w ? wizardX(w) : 0;
     return new THREE.Vector3(x, y, wid === 0 ? PLAYER_Z : ENEMY_Z);
+  }
+
+  showWizardEmoji(sender, kind, durationMs = 2000) {
+      const allowed = new Set(['smile', 'angry', 'cry', 'laugh']);
+      if (!allowed.has(kind)) return false;
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 256, 256);
+      ctx.fillStyle = 'rgba(8,5,18,0.88)';
+      ctx.beginPath(); ctx.arc(128, 140, 82, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8b6bff'; ctx.lineWidth = 8; ctx.stroke();
+      // Custom wizard hat.
+      ctx.fillStyle = '#5f42c9';
+      ctx.beginPath(); ctx.moveTo(128, 12); ctx.lineTo(65, 100); ctx.lineTo(191, 100); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8b6bff'; ctx.fillRect(48, 92, 160, 20);
+      ctx.fillStyle = '#ffd66b'; ctx.beginPath(); ctx.arc(135, 58, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#f4efff'; ctx.fillStyle = '#f4efff'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+      if (kind === 'angry') {
+        ctx.beginPath(); ctx.moveTo(88, 125); ctx.lineTo(112, 137); ctx.moveTo(168, 125); ctx.lineTo(144, 137); ctx.stroke();
+        ctx.strokeStyle = '#ff7066'; ctx.beginPath(); ctx.moveTo(98, 188); ctx.quadraticCurveTo(128, 160, 158, 188); ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(98, 140, 7, 0, Math.PI * 2); ctx.arc(158, 140, 7, 0, Math.PI * 2); ctx.fill();
+        if (kind === 'smile') {
+          ctx.beginPath(); ctx.arc(128, 157, 34, 0.15, Math.PI - 0.15); ctx.stroke();
+        } else if (kind === 'cry') {
+          ctx.beginPath(); ctx.arc(128, 192, 28, Math.PI + 0.2, Math.PI * 2 - 0.2); ctx.stroke();
+          ctx.fillStyle = '#57c8ff'; ctx.beginPath(); ctx.ellipse(98, 166, 9, 18, 0, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(128, 155, 38, 0.05, Math.PI - 0.05); ctx.stroke();
+          ctx.fillStyle = '#f4efff'; ctx.fillRect(100, 174, 56, 13);
+        }
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+      const sprite = new THREE.Sprite(material);
+      sprite.position.copy(this._wizardWorld(sender, 2.55));
+      if (!this._showcaseMode && sender === 0) sprite.position.z -= 1.2;
+      sprite.scale.set(1.55, 1.55, 1.55);
+      let elapsed = 0;
+      const handle = {
+        kind: `wizard-emoji-${kind}`,
+        object3D: sprite,
+        billboard: true,
+        update: ({ dtMs }) => {
+          elapsed += dtMs;
+          const p = Math.min(1, elapsed / Math.max(1, durationMs));
+          material.opacity = p < 0.75 ? 1 : 1 - (p - 0.75) / 0.25;
+          sprite.position.y += dtMs * 0.00018;
+          return p < 1;
+        },
+        dispose: () => { texture.dispose(); material.dispose(); },
+      };
+      this._pushEffect(handle, null, true);
+      return true;
   }
 
   // Ambient render used while in menus (no active match).

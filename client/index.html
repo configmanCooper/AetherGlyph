@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.12.0-account1" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.13.0" />
   <script type="importmap">
   {
     "imports": {
@@ -30,7 +30,7 @@
   <div id="hud" class="hud hidden" aria-hidden="true">
     <!-- Opponent bar (top) -->
     <div class="enemy-panel">
-      <div class="name-row"><span class="label">Opponent</span><span id="enemy-cast" class="cast-tell"></span></div>
+      <div class="name-row"><span id="enemy-name" class="label">Opponent</span><span id="enemy-cast" class="cast-tell"></span></div>
       <div class="bar health"><div id="enemy-health" class="fill"></div></div>
       <div class="mini-row">
         <div class="bar small aether"><div id="enemy-aether" class="fill"></div></div>
@@ -42,6 +42,7 @@
 
     <!-- Player panel (bottom-left) -->
     <div class="player-panel">
+      <div class="name-row"><span id="player-name" class="label">You</span><span id="player-cast" class="cast-tell"></span></div>
       <div class="bar health"><div id="player-health" class="fill"></div></div>
       <div class="mini-row">
         <div class="bar small aether"><div id="player-aether" class="fill"></div></div>
@@ -105,6 +106,12 @@
       <button id="btn-brace" class="act-btn"><span class="desktop-label">Brace (B)</span><span class="touch-label">Brace</span></button>
       <button id="btn-sidestep" class="act-btn"><span class="desktop-label">Dodge (Space)</span><span class="touch-label">Dodge</span></button>
     </div>
+    <div id="emoji-bar" class="emoji-bar hidden" aria-label="Wizard emojis">
+      <button class="emoji-btn" data-emoji="smile" title="Smile"><span class="mini-wizard-emoji">⌣</span></button>
+      <button class="emoji-btn" data-emoji="angry" title="Angry"><span class="mini-wizard-emoji">╬</span></button>
+      <button class="emoji-btn" data-emoji="cry" title="Crying"><span class="mini-wizard-emoji">╥</span></button>
+      <button class="emoji-btn" data-emoji="laugh" title="Laughing"><span class="mini-wizard-emoji">ᗧ</span></button>
+    </div>
 
     <button id="btn-menu" class="corner-btn" title="Menu">☰</button>
   </div>
@@ -119,6 +126,7 @@
       <div class="menu-list">
         <button id="btn-resume-game" class="menu-btn hidden" data-action="resume-game">Go back to current game</button>
         <button id="btn-surrender-game" class="menu-btn danger hidden" data-action="online-surrender">Surrender and exit duel</button>
+        <button id="btn-leave-spectate" class="menu-btn danger hidden" data-action="spectate-leave">Leave spectating</button>
         <button class="menu-btn" data-action="tutorial">Tutorial</button>
         <button class="menu-btn" data-action="practice-ai">Practice vs AI</button>
         <button class="menu-btn" data-action="lab">Glyph Laboratory</button>
@@ -128,7 +136,7 @@
       </div>
       <p class="offline-note">Tutorial, Practice vs AI &amp; Glyph Laboratory are fully offline single-player. Online Duel connects to the authoritative server.</p>
       <p class="links">
-        <span id="menu-version">Version 1.12.0</span> ·
+        <span id="menu-version">Version 1.13.0</span> ·
         <button class="link-button" data-action="spell-roster">Spell roster</button>
       </p>
     </div>
@@ -212,7 +220,7 @@
     </div>
 
     <div class="panel hidden" id="panel-online-account">
-      <h2>Choose Your Wizard Name</h2>
+      <h2 id="account-title">Choose Your Wizard Name</h2>
       <p>Online play requires a temporary wizard name and six-digit PIN. Names use letters and numbers only, with no spaces.</p>
       <label class="field">Wizard name
         <input type="text" id="account-username" maxlength="24" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="ArcaneWizard7" />
@@ -243,6 +251,7 @@
         <button class="menu-btn" data-action="online-quick-ranked">Quick Match — Ranked</button>
         <button class="menu-btn ghost" data-action="online-quick-unranked">Quick Match — Unranked</button>
         <button class="menu-btn ghost" data-action="online-rankings">World Rankings</button>
+        <button id="btn-spectate-ranked" class="menu-btn ghost" data-action="spectate-ranked" disabled>Spectate Ranked Match</button>
         <button class="menu-btn" data-action="online-create">Create Private Duel</button>
         <button class="menu-btn ghost" data-action="lan-duel">Local Network Duel</button>
         <div class="join-row">
@@ -268,7 +277,18 @@
           <tbody id="rankings-body"></tbody>
         </table>
       </div>
+
       <p id="rankings-self" class="ranking-self"></p>
+      <div class="menu-list">
+        <button class="menu-btn ghost" data-action="online">Back to Online Duel</button>
+      </div>
+
+    </div>
+
+    <div class="panel hidden wide" id="panel-spectate-list">
+      <h2>Spectate Ranked Match</h2>
+      <p id="spectate-status" class="ranking-summary">Loading active matches…</p>
+      <div id="spectate-match-list" class="spectate-match-list"></div>
       <div class="menu-list">
         <button class="menu-btn ghost" data-action="online">Back to Online Duel</button>
       </div>
@@ -311,6 +331,14 @@
         <button class="menu-btn ghost" id="wait-copy" data-action="online-copy">Copy</button>
       </div>
       <div id="wait-spinner" class="spinner" aria-hidden="true"></div>
+      <div id="bot-offer" class="bot-offer hidden">
+        <h3 id="bot-offer-title">AI opponent available</h3>
+        <p id="bot-offer-text"></p>
+        <div class="menu-list compact">
+          <button class="menu-btn" data-action="bot-offer-accept">Accept AI Duel</button>
+          <button class="menu-btn ghost" data-action="bot-offer-decline">Keep Waiting for a Human</button>
+        </div>
+      </div>
       <div class="menu-list">
         <button id="btn-private-ready" class="menu-btn hidden" data-action="online-ready">Ready to duel</button>
         <button id="btn-private-guides" class="menu-btn ghost hidden" data-action="online-lobby-loadout">Edit guides</button>
@@ -453,6 +481,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.12.0-account1"></script>
+  <script type="module" src="./src/app/main.js?v=1.13.0"></script>
 </body>
 </html>

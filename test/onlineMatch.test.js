@@ -69,6 +69,10 @@ export async function run() {
   let status = null;
   let population = null;
   let rankingUpdate = null;
+  let botOffer = null;
+  let emojiEvent = null;
+  let spectateStart = null;
+  let spectateEnd = null;
   let room = null;
   let ended = null;
   const online = new OnlineMatch({
@@ -80,6 +84,10 @@ export async function run() {
     onStatus: (p) => { status = p; },
     onPopulation: (p) => { population = p; },
     onRankingUpdate: (p) => { rankingUpdate = p; },
+    onBotOffer: (p) => { botOffer = p; },
+    onEmoji: (p) => { emojiEvent = p; },
+    onSpectateStart: (p) => { spectateStart = p; },
+    onSpectateEnd: (p) => { spectateEnd = p; },
     onRoom: (p) => { room = p; },
     onMatchEnd: (p) => { ended = p; },
   });
@@ -110,6 +118,25 @@ export async function run() {
     matchId: 'reload-match', ok: false, code: 'persistence-failed',
   });
   eq(rankingUpdate.ok, false, 'ranking persistence failures reach the app callback');
+  socket.trigger(EVENTS.BOT_OFFER, { offerId: 'offer-1', bot: { name: 'MediumAIbot' } });
+  eq(botOffer.bot.name, 'MediumAIbot', 'bot fallback offers reach the app callback');
+  socket.trigger(EVENTS.EMOJI_EVENT, {
+    matchId: 'reload-match', sender: 1, kind: 'laugh', durationMs: 2000,
+  });
+  eq(emojiEvent.kind, 'laugh', 'online wizard emoji events reach the app callback');
+  socket.trigger(EVENTS.SPECTATE_START, {
+    matchId: 'spectate-match', names: ['Alpha', 'Beta'], glyphs: [100, 150],
+  });
+  eq(spectateStart.matchId, 'spectate-match', 'spectator start metadata reaches the app');
+  socket.trigger(EVENTS.SPECTATE_SNAPSHOT, {
+    matchId: 'spectate-match',
+    state: { tick: 1, wizards: [{ id: 0 }, { id: 1 }], projectiles: [], zones: [] },
+    events: [],
+    lastCasts: [1, 2],
+  });
+  eq(online.sim.tick, 1, 'spectator snapshot becomes the read-only render view');
+  socket.trigger(EVENTS.SPECTATE_END, { matchId: 'spectate-match' });
+  eq(spectateEnd.matchId, 'spectate-match', 'spectator end reaches the app callback');
   socket.trigger(EVENTS.ROOM_UPDATE, { state: 'private-lobby', code: 'ABCDE', readyCount: 0 });
   eq(room.code, 'ABCDE', 'private-lobby updates reach the app callback');
   eq(online.privateCode, 'ABCDE', 'private room code is retained between matches');

@@ -498,6 +498,46 @@ body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
   padding: 9px 12px; border-radius: 10px; color: #ffd66b;
   background: rgba(255,214,107,0.1); border: 1px solid rgba(255,214,107,0.35);
 }
+.bot-offer {
+  margin: 12px 0; padding: 12px; border-radius: 12px;
+  background: rgba(139,107,255,0.14); border: 1px solid rgba(139,107,255,0.5);
+}
+.bot-offer h3 { margin: 0 0 6px; color: var(--accent2); }
+.bot-offer p { margin: 0 0 8px; color: var(--ink); font-size: 13px; }
+.emoji-bar {
+  position: fixed; top: calc(62px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  z-index: 13; display: flex; gap: 7px; pointer-events: auto;
+}
+.emoji-btn {
+  width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+  color: #f4efff; background: rgba(20,12,40,0.9);
+  border: 1px solid rgba(139,107,255,0.65);
+}
+.emoji-btn:disabled { opacity: 0.35; cursor: default; }
+.mini-wizard-emoji {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 25px; height: 21px; margin-top: 6px; border-radius: 50%;
+  background: #6f51d8; font-size: 15px; font-weight: 900;
+}
+.mini-wizard-emoji::before {
+  content: ''; position: absolute; top: -10px; left: 4px;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+  border-bottom: 12px solid #8b6bff;
+}
+.spectate-match-list { display: grid; gap: 9px; margin: 12px 0; }
+.spectate-match-btn {
+  width: 100%; padding: 12px; text-align: left; cursor: pointer; border-radius: 11px;
+  color: var(--ink); background: rgba(20,12,40,0.86);
+  border: 1px solid rgba(139,107,255,0.45);
+}
+.spectate-match-btn strong { display: block; color: var(--accent2); }
+.spectate-match-btn small { color: #ffd66b; }
+body.mode-spectator .spellbar,
+body.mode-spectator .move-pad,
+body.mode-spectator .draw-pad,
+body.mode-spectator .action-buttons,
+body.mode-spectator .emoji-bar { display: none !important; }
+body.mode-spectator .player-panel { bottom: calc(16px + var(--safe-bottom)); }
 .join-row { display: flex; gap: 8px; align-items: stretch; }
 .join-row input {
   flex: 1; min-width: 0; padding: 10px; border-radius: 10px; background: #1a1230;
