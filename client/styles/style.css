@@ -509,20 +509,22 @@ body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
   z-index: 13; display: flex; gap: 7px; pointer-events: auto;
 }
 .emoji-btn {
-  width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+  width: 56px; height: 58px; border-radius: 12px; cursor: pointer;
   color: #f4efff; background: rgba(20,12,40,0.9);
-  border: 1px solid rgba(139,107,255,0.65);
+  border: 1px solid rgba(139,107,255,0.75);
+  padding: 5px 2px 2px;
 }
 .emoji-btn:disabled { opacity: 0.35; cursor: default; }
+.emoji-btn small { display: block; margin-top: 4px; font-size: 9px; color: #fff; }
 .mini-wizard-emoji {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
-  width: 25px; height: 21px; margin-top: 6px; border-radius: 50%;
-  background: #6f51d8; font-size: 15px; font-weight: 900;
+  width: 30px; height: 27px; margin-top: 4px; border-radius: 50%;
+  font-size: 25px; line-height: 1;
 }
 .mini-wizard-emoji::before {
-  content: ''; position: absolute; top: -10px; left: 4px;
-  border-left: 8px solid transparent; border-right: 8px solid transparent;
-  border-bottom: 12px solid #8b6bff;
+  content: ''; position: absolute; z-index: 2; top: -9px; left: 5px;
+  border-left: 10px solid transparent; border-right: 10px solid transparent;
+  border-bottom: 13px solid #8b6bff;
 }
 .spectate-match-list { display: grid; gap: 9px; margin: 12px 0; }
 .spectate-match-btn {

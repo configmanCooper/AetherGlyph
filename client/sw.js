@@ -10,7 +10,7 @@
 // unaffected. CACHE_VERSION starts with the app version and may add an asset
 // revision when web files change without rebuilding the native packages.
 
-const CACHE_VERSION = '1.13.0';
+const CACHE_VERSION = '1.13.0-emoji2';
 const CACHE_PREFIX = 'aetherglyph-shell-v';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
@@ -19,8 +19,8 @@ const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 // runtime on first load.
 const SHELL = [
   './index.html',
-  './styles/style.css?v=1.13.0',
-  './src/app/main.js?v=1.13.0',
+  './styles/style.css?v=1.13.0-emoji2',
+  './src/app/main.js?v=1.13.0-emoji2',
   './src/game/menuDuel.js',
   './audio/music/wanderlust-menu.mp3',
   './audio/music/spell-duel.mp3',

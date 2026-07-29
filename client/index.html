@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles/style.css?v=1.13.0" />
+  <link rel="stylesheet" href="./styles/style.css?v=1.13.0-emoji2" />
   <script type="importmap">
   {
     "imports": {
@@ -107,10 +107,18 @@
       <button id="btn-sidestep" class="act-btn"><span class="desktop-label">Dodge (Space)</span><span class="touch-label">Dodge</span></button>
     </div>
     <div id="emoji-bar" class="emoji-bar hidden" aria-label="Wizard emojis">
-      <button class="emoji-btn" data-emoji="smile" title="Smile"><span class="mini-wizard-emoji">⌣</span></button>
-      <button class="emoji-btn" data-emoji="angry" title="Angry"><span class="mini-wizard-emoji">╬</span></button>
-      <button class="emoji-btn" data-emoji="cry" title="Crying"><span class="mini-wizard-emoji">╥</span></button>
-      <button class="emoji-btn" data-emoji="laugh" title="Laughing"><span class="mini-wizard-emoji">ᗧ</span></button>
+      <button class="emoji-btn" data-emoji="smile" title="Smiling wizard" aria-label="Smiling wizard">
+        <span class="mini-wizard-emoji">🙂</span><small>Smile</small>
+      </button>
+      <button class="emoji-btn" data-emoji="laugh" title="Laughing wizard" aria-label="Laughing wizard">
+        <span class="mini-wizard-emoji">😂</span><small>Laugh</small>
+      </button>
+      <button class="emoji-btn" data-emoji="cry" title="Crying wizard" aria-label="Crying wizard">
+        <span class="mini-wizard-emoji">😢</span><small>Cry</small>
+      </button>
+      <button class="emoji-btn" data-emoji="angry" title="Angry wizard" aria-label="Angry wizard">
+        <span class="mini-wizard-emoji">😠</span><small>Angry</small>
+      </button>
     </div>
 
     <button id="btn-menu" class="corner-btn" title="Menu">☰</button>
@@ -481,6 +489,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="./src/app/main.js?v=1.13.0"></script>
+  <script type="module" src="./src/app/main.js?v=1.13.0-emoji2"></script>
 </body>
 </html>

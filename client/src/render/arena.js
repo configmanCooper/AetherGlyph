@@ -886,30 +886,54 @@ export class Arena {
       canvas.width = 256; canvas.height = 256;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, 256, 256);
-      ctx.fillStyle = 'rgba(8,5,18,0.88)';
-      ctx.beginPath(); ctx.arc(128, 140, 82, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#8b6bff'; ctx.lineWidth = 8; ctx.stroke();
-      // Custom wizard hat.
-      ctx.fillStyle = '#5f42c9';
-      ctx.beginPath(); ctx.moveTo(128, 12); ctx.lineTo(65, 100); ctx.lineTo(191, 100); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#8b6bff'; ctx.fillRect(48, 92, 160, 20);
-      ctx.fillStyle = '#ffd66b'; ctx.beginPath(); ctx.arc(135, 58, 8, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#f4efff'; ctx.fillStyle = '#f4efff'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+      ctx.fillStyle = 'rgba(8,5,18,0.82)';
+      ctx.beginPath(); ctx.arc(128, 139, 86, 0, Math.PI * 2); ctx.fill();
+      // Bright, readable face.
+      ctx.fillStyle = '#ffd84d';
+      ctx.beginPath(); ctx.arc(128, 145, 68, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#2a173d'; ctx.lineWidth = 7; ctx.stroke();
+      // Shared purple wizard hat.
+      ctx.fillStyle = '#603cc5';
+      ctx.beginPath(); ctx.moveTo(128, 5); ctx.lineTo(73, 88); ctx.lineTo(183, 88); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#c5aaff'; ctx.lineWidth = 5; ctx.stroke();
+      ctx.fillStyle = '#815de0'; ctx.fillRect(58, 80, 140, 18);
+      ctx.fillStyle = '#fff1a3'; ctx.beginPath(); ctx.arc(138, 43, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#311d38'; ctx.fillStyle = '#311d38'; ctx.lineWidth = 8; ctx.lineCap = 'round';
       if (kind === 'angry') {
-        ctx.beginPath(); ctx.moveTo(88, 125); ctx.lineTo(112, 137); ctx.moveTo(168, 125); ctx.lineTo(144, 137); ctx.stroke();
-        ctx.strokeStyle = '#ff7066'; ctx.beginPath(); ctx.moveTo(98, 188); ctx.quadraticCurveTo(128, 160, 158, 188); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(88, 118); ctx.lineTo(112, 130); ctx.moveTo(168, 118); ctx.lineTo(144, 130); ctx.stroke();
+        ctx.beginPath(); ctx.arc(101, 139, 7, 0, Math.PI * 2); ctx.arc(155, 139, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(99, 187); ctx.quadraticCurveTo(128, 158, 157, 187); ctx.stroke();
+        ctx.strokeStyle = '#e23b36'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(180, 110); ctx.lineTo(196, 95); ctx.moveTo(183, 119); ctx.lineTo(204, 116); ctx.stroke();
       } else {
-        ctx.beginPath(); ctx.arc(98, 140, 7, 0, Math.PI * 2); ctx.arc(158, 140, 7, 0, Math.PI * 2); ctx.fill();
         if (kind === 'smile') {
-          ctx.beginPath(); ctx.arc(128, 157, 34, 0.15, Math.PI - 0.15); ctx.stroke();
+          ctx.beginPath(); ctx.arc(101, 137, 7, 0, Math.PI * 2); ctx.arc(155, 137, 7, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(128, 151, 34, 0.2, Math.PI - 0.2); ctx.stroke();
         } else if (kind === 'cry') {
-          ctx.beginPath(); ctx.arc(128, 192, 28, Math.PI + 0.2, Math.PI * 2 - 0.2); ctx.stroke();
-          ctx.fillStyle = '#57c8ff'; ctx.beginPath(); ctx.ellipse(98, 166, 9, 18, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(101, 137, 7, 0, Math.PI * 2); ctx.arc(155, 137, 7, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(128, 188, 30, Math.PI + 0.2, Math.PI * 2 - 0.2); ctx.stroke();
+          ctx.fillStyle = '#36aef4';
+          ctx.beginPath(); ctx.ellipse(100, 166, 9, 20, 0.1, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(156, 166, 9, 20, -0.1, 0, Math.PI * 2); ctx.fill();
         } else {
-          ctx.beginPath(); ctx.arc(128, 155, 38, 0.05, Math.PI - 0.05); ctx.stroke();
-          ctx.fillStyle = '#f4efff'; ctx.fillRect(100, 174, 56, 13);
+          // Laughing: closed crescent eyes, open mouth, teeth, and joy tears.
+          ctx.beginPath(); ctx.arc(101, 143, 14, Math.PI + 0.2, Math.PI * 2 - 0.2);
+          ctx.arc(155, 143, 14, Math.PI + 0.2, Math.PI * 2 - 0.2); ctx.stroke();
+          ctx.fillStyle = '#54233e'; ctx.beginPath(); ctx.ellipse(128, 177, 37, 31, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(100, 161, 56, 12);
+          ctx.fillStyle = '#ef6d8f'; ctx.beginPath(); ctx.ellipse(128, 193, 20, 9, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#36aef4'; ctx.beginPath(); ctx.ellipse(85, 158, 7, 14, -0.3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(171, 158, 7, 14, 0.3, 0, Math.PI * 2); ctx.fill();
         }
       }
+      ctx.font = 'bold 21px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#20102f';
+      ctx.lineWidth = 5;
+      const label = { smile: 'SMILE', laugh: 'LAUGH', cry: 'CRY', angry: 'ANGRY' }[kind];
+      ctx.strokeText(label, 128, 239);
+      ctx.fillText(label, 128, 239);
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });

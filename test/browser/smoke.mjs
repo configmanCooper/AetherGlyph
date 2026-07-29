@@ -237,8 +237,12 @@ try {
     spectateDisabled: document.querySelector('#btn-spectate-ranked')?.disabled,
     spectateText: document.querySelector('#btn-spectate-ranked')?.textContent || '',
     emojis: document.querySelectorAll('#emoji-bar [data-emoji]').length,
+    emojiLabels: [...document.querySelectorAll('#emoji-bar .emoji-btn')]
+      .map((button) => button.textContent.trim()),
   }));
-  if (!socialControls.spectateDisabled || socialControls.emojis !== 4) {
+  if (!socialControls.spectateDisabled || socialControls.emojis !== 4
+      || !['Smile', 'Laugh', 'Cry', 'Angry'].every((label) =>
+        socialControls.emojiLabels.some((text) => text.includes(label)))) {
     fail('online social controls are incomplete: ' + JSON.stringify(socialControls));
   }
   const emojiKinds = await page.evaluate(() =>
@@ -368,7 +372,8 @@ try {
   }));
   if (!simulatedSpectator || !spectatorUi.bodyMode || !spectatorUi.drawHidden
       || !spectatorUi.spellbarHidden || spectatorUi.playerName !== 'AlphaWizard') {
-    fail('ranked spectator view is not read-only or third-person: ' + JSON.stringify(spectatorUi));
+    fail('ranked spectator view is not read-only or third-person: '
+      + JSON.stringify({ simulatedSpectator, ...spectatorUi }));
   }
   await page.evaluate(() => window.__aegTest.stopSpectating());
   const simulatedOnline = await page.evaluate(() => window.__aegTest?.simulateOnlineStart());
