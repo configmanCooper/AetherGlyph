@@ -251,6 +251,13 @@ try {
       || emojiKinds.some((kind) => !/^wizard-emoji-/.test(String(kind)))) {
     fail('custom wizard emoji visuals are missing or duplicated: ' + JSON.stringify(emojiKinds));
   }
+  const remoteEmoji = await page.evaluate(() => window.__aegTest.simulateOnlineEmoji({
+    sender: 1, kind: 'laugh', durationMs: 2000,
+  }));
+  if (remoteEmoji.effect !== 'wizard-emoji-laugh'
+      || !/Opponent sent .*Laugh/.test(remoteEmoji.toast || '')) {
+    fail('remote wizard emoji is not prominently presented: ' + JSON.stringify(remoteEmoji));
+  }
   await page.waitForFunction(() => /^Players online: (?:\d+|9999\+)$/.test(
     document.querySelector('#online-population')?.textContent || ''), { timeout: 10000 });
   await activate(page, '[data-action="online-rankings"]');

@@ -936,11 +936,21 @@ export class Arena {
       ctx.fillText(label, 128, 239);
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      });
       const sprite = new THREE.Sprite(material);
       sprite.position.copy(this._wizardWorld(sender, 2.55));
       if (!this._showcaseMode && sender === 0) sprite.position.z -= 1.2;
-      sprite.scale.set(1.55, 1.55, 1.55);
+      const distance = this.camera.position.distanceTo(sprite.position);
+      const scale = Math.max(1.65, Math.min(2.6, distance * 0.2));
+      sprite.scale.set(scale, scale, scale);
+      sprite.layers.set(1);
+      sprite.renderOrder = 1000;
       let elapsed = 0;
       const handle = {
         kind: `wizard-emoji-${kind}`,

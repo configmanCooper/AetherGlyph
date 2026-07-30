@@ -124,6 +124,11 @@ export async function run() {
     matchId: 'reload-match', sender: 1, kind: 'laugh', durationMs: 2000,
   });
   eq(emojiEvent.kind, 'laugh', 'online wizard emoji events reach the app callback');
+  eq(emojiEvent.sender, 1, 'opponent emoji identity reaches the app callback');
+  socket.trigger(EVENTS.EMOJI_EVENT, {
+    matchId: 'stale-match', sender: 0, kind: 'angry', durationMs: 2000,
+  });
+  eq(emojiEvent.kind, 'laugh', 'stale emoji events from another match are ignored');
   socket.trigger(EVENTS.SPECTATE_START, {
     matchId: 'spectate-match', names: ['Alpha', 'Beta'], glyphs: [100, 150],
   });

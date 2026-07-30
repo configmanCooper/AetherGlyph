@@ -220,6 +220,15 @@ async function main() {
     eq(joinStart.slot, 1, 'joiner match-start slot 1');
     ok(typeof hostStart.token === 'string' && hostStart.token.length > 10, 'host receives a resume token');
     eq(hostStart.ranked, false, 'private match is unranked (does not affect Glyphs)');
+    const hostEmojiP = once(host, EVENTS.EMOJI_EVENT);
+    const joinerEmojiP = once(joiner, EVENTS.EMOJI_EVENT);
+    const privateEmoji = await emitAck(host, EVENTS.EMOJI, { kind: 'laugh' });
+    ok(privateEmoji.ok, 'private-duel emoji is accepted');
+    const hostEmoji = await hostEmojiP;
+    const joinerEmoji = await joinerEmojiP;
+    eq(hostEmoji.sender, 0, 'private-duel sender sees the emoji on their wizard');
+    eq(joinerEmoji.sender, 1, 'private-duel opponent sees the emoji on the remote wizard');
+    eq(joinerEmoji.kind, 'laugh', 'private-duel opponent receives the selected emoji kind');
 
     // --- 4. Full-roster trace classification + forged spell id ignored ----
     // Collect host snapshots to observe authoritative state.

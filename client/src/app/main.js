@@ -2169,9 +2169,20 @@ async function sendOnlineEmoji(kind) {
 }
 
 function onOnlineEmoji(event) {
+  const presentations = {
+    smile: { icon: '🙂', label: 'Smile' },
+    laugh: { icon: '😂', label: 'Laugh' },
+    cry: { icon: '😢', label: 'Cry' },
+    angry: { icon: '😠', label: 'Angry' },
+  };
+  const presentation = presentations[event?.kind];
+  if (!presentation) return;
   const sender = event?.sender === 1 ? 1 : 0;
   if (!arena.showWizardEmoji(sender, event?.kind, event?.durationMs || 2000)) return;
   audio.emoji(event.kind);
+  if (sender === 1 && !event?.spectator) {
+    toast(`Opponent sent ${presentation.icon} ${presentation.label}`);
+  }
   if (sender === 0 && !event?.spectator) {
     onlineEmojiReadyAt = Date.now() + (event.cooldownMs || 10000);
     setEmojiButtonsEnabled(false);
@@ -2915,6 +2926,17 @@ if (typeof window !== 'undefined') {
         return $('#toast')?.textContent || '';
       } catch (e) {
         return String(e && e.message || e);
+      }
+    },
+    simulateOnlineEmoji: (event = {}) => {
+      try {
+        onOnlineEmoji(event);
+        return {
+          toast: $('#toast')?.textContent || '',
+          effect: arena.effects[arena.effects.length - 1]?.handle?.kind || null,
+        };
+      } catch (e) {
+        return { error: String(e && e.message || e) };
       }
     },
     returnMenu: () => { try { returnToMainMenu(); return true; } catch { return false; } },
