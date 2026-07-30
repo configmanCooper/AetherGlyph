@@ -388,10 +388,69 @@ try {
   const emojiUi = await page.evaluate(() => ({
     visible: !document.querySelector('#emoji-bar')?.classList.contains('hidden'),
     buttons: document.querySelectorAll('#emoji-bar [data-emoji]').length,
+    emoji: (() => {
+      const rect = document.querySelector('#emoji-bar')?.getBoundingClientRect();
+      return rect ? { top: rect.top, bottom: rect.bottom } : null;
+    })(),
+    actions: (() => {
+      const rect = document.querySelector('.action-buttons')?.getBoundingClientRect();
+      return rect ? { top: rect.top, bottom: rect.bottom } : null;
+    })(),
+    maxButtonWidth: Math.max(...[...document.querySelectorAll('#emoji-bar [data-emoji]')]
+      .map((button) => button.getBoundingClientRect().width)),
   }));
-  if (!emojiUi.visible || emojiUi.buttons !== 4) {
+  if (!emojiUi.visible || emojiUi.buttons !== 4
+      || !emojiUi.emoji || !emojiUi.actions
+      || emojiUi.emoji.bottom > emojiUi.actions.top + 1
+      || emojiUi.maxButtonWidth > 44) {
     fail('online match did not show four wizard emojis: ' + JSON.stringify(emojiUi));
   }
+  const originalLeftHanded = await page.evaluate(() => document.body.classList.contains('lefthand'));
+  for (const layout of [
+    { width: 390, height: 844, leftHanded: false },
+    { width: 390, height: 844, leftHanded: true },
+    { width: 844, height: 390, leftHanded: false },
+    { width: 844, height: 390, leftHanded: true },
+  ]) {
+    await page.setViewport({
+      width: layout.width, height: layout.height, isMobile: true, hasTouch: true,
+    });
+    await page.evaluate((leftHanded) => {
+      document.body.classList.toggle('lefthand', leftHanded);
+    }, layout.leftHanded);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const stacked = await page.evaluate(() => {
+      const bounds = (selector) => {
+        const rect = document.querySelector(selector)?.getBoundingClientRect();
+        return rect ? {
+          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+        } : null;
+      };
+      return {
+        emoji: bounds('#emoji-bar'),
+        actions: bounds('.action-buttons'),
+        viewport: { width: innerWidth, height: innerHeight },
+        buttonWidths: [...document.querySelectorAll('#emoji-bar [data-emoji]')]
+          .map((button) => button.getBoundingClientRect().width),
+      };
+    });
+    const aligned = !!stacked.emoji && !!stacked.actions && (layout.leftHanded
+      ? Math.abs(stacked.emoji.right - stacked.actions.right) <= 2
+      : Math.abs(stacked.emoji.left - stacked.actions.left) <= 2);
+    if (!stacked.emoji || !stacked.actions || !aligned
+        || stacked.emoji.bottom > stacked.actions.top + 1
+        || stacked.emoji.top < 0 || stacked.emoji.right > stacked.viewport.width + 1
+        || Math.max(...stacked.buttonWidths) > 44) {
+      fail('responsive emoji controls are not stacked above actions: '
+        + JSON.stringify({ layout, stacked }));
+    }
+  }
+  await page.setViewport({ width: 900, height: 520, isMobile: true, hasTouch: true });
+  await page.evaluate((leftHanded) => {
+    document.body.classList.toggle('lefthand', leftHanded);
+  }, originalLeftHanded);
+  await page.bringToFront();
+  await page.evaluate(() => window.focus());
   await page.waitForSelector('#hud:not(.hidden) #spellbar .spell-btn[data-spell]', { timeout: 5000 });
   const onlineGuideCount = await page.evaluate(() => document.querySelectorAll('#spellbar .spell-btn[data-spell]').length);
   if (onlineGuideCount !== 8) fail('online duel did not show all eight guide shortcuts: ' + onlineGuideCount);

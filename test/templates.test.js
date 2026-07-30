@@ -151,5 +151,11 @@ export function run() {
       && Math.max(...oilYs) - Math.min(...oilYs) >= 40,
   'Oil Script is a smooth horizontal three-hump wave');
 
+  const phoenix = GESTURE_TEMPLATES.phoenixWing[0];
+  eq(phoenix[phoenix.length - 1].x, phoenix[0].x,
+    'Phoenix Covenant closes from its final point back to its first point horizontally');
+  eq(phoenix[phoenix.length - 1].y, phoenix[0].y,
+    'Phoenix Covenant closes from its final point back to its first point vertically');
+
   return report('templates');
 }

@@ -95,6 +95,11 @@ export function run() {
     'First Formal Duel prompts for eight public guide shortcuts');
   ok(CAMPAIGN_BY_ID.A16.fullRoster === true,
     'Eight Schools Examination enables recognition for the full spell roster');
+  ok(['L12', 'A16', 'EXAM', 'EXAM_GM'].every((id) => {
+    const narration = CAMPAIGN_BY_ID[id].narration.join(' ');
+    return /guides?/i.test(narration) && /any spell|every spell/i.test(narration)
+      && /limit|restrict/i.test(narration);
+  }), 'every formal duel explains that guides do not limit which spell can be cast');
   ok(CAMPAIGN_BY_ID.L01.narration.some((line) => /joystick down|Brace button/i.test(line)),
     'Aether Breath explicitly teaches the Brace controls');
   ok(CAMPAIGN_BY_ID.L02.narration.some((line) => /joystick.*left or right.*Dodge/i.test(line)),

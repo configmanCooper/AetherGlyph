@@ -163,18 +163,27 @@ export function run() {
   eq(groundingVsFireball, 0, 'Fireball triangles and Grounding diamonds never cross-cast');
   ok(stoneWallCorrect >= 195, `rough Stone Wall U-shapes meet confidence (${stoneWallCorrect}/200)`);
   ok(veilCorrect >= 195, `wider Veil ribbon remains recognizable (${veilCorrect}/200)`);
-  let arcaneMissileCorrect = 0, basicFlickMiscasts = 0, phoenixMissileMiscasts = 0;
+  const openPhoenix = [
+    { x: 10, y: 72 }, { x: 28, y: 36 }, { x: 40, y: 56 }, { x: 50, y: 18 },
+    { x: 60, y: 56 }, { x: 72, y: 36 }, { x: 90, y: 72 },
+  ];
+  let arcaneMissileCorrect = 0, basicFlickMiscasts = 0;
+  let openPhoenixIncorrectlyAccepted = 0, openPhoenixMissileCasts = 0;
   for (let seed = 1; seed <= 200; seed++) {
     const missile = full.recognize(jitter(GESTURE_TEMPLATES.arcUp[0], 12, seed * 239));
     const flick = full.recognize(jitter(GESTURE_TEMPLATES.flickRight[0], 8, seed * 239));
-    const phoenix = full.recognize(jitter(GESTURE_TEMPLATES.phoenixWing[0], 8, seed * 239));
+    const phoenix = full.recognize(jitter(openPhoenix, 8, seed * 239));
     if (missile.accepted && missile.spellId === 5) arcaneMissileCorrect++;
     if (flick.accepted && flick.spellId === 5) basicFlickMiscasts++;
-    if (phoenix.accepted && phoenix.spellId === 5) phoenixMissileMiscasts++;
+    if (phoenix.accepted && phoenix.spellId === 39) openPhoenixIncorrectlyAccepted++;
+    if (phoenix.accepted && phoenix.spellId === 5) openPhoenixMissileCasts++;
   }
   ok(arcaneMissileCorrect >= 195, `rough Arcane Missile arcs remain recognizable (${arcaneMissileCorrect}/200)`);
   eq(basicFlickMiscasts, 0, 'Ember Bolt flicks do not become Arcane Missile');
-  eq(phoenixMissileMiscasts, 0, 'Phoenix Covenant wings do not become Arcane Missile');
+  eq(openPhoenixIncorrectlyAccepted, 0,
+    'an open Phoenix wing is never accepted as the harder Phoenix Covenant');
+  ok(openPhoenixMissileCasts > 0,
+    `an unfinished Phoenix wing may resolve as Arcane Missile (${openPhoenixMissileCasts}/200)`);
   eq(full.recognize(GESTURE_TEMPLATES.arcUp[0]).requiredMargin, 0.01,
     'high-confidence Arcane Missile uses the forgiving ambiguity margin');
   const chainNearMiss = [

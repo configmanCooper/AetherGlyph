@@ -522,6 +522,7 @@ export const CAMPAIGN = [
     id: 'L12', chapter: 'core', title: 'First Formal Duel', order: 12,
     narration: [
       'Build a legal loadout: eight spells, fourteen points, school and heavy limits.',
+      'The eight selected guides are only visual references — you may draw and cast any spell you know, even when a different guide is selected.',
       'A full round adds the timer and Arcane Pressure. Win it fairly.',
       'Defeat the fair Easy AI in one legal round.',
     ],
@@ -676,6 +677,7 @@ export const CAMPAIGN = [
     optional: true, formal: true, bestOfThree: true, fullRoster: true,
     narration: [
       'Adapt across schools against a sharper opponent.',
+      'Guides are only visual references — they never limit casting, so you may draw and cast any spell you know.',
       'Win a best-of-three against the fair Medium AI — take two rounds.',
     ],
     timerEnabled: true, pressureEnabled: true,
@@ -865,6 +867,7 @@ export const CAMPAIGN = [
     narration: [
       'The Final Duel: a best-of-three against the fair Magus examiner.',
       'Bring a legal loadout. Timer and Arcane Pressure are live.',
+      'Your eight guides are optional references, not a spell limit — you may draw and cast any spell you know.',
       'Take two rounds to pass the examination.',
     ],
     timerEnabled: true, pressureEnabled: true,
@@ -892,6 +895,7 @@ export const CAMPAIGN = [
     requires: [{ lesson: 'EXAM' }],
     narration: [
       'Optional mastery: a best-of-three against the fair Hard AI.',
+      'Guides never restrict which spell you can cast; this trial leaves them hidden, but every spell you know remains drawable from memory.',
       'Win two rounds to earn the persistent Grandmaster title.',
     ],
     timerEnabled: true, pressureEnabled: true,

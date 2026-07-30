@@ -505,26 +505,54 @@ body.reduced .spell-btn, body.reduced .zone-chip { transition: none; }
 .bot-offer h3 { margin: 0 0 6px; color: var(--accent2); }
 .bot-offer p { margin: 0 0 8px; color: var(--ink); font-size: 13px; }
 .emoji-bar {
-  position: fixed; top: calc(62px + var(--safe-top)); left: 50%; transform: translateX(-50%);
-  z-index: 13; display: flex; gap: 7px; pointer-events: auto;
+  position: absolute; bottom: calc(min(42vh, 340px) + 76px + var(--safe-bottom));
+  left: 50%; transform: translateX(-50%);
+  z-index: 13; display: flex; gap: 4px; pointer-events: auto;
 }
 .emoji-btn {
-  width: 56px; height: 58px; border-radius: 12px; cursor: pointer;
+  width: 42px; height: 44px; border-radius: 10px; cursor: pointer;
   color: #f4efff; background: rgba(20,12,40,0.9);
   border: 1px solid rgba(139,107,255,0.75);
-  padding: 5px 2px 2px;
+  padding: 3px 1px 1px;
 }
 .emoji-btn:disabled { opacity: 0.35; cursor: default; }
-.emoji-btn small { display: block; margin-top: 4px; font-size: 9px; color: #fff; }
+.emoji-btn small { display: block; margin-top: 2px; font-size: 8px; line-height: 1; color: #fff; }
 .mini-wizard-emoji {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 27px; margin-top: 4px; border-radius: 50%;
-  font-size: 25px; line-height: 1;
+  width: 23px; height: 21px; margin-top: 3px; border-radius: 50%;
+  font-size: 19px; line-height: 1;
 }
 .mini-wizard-emoji::before {
-  content: ''; position: absolute; z-index: 2; top: -9px; left: 5px;
-  border-left: 10px solid transparent; border-right: 10px solid transparent;
-  border-bottom: 13px solid #8b6bff;
+  content: ''; position: absolute; z-index: 2; top: -7px; left: 4px;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+  border-bottom: 10px solid #8b6bff;
+}
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  .emoji-bar {
+    left: calc(14px + var(--safe-left)); right: auto; transform: none;
+    width: min(34vw, 210px); justify-content: center; gap: 3px;
+    bottom: calc(50px + var(--safe-bottom) + min(34vw, 210px));
+  }
+  body.lefthand .emoji-bar {
+    left: auto; right: calc(14px + var(--safe-right));
+  }
+  .emoji-btn { flex: 1 1 0; min-width: 0; max-width: 44px; }
+}
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  .emoji-bar {
+    left: calc(14px + var(--safe-left)); right: auto; transform: none;
+    width: min(17vw, 120px); justify-content: center; gap: 2px;
+    bottom: calc(48px + var(--safe-bottom) + min(17vw, 120px));
+  }
+  body.lefthand .emoji-bar {
+    left: auto; right: calc(14px + var(--safe-right));
+  }
+  .emoji-btn {
+    flex: 1 1 0; min-width: 0; width: auto; max-width: 30px;
+    height: 38px; padding-inline: 0;
+  }
+  .emoji-btn small { font-size: 7px; }
+  .mini-wizard-emoji { width: 20px; font-size: 17px; }
 }
 .spectate-match-list { display: grid; gap: 9px; margin: 12px 0; }
 .spectate-match-btn {

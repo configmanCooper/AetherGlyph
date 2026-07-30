@@ -16,6 +16,7 @@ import { boundTrace } from '../shared/src/protocol/net.js';
 import { GESTURE_TEMPLATES } from '../shared/src/gesture/templates.js';
 import { presetLoadout } from '../shared/src/balance/loadouts.js';
 import { MATCH } from '../shared/src/sim/constants.js';
+import { chooseBotEmojiReaction } from '../server/matchRoom.js';
 
 let pass = 0, fail = 0;
 const fails = [];
@@ -60,6 +61,54 @@ const emberIds = presetLoadout('ember-rush').map((s) => s.id);   // includes Emb
 const tideIds = presetLoadout('tide-control').map((s) => s.id);
 
 async function main() {
+  {
+    const wizards = [{ health: MATCH.startHealth }, { health: MATCH.startHealth }];
+    eq(chooseBotEmojiReaction({
+      botSlot: 1,
+      events: [{ type: 'damage', target: 1, amount: 10 }],
+      wizards,
+      random: () => 0,
+    }), 'cry', 'server bot may cry after taking spell damage');
+    {
+      const rolls = [0, 0.9];
+      eq(chooseBotEmojiReaction({
+        botSlot: 1,
+        events: [{ type: 'damage', target: 1, amount: 10 }],
+        wizards,
+        random: () => rolls.shift(),
+      }), 'angry', 'server bot may become angry after taking spell damage');
+    }
+    eq(chooseBotEmojiReaction({
+      botSlot: 1,
+      events: [{ type: 'damage', target: 0, amount: 10 }],
+      wizards,
+      random: () => 0,
+    }), 'smile', 'server bot may smile after dealing spell damage');
+    {
+      const rolls = [0, 0.9];
+      eq(chooseBotEmojiReaction({
+        botSlot: 1,
+        events: [{ type: 'damage', target: 0, amount: 10 }],
+        wizards,
+        random: () => rolls.shift(),
+      }), 'laugh', 'server bot may laugh after dealing spell damage');
+    }
+    eq(chooseBotEmojiReaction({
+      botSlot: 1,
+      events: [],
+      wizards: [{ health: MATCH.startHealth }, { health: 20 }],
+      ambient: true,
+      random: () => 0,
+    }), 'cry', 'server bot may cry while very low on health');
+    eq(chooseBotEmojiReaction({
+      botSlot: 1,
+      events: [],
+      wizards: [{ health: 20 }, { health: MATCH.startHealth }],
+      ambient: true,
+      random: () => 0,
+    }), 'laugh', 'server bot may laugh while its opponent is very low on health');
+  }
+
   const gs = createGameServer({
     secret: 'test-secret',
     allowedOrigins: [],
@@ -470,6 +519,14 @@ async function main() {
       }
       ok(match.sim.wizards[1].castsResolved > 0,
         'authoritative internal PracticeBot actively casts during the duel');
+      match.seats[1].emojiReadyAt = 0;
+      match.sim.wizards[0].health = 20;
+      match.botEmojiRngState = 1;
+      const botEmojiP = once(human, EVENTS.EMOJI_EVENT);
+      match.updateBotEmojiReactions([{ type: 'damage', target: 0, amount: 10 }]);
+      const botEmoji = await botEmojiP;
+      eq(botEmoji.sender, 1, 'internal server bot emoji appears on the opponent wizard');
+      eq(botEmoji.kind, 'laugh', 'internal server bot laughs after hitting a low-health player');
       match.endMatch(0, 'series');
       const ranking = await rankingP;
       eq(ranking.delta, 20, 'ranked AI win awards at most 20 Glyphs');
