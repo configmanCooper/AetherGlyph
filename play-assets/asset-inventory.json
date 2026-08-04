@@ -1,0 +1,541 @@
+{
+  "generatedAt": "2026-08-04T04:42:34.763Z",
+  "editions": {
+    "demo": {
+      "static": [
+        {
+          "file": "demo/app-icon-512.png",
+          "width": 512,
+          "height": 512,
+          "format": "png",
+          "hasAlpha": true,
+          "bytes": 534374
+        },
+        {
+          "file": "demo/feature-graphic-1024x500.png",
+          "width": 1024,
+          "height": 500,
+          "format": "png",
+          "hasAlpha": false,
+          "bytes": 1053613
+        },
+        {
+          "file": "demo/google-play-games-pc/logo-600x400.png",
+          "width": 600,
+          "height": 400,
+          "format": "png",
+          "hasAlpha": true,
+          "bytes": 17880
+        },
+        {
+          "file": "demo/google-play-games-pc/feature-graphic-1920x1080.png",
+          "width": 1920,
+          "height": 1080,
+          "format": "png",
+          "hasAlpha": false,
+          "bytes": 3687912
+        }
+      ],
+      "phone": [
+        {
+          "file": "demo/phone/01-enter-the-academy.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 300771
+        },
+        {
+          "file": "demo/phone/02-guided-campaign.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 317575
+        },
+        {
+          "file": "demo/phone/03-spell-roster.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 311868
+        },
+        {
+          "file": "demo/phone/04-guide-shortcuts.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 362266
+        },
+        {
+          "file": "demo/phone/05-practice-options.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 265263
+        },
+        {
+          "file": "demo/phone/06-offline-duel.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 304562
+        },
+        {
+          "file": "demo/phone/07-glyph-laboratory.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 276626
+        }
+      ],
+      "tablet7": [
+        {
+          "file": "demo/tablet-7/01-enter-the-academy.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 435354
+        },
+        {
+          "file": "demo/tablet-7/02-guided-campaign.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 433209
+        },
+        {
+          "file": "demo/tablet-7/03-spell-roster.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 624832
+        },
+        {
+          "file": "demo/tablet-7/04-guide-shortcuts.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 466846
+        },
+        {
+          "file": "demo/tablet-7/05-practice-options.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 352539
+        },
+        {
+          "file": "demo/tablet-7/06-offline-duel.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 403362
+        },
+        {
+          "file": "demo/tablet-7/07-glyph-laboratory.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 368080
+        }
+      ],
+      "tablet10": [
+        {
+          "file": "demo/tablet-10/01-enter-the-academy.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 528326
+        },
+        {
+          "file": "demo/tablet-10/02-guided-campaign.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 506467
+        },
+        {
+          "file": "demo/tablet-10/03-spell-roster.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 716304
+        },
+        {
+          "file": "demo/tablet-10/04-guide-shortcuts.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 538214
+        },
+        {
+          "file": "demo/tablet-10/05-practice-options.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 423083
+        },
+        {
+          "file": "demo/tablet-10/06-offline-duel.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 473656
+        },
+        {
+          "file": "demo/tablet-10/07-glyph-laboratory.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 425150
+        }
+      ],
+      "pc": [
+        {
+          "file": "demo/google-play-games-pc/screenshots/01-enter-the-academy.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 271862
+        },
+        {
+          "file": "demo/google-play-games-pc/screenshots/02-guided-campaign.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 203443
+        },
+        {
+          "file": "demo/google-play-games-pc/screenshots/03-spell-roster.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 290430
+        },
+        {
+          "file": "demo/google-play-games-pc/screenshots/04-guide-shortcuts.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 272130
+        },
+        {
+          "file": "demo/google-play-games-pc/screenshots/05-practice-options.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 243313
+        },
+        {
+          "file": "demo/google-play-games-pc/screenshots/06-offline-duel.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 319992
+        },
+        {
+          "file": "demo/google-play-games-pc/screenshots/07-glyph-laboratory.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 291085
+        }
+      ]
+    },
+    "full": {
+      "static": [
+        {
+          "file": "full/app-icon-512.png",
+          "width": 512,
+          "height": 512,
+          "format": "png",
+          "hasAlpha": false,
+          "bytes": 479997
+        },
+        {
+          "file": "full/feature-graphic-1024x500.png",
+          "width": 1024,
+          "height": 500,
+          "format": "png",
+          "hasAlpha": false,
+          "bytes": 1077277
+        },
+        {
+          "file": "full/google-play-games-pc/logo-600x400.png",
+          "width": 600,
+          "height": 400,
+          "format": "png",
+          "hasAlpha": true,
+          "bytes": 15867
+        },
+        {
+          "file": "full/google-play-games-pc/feature-graphic-1920x1080.png",
+          "width": 1920,
+          "height": 1080,
+          "format": "png",
+          "hasAlpha": false,
+          "bytes": 3687912
+        }
+      ],
+      "phone": [
+        {
+          "file": "full/phone/01-enter-the-academy.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 307793
+        },
+        {
+          "file": "full/phone/02-online-duels.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 263914
+        },
+        {
+          "file": "full/phone/03-world-rankings.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 202477
+        },
+        {
+          "file": "full/phone/04-fair-ai-fallback.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 185961
+        },
+        {
+          "file": "full/phone/05-authoritative-online-duel.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 277817
+        },
+        {
+          "file": "full/phone/06-ranked-spectating.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 202558
+        },
+        {
+          "file": "full/phone/07-private-room.jpg",
+          "width": 1080,
+          "height": 1920,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 179425
+        }
+      ],
+      "tablet7": [
+        {
+          "file": "full/tablet-7/01-enter-the-academy.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 440944
+        },
+        {
+          "file": "full/tablet-7/02-online-duels.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 354861
+        },
+        {
+          "file": "full/tablet-7/03-world-rankings.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 288328
+        },
+        {
+          "file": "full/tablet-7/04-fair-ai-fallback.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 265432
+        },
+        {
+          "file": "full/tablet-7/05-authoritative-online-duel.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 411728
+        },
+        {
+          "file": "full/tablet-7/06-ranked-spectating.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 284324
+        },
+        {
+          "file": "full/tablet-7/07-private-room.jpg",
+          "width": 1440,
+          "height": 2560,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 257849
+        }
+      ],
+      "tablet10": [
+        {
+          "file": "full/tablet-10/01-enter-the-academy.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 533447
+        },
+        {
+          "file": "full/tablet-10/02-online-duels.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 416715
+        },
+        {
+          "file": "full/tablet-10/03-world-rankings.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 342758
+        },
+        {
+          "file": "full/tablet-10/04-fair-ai-fallback.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 325000
+        },
+        {
+          "file": "full/tablet-10/05-authoritative-online-duel.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 403251
+        },
+        {
+          "file": "full/tablet-10/06-ranked-spectating.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 342823
+        },
+        {
+          "file": "full/tablet-10/07-private-room.jpg",
+          "width": 1620,
+          "height": 2880,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 320015
+        }
+      ],
+      "pc": [
+        {
+          "file": "full/google-play-games-pc/screenshots/01-enter-the-academy.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 280839
+        },
+        {
+          "file": "full/google-play-games-pc/screenshots/02-online-duels.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 232686
+        },
+        {
+          "file": "full/google-play-games-pc/screenshots/03-world-rankings.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 193078
+        },
+        {
+          "file": "full/google-play-games-pc/screenshots/04-fair-ai-fallback.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 192874
+        },
+        {
+          "file": "full/google-play-games-pc/screenshots/05-authoritative-online-duel.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 330855
+        },
+        {
+          "file": "full/google-play-games-pc/screenshots/06-ranked-spectating.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 215116
+        },
+        {
+          "file": "full/google-play-games-pc/screenshots/07-private-room.jpg",
+          "width": 1920,
+          "height": 1080,
+          "format": "jpeg",
+          "hasAlpha": false,
+          "bytes": 178801
+        }
+      ]
+    }
+  }
+}

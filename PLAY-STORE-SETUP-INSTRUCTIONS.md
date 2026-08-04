@@ -1,6 +1,6 @@
 # Google Play Console Setup Instructions
 
-This guide is tailored to the current Aetherglyph 1.13.2 Android releases.
+This guide is tailored to the current Aetherglyph 1.13.3 Android releases.
 Google changes Play Console labels occasionally, but the overall sequence remains
 the same. Official Google references are listed at the end.
 
@@ -11,8 +11,8 @@ the other listing.
 
 | Edition | Play Console name | Package name | Price | Upload file |
 | --- | --- | --- | --- | --- |
-| Full game | Aetherglyph: Arcane Duels | `com.configmancooper.aetherglyph` | **$4.99 paid, one-time purchase** | `dist\Aetherglyph-1.13.2-release.aab` |
-| Demo | Aetherglyph: Arcane Duels Demo | `com.configmancooper.aetherglyph.demo` | **Free** | `dist\Aetherglyph-Demo-1.13.2.aab` |
+| Full game | Aetherglyph: Arcane Duels | `com.configmancooper.aetherglyph` | **$4.99 paid, one-time purchase** | `dist\Aetherglyph-1.13.3-release.aab` |
+| Demo | Aetherglyph: Arcane Duels Demo | `com.configmancooper.aetherglyph.demo` | **Free** | `dist\Aetherglyph-Demo-1.13.3.aab` |
 
 Upload the `.aab` files to Google Play. The APK files in `dist\` are for local
 device testing and should not be used for a new Play Store release.
@@ -46,11 +46,11 @@ This is the quick copy/paste reference for the fields Play Console will request.
 | Subscriptions | No |
 | Login/account required | No |
 | Target audience | 13–15, 16–17, 18 and over |
-| Version code | `11302` |
-| Version name | `1.13.2` |
+| Version code | `11303` |
+| Version name | `1.13.3` |
 | Minimum Android | Android 7.0 / API 24 |
 | Target Android | API 36 |
-| App Bundle | `dist\Aetherglyph-1.13.2-release.aab` |
+| App Bundle | `dist\Aetherglyph-1.13.3-release.aab` |
 | Internet use | Required only for online multiplayer |
 | Online interaction | Real-time 1v1 gameplay; no text or voice chat |
 
@@ -73,11 +73,11 @@ This is the quick copy/paste reference for the fields Play Console will request.
 | Subscriptions | No |
 | Login/account required | No |
 | Target audience | 13–15, 16–17, 18 and over |
-| Version code | `11302` |
-| Version name | `1.13.2-demo` |
+| Version code | `11303` |
+| Version name | `1.13.3-demo` |
 | Minimum Android | Android 7.0 / API 24 |
 | Target Android | API 36 |
-| App Bundle | `dist\Aetherglyph-Demo-1.13.2.aab` |
+| App Bundle | `dist\Aetherglyph-Demo-1.13.3.aab` |
 | Internet use | None; no Internet permission |
 | Online interaction | None |
 
@@ -153,13 +153,16 @@ from `store-listing-android.md`.
 
 Upload these existing graphics:
 
-| Play asset | File | Dimensions |
+| Play asset | File or folder | Dimensions |
 | --- | --- | --- |
-| App icon | `play-assets\icon-512.png` | 512 × 512 |
-| Feature graphic | `play-assets\feature-graphic.png` | 1024 × 500 |
-| Screenshot 1 | `play-assets\screenshots\01-title.png` | 1600 × 900 |
-| Screenshot 2 | `play-assets\screenshots\02-loadout.png` | 1600 × 900 |
-| Screenshot 3 | `play-assets\screenshots\03-duel.png` | 1600 × 900 |
+| App icon | `play-assets\full\app-icon-512.png` | 512 × 512 |
+| Feature graphic | `play-assets\full\feature-graphic-1024x500.png` | 1024 × 500 |
+| Phone screenshots | `play-assets\full\phone\` | 7 × 1080 × 1920 |
+| 7-inch tablet screenshots | `play-assets\full\tablet-7\` | 7 × 1440 × 2560 |
+| 10-inch tablet screenshots | `play-assets\full\tablet-10\` | 7 × 1620 × 2880 |
+| Google Play Games on PC logo | `play-assets\full\google-play-games-pc\logo-600x400.png` | 600 × 400 |
+| Google Play Games on PC feature graphic | `play-assets\full\google-play-games-pc\feature-graphic-1920x1080.png` | 1920 × 1080 |
+| Google Play Games on PC screenshots | `play-assets\full\google-play-games-pc\screenshots\` | 7 × 1920 × 1080 |
 
 Do not add unsupported claims, rankings, sale language, or keyword lists to the
 title or descriptions.
@@ -270,18 +273,18 @@ Start with **Testing → Internal testing**:
    signing key; the local keystore remains the upload key.
 3. Upload:
 
-   `dist\Aetherglyph-1.13.2-release.aab`
+   `dist\Aetherglyph-1.13.3-release.aab`
 
 4. Confirm Play Console displays:
 
    | Field | Expected value |
    | --- | --- |
    | Package | `com.configmancooper.aetherglyph` |
-   | Version code | `11302` |
-   | Version name | `1.13.2` |
+   | Version code | `11303` |
+   | Version name | `1.13.3` |
    | Target API | 36 |
 
-5. Release name: `1.13.2 bot reactions and tutorial guide update`.
+5. Release name: `1.13.3 store artwork and icon update`.
 6. Suggested release notes:
 
    ```text
@@ -322,7 +325,7 @@ tester count or duration. Organization accounts may receive a different path.
 1. Finish every Dashboard and App content task.
 2. Open **Test and release → Production**.
 3. Select **Create new release**.
-4. Add the already uploaded 1.13.2 bundle from the library.
+4. Add the already uploaded 1.13.3 bundle from the library.
 5. Add the release notes above.
 6. Resolve every error; review warnings individually.
 7. Select **Next**, review the release, and start the production rollout.
@@ -378,10 +381,15 @@ duels, private rooms, ranked matchmaking and local-network multiplayer are
 available in the paid Aetherglyph: Arcane Duels app.
 ```
 
-Use `play-assets\demo\icon-512.png` for the demo's 512 × 512 Play Store icon.
-Use `play-assets\demo\FeatureBanner.png` for the demo's 1024 × 500 feature
-graphic. Do not use screenshots that imply online play is included; upload at
-least two offline-game screenshots.
+Use the complete demo upload set under `play-assets\demo\`:
+
+- `app-icon-512.png`
+- `feature-graphic-1024x500.png`
+- Seven offline-only images in each of `phone\`, `tablet-7\`, and `tablet-10\`
+- The logo, text-free feature graphic, and seven screenshots under
+  `google-play-games-pc\`
+
+Do not use full-edition screenshots that imply online play is included.
 
 ### 3. Demo App content answers
 
@@ -416,18 +424,18 @@ communicates through the installed Google Play Store service.
 3. Accept Play App Signing.
 4. Upload:
 
-   `dist\Aetherglyph-Demo-1.13.2.aab`
+   `dist\Aetherglyph-Demo-1.13.3.aab`
 
 5. Confirm:
 
    | Field | Expected value |
    | --- | --- |
    | Package | `com.configmancooper.aetherglyph.demo` |
-   | Version code | `11302` |
-   | Version name | `1.13.2-demo` |
+   | Version code | `11303` |
+   | Version name | `1.13.3-demo` |
    | Target API | 36 |
 
-6. Release name: `1.13.2 demo update`.
+6. Release name: `1.13.3 demo store artwork and icon update`.
 7. Suggested release notes:
 
    ```text
@@ -463,7 +471,7 @@ communicates through the installed Google Play Store service.
 
 For each update:
 
-1. Increase `versionCode` above `11302`.
+1. Increase `versionCode` above `11303`.
 2. Increase `versionName`.
 3. Rebuild the correct signed AAB.
 4. Upload it to the existing listing—never create a replacement app.

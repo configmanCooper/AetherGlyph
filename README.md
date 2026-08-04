@@ -7,7 +7,7 @@ The separate free, offline-only Google Play demo is built with
 
 ## Project status
 
-**Version 1.13.2 — feature complete.** The castle-styled title page now stages an
+**Version 1.13.3 — feature complete.** The castle-styled title page now stages an
 immortal two-wizard hard-AI exhibition using all 36 public spells, with dedicated
 crossfading menu and duel music. Phone joystick gestures add central up/down
 Focus/Brace, extreme-edge Dodge, and double-tap Dodge. The final solo phase
@@ -168,8 +168,8 @@ optional academies, the final exam, medals, and secrets never gate it.
 
 **Capacitor Android / Google Play packaging** stages the no-build web app into a
 Capacitor `webDir` and builds a signable Android App Bundle (app id
-`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 11302 /
-versionName 1.13.2). Both the native package and installable web app offer
+`com.configmancooper.aetherglyph`, API 24 → 36, versionCode 11303 /
+versionName 1.13.3). Both the native package and installable web app offer
 Auto rotate, Portrait, and Landscape choices in Settings. Online play connects to a configurable authoritative service
 (default `https://aetherglyph-server.onrender.com`); localhost/LAN development
 stays same-origin.
@@ -443,7 +443,7 @@ run in the browser and in the app.
   localhost, so Capacitor and dev cache iteration are unaffected.
 - **Capacitor Android project (checked in).** `com.configmancooper.aetherglyph`,
   "Aetherglyph: Arcane Duels", landscape, `minSdk 24` / `compile+target 36`,
-  `versionCode 11302` / `versionName 1.13.2`, HTTPS production traffic plus
+  `versionCode 11303` / `versionName 1.13.3`, HTTPS production traffic plus
   app-validated private-LAN hosting,
   `INTERNET` + `ACCESS_NETWORK_STATE` only, Render navigation allowed, native
   back-button + background/resume, haptics, and user-selected orientation via
@@ -455,7 +455,7 @@ run in the browser and in the app.
   labelled unsigned otherwise) into `dist/`.
 - **Assets + store.** `npm run android:assets` generates the app icon, adaptive
   fore/background, splash, Play 512 icon, and 1024×500 feature graphic;
-  `npm run android:screenshots` renders deterministic phone screenshots. Listing,
+  `npm run android:screenshots` renders complete full/demo phone, tablet, and PC screenshot sets. Listing,
   privacy, account-deletion, and Data Safety material are documented.
 
 Build/sign/publish: see `docs/ANDROID.md` and `PUBLISHING-ANDROID.md`.

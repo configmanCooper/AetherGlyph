@@ -34,8 +34,8 @@ changed to paid.) No ads. No in-app purchases.
 | --- | --- |
 | App id | `com.configmancooper.aetherglyph` |
 | App name | Aetherglyph: Arcane Duels |
-| Version code | `11302` |
-| Version name | `1.13.2` |
+| Version code | `11303` |
+| Version name | `1.13.3` |
 | Minimum Android | 7.0 / API 24 |
 | Target / compile Android | API 36 |
 | Orientation | User-selectable: Auto rotate, Portrait, or Landscape |
@@ -49,14 +49,17 @@ When Google Play reports a newer version, the app shows an Update/Later dialog
 and opens its own Play listing when Update is selected. Sideloaded builds and
 devices without Google Play continue normally without a prompt.
 
-Listing copy is in `store-listing-android.md`. Graphics are generated into
-`play-assets\` (icon 512, feature graphic 1024×500) and screenshots into
-`play-assets\screenshots\`:
+Listing copy is in `store-listing-android.md`. Complete, separate graphics are
+generated under `play-assets\full\` and `play-assets\demo\`, including phone,
+7-inch tablet, 10-inch tablet, and Google Play Games on PC sets:
 
 ```powershell
-npm run android:assets        # app icon, adaptive fg/bg, splash, Play 512, feature graphic
-npm run android:screenshots   # deterministic phone screenshots (needs local Edge/Chrome)
+npm run android:assets         # full/demo launcher, adaptive, splash and PWA icons
+npm run play-assets            # static graphics + every screenshot set (needs Edge/Chrome)
+npm run play-assets:validate   # dimensions, ratios, formats, transparency and sizes
 ```
+
+See `play-assets\README.md` for the exact Play Console upload map.
 
 ## 3. Signing
 

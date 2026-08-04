@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-08-04T04:18:40.256Z",
+  "editions": {
+    "demo": {
+      "phone": [
+        "01-enter-the-academy.jpg",
+        "02-guided-campaign.jpg",
+        "03-spell-roster.jpg",
+        "04-guide-shortcuts.jpg",
+        "05-practice-options.jpg",
+        "06-offline-duel.jpg",
+        "07-glyph-laboratory.jpg"
+      ],
+      "tablet-7": [
+        "01-enter-the-academy.jpg",
+        "02-guided-campaign.jpg",
+        "03-spell-roster.jpg",
+        "04-guide-shortcuts.jpg",
+        "05-practice-options.jpg",
+        "06-offline-duel.jpg",
+        "07-glyph-laboratory.jpg"
+      ],
+      "tablet-10": [
+        "01-enter-the-academy.jpg",
+        "02-guided-campaign.jpg",
+        "03-spell-roster.jpg",
+        "04-guide-shortcuts.jpg",
+        "05-practice-options.jpg",
+        "06-offline-duel.jpg",
+        "07-glyph-laboratory.jpg"
+      ],
+      "pc": [
+        "01-enter-the-academy.jpg",
+        "02-guided-campaign.jpg",
+        "03-spell-roster.jpg",
+        "04-guide-shortcuts.jpg",
+        "05-practice-options.jpg",
+        "06-offline-duel.jpg",
+        "07-glyph-laboratory.jpg"
+      ]
+    },
+    "full": {
+      "phone": [
+        "01-enter-the-academy.jpg",
+        "02-online-duels.jpg",
+        "03-world-rankings.jpg",
+        "04-fair-ai-fallback.jpg",
+        "05-authoritative-online-duel.jpg",
+        "06-ranked-spectating.jpg",
+        "07-private-room.jpg"
+      ],
+      "tablet-7": [
+        "01-enter-the-academy.jpg",
+        "02-online-duels.jpg",
+        "03-world-rankings.jpg",
+        "04-fair-ai-fallback.jpg",
+        "05-authoritative-online-duel.jpg",
+        "06-ranked-spectating.jpg",
+        "07-private-room.jpg"
+      ],
+      "tablet-10": [
+        "01-enter-the-academy.jpg",
+        "02-online-duels.jpg",
+        "03-world-rankings.jpg",
+        "04-fair-ai-fallback.jpg",
+        "05-authoritative-online-duel.jpg",
+        "06-ranked-spectating.jpg",
+        "07-private-room.jpg"
+      ],
+      "pc": [
+        "01-enter-the-academy.jpg",
+        "02-online-duels.jpg",
+        "03-world-rankings.jpg",
+        "04-fair-ai-fallback.jpg",
+        "05-authoritative-online-duel.jpg",
+        "06-ranked-spectating.jpg",
+        "07-private-room.jpg"
+      ]
+    }
+  }
+}

@@ -82,7 +82,7 @@ imports, so every call is a safe no-op in a plain browser:
 ## Android project (`android/`, checked in)
 
 - `variables.gradle`: `minSdk 24`, `compileSdk 36`, `targetSdk 36`.
-- `app/build.gradle`: `versionCode 11302`, `versionName "1.13.2"`; release signing
+- `app/build.gradle`: `versionCode 11303`, `versionName "1.13.3"`; release signing
   read from an ignored `keystore.properties` (unsigned when absent).
 - `AndroidManifest.xml`: `singleTask`, orientation unlocked for the in-app
   Auto/Portrait/Landscape selector,
@@ -101,7 +101,7 @@ imports, so every call is a safe no-op in a plain browser:
 | --- | --- |
 | `npm run stage:web` | Assemble `www/` from the no-build sources |
 | `npm run android:assets` | Generate app icon/adaptive/splash + Play 512 + feature graphic + PWA icons |
-| `npm run android:screenshots` | Deterministic phone screenshots (needs local Edge/Chrome) |
+| `npm run android:screenshots` | Complete full/demo phone, tablet, and PC screenshot sets (needs local Edge/Chrome) |
 | `.\setup-android.ps1` | Accept SDK licenses; create the upload keystore (first run) |
 | `.\sync-android.ps1` | Stage web + `cap sync android` |
 | `.\build-android.ps1` | Stage → sync → Gradle → named artifacts in `dist\` |

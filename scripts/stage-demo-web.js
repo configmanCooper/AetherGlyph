@@ -24,6 +24,12 @@ export function stageDemoWeb({ log = () => {} } = {}) {
   rmSync(DEMO_WWW, { recursive: true, force: true });
   cpSync(WWW, DEMO_WWW, { recursive: true });
 
+  const demoIcons = join(ROOT, 'play-assets', 'demo', 'web-icons');
+  if (!existsSync(demoIcons)) {
+    throw new Error('Demo web icons are missing. Run `npm run android:assets` first.');
+  }
+  cpSync(demoIcons, join(DEMO_WWW, 'client', 'icons'), { recursive: true });
+
   write('client/src/app/edition.js', `export const DEMO_BUILD = true;
 export const DEMO_ONLINE_MESSAGE = ${JSON.stringify(DEMO_MESSAGE)};
 `);
