@@ -56,6 +56,20 @@ try {
     'Thanks for playing the demo! For online functionality, please purchase the full version of Aetherglyph: Arcane Duels';
   if (message !== expected) throw new Error(`Wrong demo online message: ${message}`);
   if (await page.$('#panel-online:not(.hidden)')) throw new Error('Full online panel opened in demo.');
+  const purchaseLink = await page.$eval('#demo-buy-full', (element) => ({
+    href: element.href,
+    target: element.target,
+    text: element.textContent.trim(),
+    visible: element.getBoundingClientRect().width > 0
+      && element.getBoundingClientRect().height > 0,
+  }));
+  if (purchaseLink.href
+      !== 'https://play.google.com/store/apps/details?id=com.configmancooper.aetherglyph'
+      || purchaseLink.target !== '_blank'
+      || !/buy the full version/i.test(purchaseLink.text)
+      || !purchaseLink.visible) {
+    throw new Error(`Demo purchase link is incorrect: ${JSON.stringify(purchaseLink)}`);
+  }
 
   await page.evaluate(() => document.querySelector('#panel-demo-online [data-action="back"]')?.click());
   await page.evaluate(() => document.querySelector('#panel-main [data-action="settings"]')?.click());

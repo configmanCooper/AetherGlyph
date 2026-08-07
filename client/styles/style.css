@@ -142,6 +142,7 @@ body.lefthand .player-panel { left: auto; right: calc(16px + var(--safe-right));
 .menu-btn:active { transform: translateY(1px); }
 .menu-btn.ghost { background: transparent; border-color: rgba(255,255,255,0.2); }
 .menu-btn.danger { background: rgba(210, 55, 75, 0.22); border-color: rgba(255, 93, 115, 0.72); }
+#demo-buy-full { display: block; text-decoration: none; }
 .offline-note { color: var(--accent2); font-size: 12px; margin-top: 16px; }
 .links { font-size: 12px; margin-top: 8px; }
 .links a { color: var(--muted); }
